@@ -2,25 +2,32 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TwoBob Tactics - Tetris Multiplayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TwoBob Tactics - Tetris Multiplayer (Optimized)</title>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script> <!-- ตามด้วย client.js -->
-
+    <script src="client.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #4a5568;
             color: white;
             overflow: hidden;
             height: 100vh;
+            position: fixed;
+            width: 100%;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -34,12 +41,13 @@
         .screen {
             display: none;
             text-align: center;
-            animation: fadeIn 0.5s ease-in;
+            will-change: opacity;
         }
 
+        /* Reduced animations for better performance */
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Menu Screen */
@@ -48,30 +56,25 @@
         }
 
         .game-title {
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: bold;
             margin-bottom: 2rem;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            color: #4ecdc4;
         }
 
         .connection-status {
             margin-bottom: 2rem;
             padding: 10px 20px;
-            border-radius: 25px;
+            border-radius: 10px;
             font-weight: bold;
         }
 
         .connected {
-            background: rgba(76, 175, 80, 0.3);
-            border: 2px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.8);
         }
 
         .disconnected {
-            background: rgba(244, 67, 54, 0.3);
-            border: 2px solid #f44336;
+            background: rgba(244, 67, 54, 0.8);
         }
 
         .menu-buttons {
@@ -87,75 +90,42 @@
             font-size: 1.1rem;
             font-weight: bold;
             border: none;
-            border-radius: 25px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            background: #4ecdc4;
             color: white;
             text-transform: uppercase;
             letter-spacing: 1px;
             text-decoration: none;
             display: inline-block;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            transition: background-color 0.2s ease;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        .btn:hover, .btn:active {
+            background: #45b7b8;
         }
 
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
         }
 
         .btn-single-player {
-            background: linear-gradient(45deg, #ff9500, #ff6b00);
+            background: #ff9500;
         }
 
-        .btn-single-player:hover {
-            background: linear-gradient(45deg, #ffb84d, #ff8533);
+        .btn-single-player:hover, .btn-single-player:active {
+            background: #e6850e;
         }
 
-        /* Waiting Screen */
-        .room-info {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .room-id {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #ffd700;
-            margin-bottom: 1rem;
-        }
-
-        .players-list {
-            list-style: none;
-            margin: 1rem 0;
-        }
-
-        .players-list li {
-            padding: 10px;
-            margin: 5px 0;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-        }
-
-        .players-list li.current-player {
-            background: rgba(255, 215, 0, 0.3);
-            border: 2px solid #ffd700;
-        }
-
-        /* Game Screen */
+        /* Game Screen Optimizations */
         .game-container {
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            gap: 2rem;
+            gap: 1rem;
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -168,25 +138,35 @@
 
         .player-board {
             position: relative;
-            width: 280px;
-            height: 560px;
-            background: rgba(0,0,0,0.8);
-            border: 3px solid #333;
-            border-radius: 10px;
+            width: 200px;
+            height: 400px;
+            background: #2d3748;
+            border: 2px solid #4a5568;
+            border-radius: 5px;
             overflow: hidden;
+            /* Performance optimizations */
+            will-change: transform;
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
         }
 
         .player-board.current-player {
             border-color: #ffd700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
 
         .tetris-block {
             position: absolute;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 2px;
+            border-radius: 1px;
+            /* Performance optimizations */
+            will-change: transform;
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
         }
 
+        /* Simplified colors for better performance */
         .block-i { background: #00f0f0; }
         .block-o { background: #f0f000; }
         .block-t { background: #a000f0; }
@@ -196,12 +176,11 @@
         .block-l { background: #f0a000; }
 
         .player-stats {
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 5px;
             padding: 1rem;
             margin-top: 1rem;
-            min-width: 200px;
-            backdrop-filter: blur(10px);
+            min-width: 180px;
         }
 
         .stat-row {
@@ -225,57 +204,39 @@
         }
 
         .game-over-text {
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: bold;
             color: #ff6b6b;
-            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
         }
 
-        /* Game Over Screen */
-        .winner-announcement {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
-            font-weight: bold;
-        }
-
-        .final-scores {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .score-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 1rem 0;
-            font-size: 1.2rem;
-        }
-
-        /* Mobile Controls */
+        /* Mobile Controls - Optimized */
         .mobile-controls {
             display: none;
             position: fixed;
-            bottom: 20px;
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            border-radius: 15px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
+            background: rgba(45, 55, 72, 0.95);
+            border-radius: 10px;
+            padding: 10px;
+            z-index: 100;
         }
 
         .control-button {
             background: rgba(255,255,255,0.2);
             border: none;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 5px;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 3px;
             color: white;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
+            font-size: 1rem;
+            min-width: 40px;
+            min-height: 40px;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .control-button:active {
@@ -293,10 +254,9 @@
             padding: 15px;
             font-size: 1rem;
             border: none;
-            border-radius: 10px;
+            border-radius: 5px;
             background: rgba(255,255,255,0.1);
             color: white;
-            backdrop-filter: blur(10px);
         }
 
         .form-input::placeholder {
@@ -308,16 +268,69 @@
             background: rgba(255,255,255,0.2);
         }
 
-        /* Responsive Design */
+        /* Optimized Room Info */
+        .room-info {
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .room-id {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 1rem;
+        }
+
+        .players-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .players-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+
+        .players-list li.current-player {
+            background: rgba(255, 215, 0, 0.3);
+            border: 1px solid #ffd700;
+        }
+
+        /* Winner Screen */
+        .winner-announcement {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            font-weight: bold;
+        }
+
+        .final-scores {
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        /* Mobile Optimizations */
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
-                gap: 1rem;
+                gap: 0.5rem;
             }
 
             .player-board {
-                width: 200px;
-                height: 400px;
+                width: 160px;
+                height: 320px;
             }
 
             .game-title {
@@ -327,17 +340,35 @@
             .mobile-controls {
                 display: block;
             }
-        }
 
-        @media (max-width: 480px) {
             .container {
                 padding: 10px;
             }
+        }
 
+        @media (max-width: 480px) {
             .player-board {
-                width: 150px;
-                height: 300px;
+                width: 140px;
+                height: 280px;
             }
+
+            .game-title {
+                font-size: 1.5rem;
+            }
+
+            .btn {
+                font-size: 1rem;
+                padding: 12px 20px;
+            }
+        }
+
+        /* Performance hints */
+        .tetris-block {
+            contain: layout style paint;
+        }
+
+        .player-board {
+            contain: layout style paint;
         }
     </style>
 </head>
@@ -451,18 +482,17 @@
                 </div>
             </div>
 
-            <!-- Mobile Controls -->
+            <!-- Optimized Mobile Controls -->
             <div class="mobile-controls">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button">↶</button>
-                    <button class="control-button">↑</button>
-                    <button class="control-button">💧</button>
-                    <button class="control-button">←</button>
-                    <button class="control-button">↓</button>
-                    <button class="control-button">→</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px;">
+                    <button class="control-button" id="rotate-btn">↻</button>
+                    <button class="control-button" id="up-btn">↑</button>
+                    <button class="control-button" id="drop-btn">💧</button>
                 </div>
-                <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
-                    หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+                    <button class="control-button" id="left-btn">←</button>
+                    <button class="control-button" id="down-btn">↓</button>
+                    <button class="control-button" id="right-btn">→</button>
                 </div>
             </div>
         </div>
@@ -488,25 +518,122 @@
         </div>
     </div>
 
-    <!-- Instructions -->
-    <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
+    <!-- Simplified Instructions -->
+    <div style="position: fixed; bottom: 5px; left: 5px; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 5px; font-size: 0.7rem; max-width: 250px;">
         <strong>การควบคุม:</strong><br>
         ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
-        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
+        📱 มือถือ: ใช้ปุ่มด้านล่าง หรือ swipe
     </div>
 
     <script>
-        // Show create room screen
-        document.getElementById('btn-create-room').addEventListener('click', () => {
+        // Performance optimizations
+        let lastFrameTime = 0;
+        const targetFPS = 60;
+        const frameInterval = 1000 / targetFPS;
+
+        // Throttle function for better performance
+        function throttle(func, limit) {
+            let inThrottle;
+            return function() {
+                const args = arguments;
+                const context = this;
+                if (!inThrottle) {
+                    func.apply(context, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            }
+        }
+
+        // Optimized touch controls
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        
+        const gameArea = document.querySelector('.game-container');
+        
+        if (gameArea) {
+            gameArea.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, { passive: true });
+
+            gameArea.addEventListener('touchend', throttle((e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipe();
+            }, 100), { passive: true });
+        }
+
+        function handleSwipe() {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            const minSwipeDistance = 30;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (Math.abs(deltaX) > minSwipeDistance) {
+                    if (deltaX > 0) {
+                        // Swipe right
+                        simulateKeyPress('ArrowRight');
+                    } else {
+                        // Swipe left
+                        simulateKeyPress('ArrowLeft');
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(deltaY) > minSwipeDistance) {
+                    if (deltaY > 0) {
+                        // Swipe down
+                        simulateKeyPress('ArrowDown');
+                    } else {
+                        // Swipe up
+                        simulateKeyPress('ArrowUp');
+                    }
+                }
+            }
+        }
+
+        function simulateKeyPress(key) {
+            const event = new KeyboardEvent('keydown', { key: key });
+            document.dispatchEvent(event);
+        }
+
+        // Mobile control buttons
+        document.getElementById('left-btn')?.addEventListener('touchstart', () => simulateKeyPress('ArrowLeft'));
+        document.getElementById('right-btn')?.addEventListener('touchstart', () => simulateKeyPress('ArrowRight'));
+        document.getElementById('down-btn')?.addEventListener('touchstart', () => simulateKeyPress('ArrowDown'));
+        document.getElementById('up-btn')?.addEventListener('touchstart', () => simulateKeyPress('ArrowUp'));
+        document.getElementById('rotate-btn')?.addEventListener('touchstart', () => simulateKeyPress('ArrowUp'));
+        document.getElementById('drop-btn')?.addEventListener('touchstart', () => simulateKeyPress(' '));
+
+        // Screen navigation
+        document.getElementById('btn-create-room')?.addEventListener('click', () => {
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('create-room-screen').style.display = 'block';
         });
 
-        // Show join room screen  
-        document.getElementById('btn-join-room').addEventListener('click', () => {
+        document.getElementById('btn-join-room')?.addEventListener('click', () => {
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('join-room-screen').style.display = 'block';
         });
+
+        // Prevent scrolling on mobile
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
     </script>
 </body>
 </html>
