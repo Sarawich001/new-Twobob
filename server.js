@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
 
 // ✅ Fallback สำหรับเส้นทางอื่น (optional)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 // CORS configuration for production and development
 const allowedOrigins = [
