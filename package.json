@@ -1,6 +1,6 @@
 {
   "name": "new-test-twobob",
-  "version": "2.0.0",
+   "version": "2.0.0",
   "description": "Multiplayer Tetris game server optimized for Render deployment",
   "main": "server.js",
   "scripts": {
