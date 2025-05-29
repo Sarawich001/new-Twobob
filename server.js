@@ -8,12 +8,12 @@ const server = http.createServer(app);
 
 
 // ✅ เสิร์ฟไฟล์ static (จาก root directory)
-app.use(express.static(__dirname)); // <== สำคัญ
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ✅ เสิร์ฟ index.html เมื่อเข้า root path "/"
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
 
 // ✅ Fallback สำหรับเส้นทางอื่น (optional)
 app.get('*', (req, res) => {
