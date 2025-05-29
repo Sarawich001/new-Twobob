@@ -5,267 +5,21 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-
-// Render-specific CORS configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://localhost:3000',
-  process.env.RENDER_EXTERNAL_URL,
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
 const io = socketIo(server, {
   cors: {
-    origin: function(origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-      
-      // Check if origin is in allowed list or matches Render patterns
-      if (allowedOrigins.includes(origin) || 
-          origin.includes('onrender.com') ||
-          origin.includes('render.com')) {
-        return callback(null, true);
-      }
-      
-      // For development
-      if (process.env.NODE_ENV !== 'production') {
-        return callback(null, true);
-      }
-      
-      callback(new Error('Not allowed by CORS'));
-    },
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  // Render-optimized settings
-  pingTimeout: 30000,  // Reduced for better connection handling
-  pingInterval: 15000, // More frequent pings for stability
-  upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6,
-  compression: true,
-  transports: ['polling', 'websocket'], // Allow both for better compatibility
-  allowEIO3: true, // Backward compatibility
-  cookie: {
-    name: "tetris-session",
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? "none" : "strict",
-    secure: process.env.NODE_ENV === 'production'
+    origin: "*",
+    methods: ["GET", "POST"]
   }
 });
 
-// Trust proxy for Render
-app.set('trust proxy', 1);
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Security headers for production
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-  }
-  next();
-});
-
-// Serve static files with production-optimized caching
-app.use(express.static(path.join(__dirname, 'public'), {
-  maxAge: process.env.NODE_ENV === 'production' ? '7d' : '1d',
-  etag: true,
-  lastModified: true,
-  setHeaders: (res, filePath) => {
-    // Cache CSS and JS files longer
-    if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
-    }
-  }
-}));
-
-// Fallback to serve index.html for SPA routing
-app.get('*', (req, res, next) => {
-  // Skip API routes
-  if (req.path.startsWith('/health') || req.path.startsWith('/metrics')) {
-    return next();
-  }
-  
-  // Serve index.html for all other routes
-  res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => {
-    if (err) {
-      res.status(404).send('Page not found');
-    }
-  });
-});
-
-// Enhanced performance monitoring for production
-class PerformanceMonitor {
-  constructor() {
-    this.metrics = {
-      activeConnections: 0,
-      totalRooms: 0,
-      messagesPerSecond: 0,
-      averageResponseTime: 0,
-      memoryUsage: 0,
-      cpuUsage: 0,
-      uptime: 0
-    };
-    this.messageCount = 0;
-    this.responseTimeSamples = [];
-    this.maxSamples = 100;
-    
-    // Monitor every 30 seconds in production, 10 seconds in development
-    const interval = process.env.NODE_ENV === 'production' ? 30000 : 10000;
-    setInterval(() => this.updateMetrics(), interval);
-  }
-  
-  recordMessage() {
-    this.messageCount++;
-  }
-  
-  recordResponseTime(time) {
-    this.responseTimeSamples.push(time);
-    if (this.responseTimeSamples.length > this.maxSamples) {
-      this.responseTimeSamples.shift();
-    }
-  }
-  
-  updateMetrics() {
-    const timeWindow = process.env.NODE_ENV === 'production' ? 30 : 10;
-    this.metrics.messagesPerSecond = this.messageCount / timeWindow;
-    this.messageCount = 0;
-    
-    if (this.responseTimeSamples.length > 0) {
-      this.metrics.averageResponseTime = 
-        this.responseTimeSamples.reduce((a, b) => a + b, 0) / this.responseTimeSamples.length;
-    }
-    
-    const memUsage = process.memoryUsage();
-    this.metrics.memoryUsage = memUsage.heapUsed / 1024 / 1024; // MB
-    this.metrics.totalRooms = rooms.size;
-    this.metrics.uptime = process.uptime();
-    
-    // Log only in development or when there are issues
-    if (process.env.NODE_ENV !== 'production' || this.metrics.memoryUsage > 400) {
-      console.log(`📊 Performance Metrics:`, {
-        ...this.metrics,
-        memoryUsage: `${Math.round(this.metrics.memoryUsage)}MB`,
-        uptime: `${Math.round(this.metrics.uptime / 60)}min`
-      });
-    }
-  }
-  
-  getMetrics() {
-    return { 
-      ...this.metrics,
-      timestamp: new Date().toISOString(),
-      nodeVersion: process.version,
-      platform: process.platform,
-      environment: process.env.NODE_ENV || 'development'
-    };
-  }
-}
-
-const monitor = new PerformanceMonitor();
-
-// Production-optimized rate limiting
-class RateLimiter {
-  constructor() {
-    this.limits = new Map();
-    this.actionLimits = {
-      'game-action': { maxRequests: 30, windowMs: 1000 },   // More lenient for production
-      'join-room': { maxRequests: 10, windowMs: 60000 },   // Allow more room joins
-      'create-room': { maxRequests: 5, windowMs: 60000 },
-      'chat-message': { maxRequests: 15, windowMs: 10000 }
-    };
-  }
-  
-  isAllowed(socketId, action) {
-    // Be more lenient in development
-    if (process.env.NODE_ENV !== 'production') {
-      return true;
-    }
-    
-    const limit = this.actionLimits[action];
-    if (!limit) return true;
-    
-    const key = `${socketId}:${action}`;
-    const now = Date.now();
-    
-    if (!this.limits.has(key)) {
-      this.limits.set(key, { count: 1, resetTime: now + limit.windowMs });
-      return true;
-    }
-    
-    const userLimit = this.limits.get(key);
-    
-    if (now > userLimit.resetTime) {
-      userLimit.count = 1;
-      userLimit.resetTime = now + limit.windowMs;
-      return true;
-    }
-    
-    if (userLimit.count < limit.maxRequests) {
-      userLimit.count++;
-      return true;
-    }
-    
-    return false;
-  }
-  
-  cleanup() {
-    const now = Date.now();
-    for (const [key, data] of this.limits.entries()) {
-      if (now > data.resetTime + 60000) {
-        this.limits.delete(key);
-      }
-    }
-  }
-}
-
-const rateLimiter = new RateLimiter();
-
-// Cleanup rate limiter every 5 minutes
-setInterval(() => rateLimiter.cleanup(), 300000);
-
-// Game state with Render optimizations
+// Game state management
 const rooms = new Map();
 const players = new Map();
 
-// Optimized piece pool
-class PiecePool {
-  constructor() {
-    this.pool = [];
-    this.poolSize = 50; // Reduced for better memory usage on Render
-    this.initializePool();
-  }
-  
-  initializePool() {
-    for (let i = 0; i < this.poolSize; i++) {
-      this.pool.push(this.createFreshPiece());
-    }
-  }
-  
-  createFreshPiece() {
-    const pieces = Object.keys(TETROMINOS);
-    const randomPiece = pieces[Math.floor(Math.random() * pieces.length)];
-    return JSON.parse(JSON.stringify(TETROMINOS[randomPiece]));
-  }
-  
-  getPiece() {
-    if (this.pool.length > 0) {
-      return this.pool.pop();
-    }
-    return this.createFreshPiece();
-  }
-  
-  returnPiece(piece) {
-    if (this.pool.length < this.poolSize) {
-      this.pool.push(this.createFreshPiece());
-    }
-  }
-}
-
-const piecePool = new PiecePool();
-
-class OptimizedGameRoom {
+class GameRoom {
   constructor(roomId) {
     this.id = roomId;
     this.players = [];
@@ -273,14 +27,12 @@ class OptimizedGameRoom {
       player1: this.createInitialPlayerState(),
       player2: this.createInitialPlayerState(),
       gameStarted: false,
+      gamePaused: false,
       winner: null,
-      lastUpdate: Date.now()
+      createdAt: Date.now()
     };
-    this.lastBroadcast = 0;
-    this.broadcastThrottle = 33; // ~30 FPS for production stability
-    this.stateChanged = false;
-    this.scheduledBroadcast = null;
-    this.createdAt = Date.now();
+    this.gameTimer = null;
+    this.dropInterval = 1000; // 1 second initially
   }
 
   createInitialPlayerState() {
@@ -288,14 +40,14 @@ class OptimizedGameRoom {
       grid: Array(20).fill().map(() => Array(10).fill(0)),
       currentPiece: null,
       nextPiece: null,
-      currentX: 4,
+      currentX: 0,
       currentY: 0,
       score: 0,
       lines: 0,
       level: 1,
       alive: true,
       ready: false,
-      lastActionTime: 0
+      lastDropTime: Date.now()
     };
   }
 
@@ -303,30 +55,37 @@ class OptimizedGameRoom {
     if (this.players.length >= 2) return false;
     
     const playerNumber = this.players.length + 1;
-    this.players.push({
+    const player = {
       socketId,
       playerName: playerName || `Player ${playerNumber}`,
       playerNumber,
-      joinTime: Date.now()
-    });
+      joinedAt: Date.now()
+    };
     
+    this.players.push(player);
     return playerNumber;
   }
 
   removePlayer(socketId) {
-    this.players = this.players.filter(p => p.socketId !== socketId);
-    if (this.players.length === 0) {
-      if (this.scheduledBroadcast) {
-        clearTimeout(this.scheduledBroadcast);
-        this.scheduledBroadcast = null;
+    const playerIndex = this.players.findIndex(p => p.socketId === socketId);
+    if (playerIndex !== -1) {
+      this.players.splice(playerIndex, 1);
+      
+      // Stop game if in progress
+      if (this.gameState.gameStarted) {
+        this.stopGame();
       }
-      return true;
     }
-    return false;
+    
+    return this.players.length === 0; // Return true if room should be deleted
   }
 
   getPlayer(socketId) {
     return this.players.find(p => p.socketId === socketId);
+  }
+
+  getPlayerByNumber(playerNumber) {
+    return this.players.find(p => p.playerNumber === playerNumber);
   }
 
   isFull() {
@@ -339,77 +98,272 @@ class OptimizedGameRoom {
            this.gameState.player2.ready;
   }
 
-  markStateChanged() {
-    this.stateChanged = true;
-    this.gameState.lastUpdate = Date.now();
-    this.scheduleBroadcast();
+  startGame() {
+    if (!this.bothPlayersReady()) return false;
+    
+    this.gameState.gameStarted = true;
+    this.gameState.gamePaused = false;
+    this.gameState.winner = null;
+    
+    // Initialize both players
+    ['player1', 'player2'].forEach(playerKey => {
+      const state = this.gameState[playerKey];
+      state.currentPiece = createRandomPiece();
+      state.nextPiece = createRandomPiece();
+      state.currentX = 4;
+      state.currentY = 0;
+      state.lastDropTime = Date.now();
+      state.alive = true;
+    });
+    
+    this.startGameLoop();
+    return true;
   }
 
-  scheduleBroadcast() {
-    if (this.scheduledBroadcast) return;
+  stopGame() {
+    this.gameState.gameStarted = false;
+    this.gameState.gamePaused = false;
     
-    const now = Date.now();
-    const timeSinceLastBroadcast = now - this.lastBroadcast;
-    
-    if (timeSinceLastBroadcast >= this.broadcastThrottle) {
-      this.broadcast();
-    } else {
-      const delay = this.broadcastThrottle - timeSinceLastBroadcast;
-      this.scheduledBroadcast = setTimeout(() => {
-        this.broadcast();
-      }, delay);
+    if (this.gameTimer) {
+      clearInterval(this.gameTimer);
+      this.gameTimer = null;
     }
   }
 
-  broadcast() {
-    if (this.stateChanged && this.players.length > 0) {
-      io.to(this.id).emit('game-update', this.gameState);
-      this.lastBroadcast = Date.now();
-      this.stateChanged = false;
-    }
-    this.scheduledBroadcast = null;
+  pauseGame() {
+    this.gameState.gamePaused = true;
+  }
+
+  resumeGame() {
+    this.gameState.gamePaused = false;
   }
 
   resetGame() {
-    // Clean up pieces
-    ['player1', 'player2'].forEach(playerKey => {
-      const player = this.gameState[playerKey];
-      if (player.currentPiece) {
-        piecePool.returnPiece(player.currentPiece);
-      }
-      if (player.nextPiece) {
-        piecePool.returnPiece(player.nextPiece);
-      }
-    });
-
+    this.stopGame();
     this.gameState = {
       player1: this.createInitialPlayerState(),
       player2: this.createInitialPlayerState(),
       gameStarted: false,
+      gamePaused: false,
       winner: null,
-      lastUpdate: Date.now()
+      createdAt: this.gameState.createdAt
     };
-    this.stateChanged = true;
   }
 
-  isValidAction(playerNumber, action, currentTime) {
-    const playerState = this.gameState[`player${playerNumber}`];
-    if (!playerState || !playerState.alive) return false;
-    
-    const timeSinceLastAction = currentTime - playerState.lastActionTime;
-    const minActionInterval = action.type === 'hard-drop' ? 50 : 16;
-    
-    return timeSinceLastAction >= minActionInterval;
+  startGameLoop() {
+    if (this.gameTimer) {
+      clearInterval(this.gameTimer);
+    }
+
+    this.gameTimer = setInterval(() => {
+      if (!this.gameState.gameStarted || this.gameState.gamePaused) {
+        return;
+      }
+
+      let gameUpdated = false;
+      const currentTime = Date.now();
+
+      // Auto-drop pieces for both players
+      ['player1', 'player2'].forEach((playerKey, index) => {
+        const playerState = this.gameState[playerKey];
+        if (!playerState.alive) return;
+
+        const dropTime = Math.max(100, 1000 - (playerState.level - 1) * 50);
+        
+        if (currentTime - playerState.lastDropTime >= dropTime) {
+          if (this.movePlayerPiece(playerKey, 'move-down')) {
+            gameUpdated = true;
+          }
+          playerState.lastDropTime = currentTime;
+        }
+      });
+
+      if (gameUpdated) {
+        io.to(this.id).emit('game-update', this.gameState);
+      }
+    }, 50); // Check every 50ms for smooth gameplay
   }
 
-  // Check if room is stale and should be cleaned up
-  isStale() {
-    const maxAge = 4 * 60 * 60 * 1000; // 4 hours
-    return (Date.now() - this.createdAt) > maxAge && this.players.length === 0;
+  movePlayerPiece(playerKey, action) {
+    const playerState = this.gameState[playerKey];
+    if (!playerState.alive) return false;
+
+    let updated = false;
+
+    switch (action) {
+      case 'move-left':
+        if (canMove(playerState.grid, playerState.currentPiece, playerState.currentX - 1, playerState.currentY)) {
+          playerState.currentX--;
+          updated = true;
+        }
+        break;
+
+      case 'move-right':
+        if (canMove(playerState.grid, playerState.currentPiece, playerState.currentX + 1, playerState.currentY)) {
+          playerState.currentX++;
+          updated = true;
+        }
+        break;
+
+      case 'move-down':
+        if (canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY + 1)) {
+          playerState.currentY++;
+          playerState.score += 1; // Bonus for soft drop
+          updated = true;
+        } else {
+          // Place piece and handle line clearing
+          return this.placePieceAndContinue(playerKey);
+        }
+        break;
+
+      case 'rotate':
+        const rotated = {
+          shape: rotateMatrix(playerState.currentPiece.shape),
+          color: playerState.currentPiece.color
+        };
+        if (canMove(playerState.grid, rotated, playerState.currentX, playerState.currentY)) {
+          playerState.currentPiece.shape = rotated.shape;
+          updated = true;
+        }
+        break;
+
+      case 'hard-drop':
+        let dropDistance = 0;
+        while (canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY + 1)) {
+          playerState.currentY++;
+          dropDistance++;
+        }
+        playerState.score += dropDistance * 2;
+        return this.placePieceAndContinue(playerKey);
+    }
+
+    return updated;
+  }
+
+  placePieceAndContinue(playerKey) {
+    const playerState = this.gameState[playerKey];
+    
+    // Place the piece
+    playerState.grid = placePiece(
+      playerState.grid,
+      playerState.currentPiece,
+      playerState.currentX,
+      playerState.currentY
+    );
+    
+    // Clear completed lines
+    const { grid: newGrid, linesCleared } = clearLines(playerState.grid);
+    playerState.grid = newGrid;
+    playerState.lines += linesCleared;
+    
+    // Calculate score based on lines cleared
+    if (linesCleared > 0) {
+      const lineScore = { 1: 100, 2: 300, 3: 500, 4: 800 };
+      const baseScore = lineScore[linesCleared] || 0;
+      playerState.score += baseScore * playerState.level;
+      
+      // Send attack lines to opponent if multiplayer
+      if (linesCleared > 1) {
+        this.sendAttackLines(playerKey, linesCleared - 1);
+      }
+    }
+    
+    // Update level
+    playerState.level = Math.floor(playerState.lines / 10) + 1;
+    
+    // Check for game over
+    if (playerState.grid[0].some(cell => cell !== 0) || playerState.grid[1].some(cell => cell !== 0)) {
+      playerState.alive = false;
+      this.checkGameEnd();
+      return true;
+    }
+    
+    // Spawn new piece
+    playerState.currentPiece = playerState.nextPiece;
+    playerState.nextPiece = createRandomPiece();
+    playerState.currentX = 4;
+    playerState.currentY = 0;
+    
+    // Check if new piece can be placed
+    if (!canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY)) {
+      playerState.alive = false;
+      this.checkGameEnd();
+    }
+    
+    return true;
+  }
+
+  sendAttackLines(attackerKey, numLines) {
+    const defenderKey = attackerKey === 'player1' ? 'player2' : 'player1';
+    const defenderState = this.gameState[defenderKey];
+    
+    if (!defenderState.alive) return;
+    
+    // Remove lines from top and add garbage lines at bottom
+    defenderState.grid.splice(0, numLines);
+    
+    for (let i = 0; i < numLines; i++) {
+      const garbageLine = Array(10).fill('block-garbage');
+      // Add one random hole in the garbage line
+      const holePosition = Math.floor(Math.random() * 10);
+      garbageLine[holePosition] = 0;
+      defenderState.grid.push(garbageLine);
+    }
+  }
+
+  checkGameEnd() {
+    const player1Alive = this.gameState.player1.alive;
+    const player2Alive = this.gameState.player2.alive;
+    
+    if (!player1Alive && !player2Alive) {
+      // Both players died - highest score wins
+      this.gameState.winner = this.gameState.player1.score >= this.gameState.player2.score ? 1 : 2;
+    } else if (!player1Alive) {
+      this.gameState.winner = 2;
+    } else if (!player2Alive) {
+      this.gameState.winner = 1;
+    } else {
+      return; // Game continues
+    }
+    
+    this.stopGame();
+    
+    io.to(this.id).emit('game-over', {
+      winner: this.gameState.winner,
+      finalScores: {
+        player1: this.gameState.player1.score,
+        player2: this.gameState.player2.score
+      },
+      finalStats: {
+        player1: {
+          score: this.gameState.player1.score,
+          lines: this.gameState.player1.lines,
+          level: this.gameState.player1.level
+        },
+        player2: {
+          score: this.gameState.player2.score,
+          lines: this.gameState.player2.lines,
+          level: this.gameState.player2.level
+        }
+      }
+    });
+  }
+
+  getRoomInfo() {
+    return {
+      id: this.id,
+      players: this.players,
+      gameStarted: this.gameState.gameStarted,
+      gamePaused: this.gameState.gamePaused,
+      playersReady: this.players.filter((_, index) => 
+        this.gameState[`player${index + 1}`]?.ready
+      ).length,
+      createdAt: this.gameState.createdAt
+    };
   }
 }
 
-// Tetris pieces
+// Tetris pieces with updated colors
 const TETROMINOS = {
   I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'block-i' },
   O: { shape: [[1,1],[1,1]], color: 'block-o' },
@@ -420,48 +374,26 @@ const TETROMINOS = {
   L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'block-l' }
 };
 
-// Game logic with limited caching for memory efficiency
-const gameLogicCache = new Map();
-const maxCacheSize = 500; // Reduced cache size for Render
-
 function createRandomPiece() {
-  return piecePool.getPiece();
+  const pieces = Object.keys(TETROMINOS);
+  const randomPiece = pieces[Math.floor(Math.random() * pieces.length)];
+  return JSON.parse(JSON.stringify(TETROMINOS[randomPiece]));
 }
 
 function canMove(grid, piece, newX, newY) {
-  // Skip caching in production to save memory
-  if (process.env.NODE_ENV === 'production') {
-    return checkCollision(grid, piece, newX, newY);
-  }
+  if (!piece || !piece.shape) return false;
   
-  const cacheKey = `${JSON.stringify(grid)}-${JSON.stringify(piece.shape)}-${newX}-${newY}`;
-  
-  if (gameLogicCache.has(cacheKey)) {
-    return gameLogicCache.get(cacheKey);
-  }
-  
-  const result = checkCollision(grid, piece, newX, newY);
-  
-  if (gameLogicCache.size < maxCacheSize) {
-    gameLogicCache.set(cacheKey, result);
-  }
-  
-  return result;
-}
-
-function checkCollision(grid, piece, newX, newY) {
   for (let y = 0; y < piece.shape.length; y++) {
     for (let x = 0; x < piece.shape[y].length; x++) {
       if (piece.shape[y][x]) {
         const gridX = newX + x;
         const gridY = newY + y;
         
-        if (gridX < 0 || gridX >= 10 || gridY >= 20) {
-          return false;
-        }
-        if (gridY >= 0 && grid[gridY][gridX] !== 0) {
-          return false;
-        }
+        // Check boundaries
+        if (gridX < 0 || gridX >= 10 || gridY >= 20) return false;
+        
+        // Check collision with existing pieces (only if within grid)
+        if (gridY >= 0 && grid[gridY] && grid[gridY][gridX] !== 0) return false;
       }
     }
   }
@@ -469,19 +401,21 @@ function checkCollision(grid, piece, newX, newY) {
 }
 
 function placePiece(grid, piece, x, y) {
-  const newGrid = grid.map(row => row.slice());
+  const newGrid = grid.map(row => [...row]);
   
   for (let py = 0; py < piece.shape.length; py++) {
     for (let px = 0; px < piece.shape[py].length; px++) {
       if (piece.shape[py][px]) {
         const gridY = y + py;
         const gridX = x + px;
+        
         if (gridY >= 0 && gridY < 20 && gridX >= 0 && gridX < 10) {
           newGrid[gridY][gridX] = piece.color;
         }
       }
     }
   }
+  
   return newGrid;
 }
 
@@ -491,12 +425,13 @@ function clearLines(grid) {
   
   for (let row = 0; row < 20; row++) {
     if (!grid[row].every(cell => cell !== 0)) {
-      newGrid.push(grid[row].slice());
+      newGrid.push([...grid[row]]);
     } else {
       linesCleared++;
     }
   }
   
+  // Add empty lines at top
   while (newGrid.length < 20) {
     newGrid.unshift(Array(10).fill(0));
   }
@@ -505,6 +440,8 @@ function clearLines(grid) {
 }
 
 function rotateMatrix(matrix) {
+  if (!matrix || matrix.length === 0) return matrix;
+  
   const rows = matrix.length;
   const cols = matrix[0].length;
   const rotated = [];
@@ -519,79 +456,88 @@ function rotateMatrix(matrix) {
   return rotated;
 }
 
-// Periodic cleanup for production stability
-setInterval(() => {
-  // Clean up stale rooms
-  let staleFooms = 0;
+// Utility functions
+function generateRoomId() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function cleanupOldRooms() {
+  const now = Date.now();
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  
   for (const [roomId, room] of rooms.entries()) {
-    if (room.isStale()) {
+    if (now - room.gameState.createdAt > maxAge && room.players.length === 0) {
       rooms.delete(roomId);
-      staleRooms++;
+      console.log(`Cleaned up old room: ${roomId}`);
     }
   }
-  
-  // Clean up cache
-  if (gameLogicCache.size > maxCacheSize) {
-    gameLogicCache.clear();
-  }
-  
-  if (staleRooms > 0) {
-    console.log(`🧹 Cleaned up ${staleRooms} stale rooms`);
-  }
-}, 300000); // Every 5 minutes
+}
 
-// Socket connections with enhanced error handling
+// Run cleanup every hour
+setInterval(cleanupOldRooms, 60 * 60 * 1000);
+
+// Socket.IO connection handling
 io.on('connection', (socket) => {
-  const startTime = Date.now();
-  monitor.metrics.activeConnections++;
-  
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`🔌 Player connected: ${socket.id} (Total: ${monitor.metrics.activeConnections})`);
-  }
+  console.log(`Player connected: ${socket.id}`);
 
-  // Enhanced error handling
-  socket.on('error', (error) => {
-    console.error('Socket error:', error);
+  // Send connection confirmation
+  socket.emit('connected', { socketId: socket.id });
+
+  socket.on('create-room', ({ playerName }) => {
+    try {
+      const roomId = generateRoomId();
+      const room = new GameRoom(roomId);
+      rooms.set(roomId, room);
+      
+      const playerNumber = room.addPlayer(socket.id, playerName);
+      socket.join(roomId);
+      socket.roomId = roomId;
+      
+      players.set(socket.id, { roomId, playerNumber, playerName });
+      
+      socket.emit('room-created', { 
+        roomId, 
+        playerNumber,
+        playerName,
+        roomInfo: room.getRoomInfo()
+      });
+      
+      console.log(`Room ${roomId} created by ${playerName}`);
+    } catch (error) {
+      console.error('Error creating room:', error);
+      socket.emit('error', 'Failed to create room');
+    }
   });
 
   socket.on('join-room', ({ roomId, playerName }) => {
-    const actionStartTime = Date.now();
-    
-    if (!rateLimiter.isAllowed(socket.id, 'join-room')) {
-      socket.emit('error', 'คุณพยายามเข้าร่วมห้องบ่อยเกินไป กรุณารอสักครู่');
-      return;
-    }
-    
-    monitor.recordMessage();
-    
     try {
-      // Clean up previous room
+      // Leave any existing room first
       if (players.has(socket.id)) {
         const oldRoomId = players.get(socket.id).roomId;
-        socket.leave(oldRoomId);
-        if (rooms.has(oldRoomId)) {
-          const shouldDelete = rooms.get(oldRoomId).removePlayer(socket.id);
-          if (shouldDelete) {
-            rooms.delete(oldRoomId);
-          } else {
-            io.to(oldRoomId).emit('player-left');
+        if (oldRoomId && oldRoomId !== roomId) {
+          socket.leave(oldRoomId);
+          if (rooms.has(oldRoomId)) {
+            const shouldDelete = rooms.get(oldRoomId).removePlayer(socket.id);
+            if (shouldDelete) {
+              rooms.delete(oldRoomId);
+            } else {
+              io.to(oldRoomId).emit('player-left', { 
+                playerNumber: players.get(socket.id).playerNumber 
+              });
+            }
           }
         }
       }
 
-      // Validate room ID
-      if (!roomId || roomId.length > 50) {
-        socket.emit('error', 'รหัสห้องไม่ถูกต้อง');
-        return;
-      }
-
-      // Create or join room
+      // Check if room exists
       if (!rooms.has(roomId)) {
-        rooms.set(roomId, new OptimizedGameRoom(roomId));
+        socket.emit('room-not-found');
+        return;
       }
 
       const room = rooms.get(roomId);
       
+      // Check if room is full
       if (room.isFull()) {
         socket.emit('room-full');
         return;
@@ -599,201 +545,227 @@ io.on('connection', (socket) => {
 
       const playerNumber = room.addPlayer(socket.id, playerName);
       socket.join(roomId);
-      
       socket.roomId = roomId;
-      players.set(socket.id, { roomId, playerNumber });
+      
+      players.set(socket.id, { roomId, playerNumber, playerName });
       
       socket.emit('joined-room', { 
         roomId, 
         playerNumber,
-        playerName: playerName || `Player ${playerNumber}`,
-        roomPlayers: room.players 
+        playerName,
+        roomInfo: room.getRoomInfo()
       });
       
       socket.to(roomId).emit('player-joined', { 
-        playerName: playerName || `Player ${playerNumber}`, 
+        playerName, 
         playerNumber,
-        roomPlayers: room.players 
+        roomInfo: room.getRoomInfo()
       });
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`✅ Player ${playerName || 'Unknown'} joined room ${roomId} as Player ${playerNumber}`);
-      }
-      
-      monitor.recordResponseTime(Date.now() - actionStartTime);
-      
+      console.log(`Player ${playerName} joined room ${roomId} as Player ${playerNumber}`);
     } catch (error) {
-      console.error('❌ Error joining room:', error);
-      socket.emit('error', 'เกิดข้อผิดพลาดในการเข้าร่วมห้อง');
+      console.error('Error joining room:', error);
+      socket.emit('error', 'Failed to join room');
     }
   });
 
-  // ... (rest of the socket event handlers remain the same but with better error handling)
-  
   socket.on('player-ready', () => {
-    const actionStartTime = Date.now();
-    monitor.recordMessage();
-    
-    try {
-      const playerInfo = players.get(socket.id);
-      if (!playerInfo) return;
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
 
-      const room = rooms.get(playerInfo.roomId);
-      if (!room) return;
+    const room = rooms.get(playerInfo.roomId);
+    if (!room) return;
 
-      const playerKey = `player${playerInfo.playerNumber}`;
-      room.gameState[playerKey].ready = true;
-      
-      room.gameState[playerKey].currentPiece = createRandomPiece();
-      room.gameState[playerKey].nextPiece = createRandomPiece();
-      room.gameState[playerKey].currentX = 4;
-      room.gameState[playerKey].currentY = 0;
+    const playerKey = `player${playerInfo.playerNumber}`;
+    room.gameState[playerKey].ready = true;
 
-      io.to(playerInfo.roomId).emit('player-ready', { 
-        playerNumber: playerInfo.playerNumber 
-      });
+    io.to(playerInfo.roomId).emit('player-ready', { 
+      playerNumber: playerInfo.playerNumber,
+      roomInfo: room.getRoomInfo()
+    });
 
-      if (room.bothPlayersReady()) {
-        room.gameState.gameStarted = true;
+    if (room.bothPlayersReady()) {
+      if (room.startGame()) {
         io.to(playerInfo.roomId).emit('game-start', room.gameState);
-        
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`🎮 Game started in room ${playerInfo.roomId}`);
-        }
       }
-      
-      monitor.recordResponseTime(Date.now() - actionStartTime);
-    } catch (error) {
-      console.error('Error in player-ready:', error);
     }
   });
 
-  // ... (continue with other socket handlers with similar error handling patterns)
+  socket.on('player-not-ready', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room) return;
+
+    const playerKey = `player${playerInfo.playerNumber}`;
+    room.gameState[playerKey].ready = false;
+
+    io.to(playerInfo.roomId).emit('player-not-ready', { 
+      playerNumber: playerInfo.playerNumber,
+      roomInfo: room.getRoomInfo()
+    });
+  });
+
+  socket.on('request-new-game', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) {
+      socket.emit('error', 'You are not in any room');
+      return;
+    }
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room) {
+      socket.emit('error', 'Room does not exist');
+      return;
+    }
+
+    room.resetGame();
+    io.to(playerInfo.roomId).emit('game-reset', {
+      roomInfo: room.getRoomInfo()
+    });
+    
+    console.log(`Game reset for room ${playerInfo.roomId}`);
+  });
+
+  socket.on('pause-game', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room || !room.gameState.gameStarted) return;
+
+    room.pauseGame();
+    io.to(playerInfo.roomId).emit('game-paused');
+  });
+
+  socket.on('resume-game', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room || !room.gameState.gameStarted) return;
+
+    room.resumeGame();
+    io.to(playerInfo.roomId).emit('game-resumed');
+  });
+
+  socket.on('leave-room', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = rooms.get(playerInfo.roomId);
+    if (room) {
+      const shouldDelete = room.removePlayer(socket.id);
+      socket.leave(playerInfo.roomId);
+      
+      if (shouldDelete) {
+        rooms.delete(playerInfo.roomId);
+        console.log(`Room ${playerInfo.roomId} deleted`);
+      } else {
+        io.to(playerInfo.roomId).emit('player-left', { 
+          playerNumber: playerInfo.playerNumber,
+          roomInfo: room.getRoomInfo()
+        });
+      }
+    }
+    
+    socket.roomId = null;
+    players.delete(socket.id);
+    console.log(`Player left room: ${playerInfo.playerName}`);
+  });
+
+  socket.on('game-action', (action) => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room || !room.gameState.gameStarted || room.gameState.gamePaused) return;
+
+    const playerKey = `player${playerInfo.playerNumber}`;
+    
+    if (room.movePlayerPiece(playerKey, action.type)) {
+      io.to(playerInfo.roomId).emit('game-update', room.gameState);
+    }
+  });
+
+  socket.on('get-room-list', () => {
+    const roomList = Array.from(rooms.values())
+      .filter(room => !room.isFull())
+      .map(room => room.getRoomInfo())
+      .slice(0, 20); // Limit to 20 rooms
+    
+    socket.emit('room-list', roomList);
+  });
+
+  socket.on('get-room-info', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (room) {
+      socket.emit('room-info', room.getRoomInfo());
+    } else {
+      socket.emit('room-not-found');
+    }
+  });
 
   socket.on('disconnect', () => {
-    monitor.metrics.activeConnections--;
+    console.log(`Player disconnected: ${socket.id}`);
     
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`🔌 Player disconnected: ${socket.id} (Total: ${monitor.metrics.activeConnections})`);
-    }
-    
-    try {
-      if (players.has(socket.id)) {
-        const playerInfo = players.get(socket.id);
-        const room = rooms.get(playerInfo.roomId);
-        
-        if (room) {
-          const shouldDelete = room.removePlayer(socket.id);
-          if (shouldDelete) {
-            rooms.delete(playerInfo.roomId);
-          } else {
-            io.to(playerInfo.roomId).emit('player-disconnected', {
-              playerNumber: playerInfo.playerNumber
-            });
-          }
+    if (players.has(socket.id)) {
+      const playerInfo = players.get(socket.id);
+      const room = rooms.get(playerInfo.roomId);
+      
+      if (room) {
+        const shouldDelete = room.removePlayer(socket.id);
+        if (shouldDelete) {
+          rooms.delete(playerInfo.roomId);
+          console.log(`Room ${playerInfo.roomId} deleted due to disconnect`);
+        } else {
+          io.to(playerInfo.roomId).emit('player-disconnected', {
+            playerNumber: playerInfo.playerNumber,
+            playerName: playerInfo.playerName,
+            roomInfo: room.getRoomInfo()
+          });
         }
-        
-        players.delete(socket.id);
       }
-    } catch (error) {
-      console.error('Error handling disconnect:', error);
+      
+      players.delete(socket.id);
     }
     
     socket.roomId = null;
   });
-
-  monitor.recordResponseTime(Date.now() - startTime);
 });
 
-// Health check endpoint for Render
+// Health check endpoint
 app.get('/health', (req, res) => {
-  const health = {
-    status: 'healthy',
-    uptime: process.uptime(),
-    connections: monitor.metrics.activeConnections,
-    rooms: rooms.size,
-    memory: `${Math.round(monitor.metrics.memoryUsage)}MB`,
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  };
-  
-  // Return unhealthy if memory usage is too high
-  if (monitor.metrics.memoryUsage > 450) { // MB
-    health.status = 'unhealthy';
-    health.reason = 'High memory usage';
-  }
-  
-  res.status(health.status === 'healthy' ? 200 : 503).json(health);
-});
-
-// Metrics endpoint
-app.get('/metrics', (req, res) => {
-  res.json(monitor.getMetrics());
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
   res.json({
-    message: 'TwoBob Tactics Server is running!',
-    version: '2.0.0',
-    environment: process.env.NODE_ENV || 'development'
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    activeRooms: rooms.size,
+    activePlayers: players.size
   });
 });
 
-// Graceful shutdown for Render
-const gracefulShutdown = (signal) => {
-  console.log(`🔄 ${signal} received, shutting down gracefully...`);
-  
-  // Stop accepting new connections
-  server.close(() => {
-    console.log('✅ HTTP server closed');
-    
-    // Close all socket connections
-    io.close(() => {
-      console.log('✅ All socket connections closed');
-      process.exit(0);
-    });
+// Server info endpoint
+app.get('/api/stats', (req, res) => {
+  const roomStats = Array.from(rooms.values()).map(room => ({
+    id: room.id,
+    players: room.players.length,
+    gameStarted: room.gameState.gameStarted,
+    createdAt: room.gameState.createdAt
+  }));
+
+  res.json({
+    totalRooms: rooms.size,
+    totalPlayers: players.size,
+    rooms: roomStats
   });
-  
-  // Force close after 30 seconds
-  setTimeout(() => {
-    console.log('❌ Forcing shutdown after timeout');
-    process.exit(1);
-  }, 30000);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Memory management for Render's limited resources
-if (process.env.NODE_ENV === 'production') {
-  setInterval(() => {
-    if (global.gc) {
-      global.gc();
-    }
-  }, 600000); // Every 10 minutes in production
-}
-
+// Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`🚀 TwoBob Tactics Server running on port ${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
-  if (process.env.RENDER_EXTERNAL_URL) {
-    console.log(`🔗 External URL: ${process.env.RENDER_EXTERNAL_URL}`);
-  }
-  
-  console.log(`💡 Health Check: /health`);
-  console.log(`📊 Metrics: /metrics`);
-  console.log(`⚡ Production optimizations enabled`);
+  console.log(`📱 Game URL: http://localhost:${PORT}`);
+  console.log(`📊 Health Check: http://localhost:${PORT}/health`);
+  console.log(`📈 Stats: http://localhost:${PORT}/api/stats`);
 });
