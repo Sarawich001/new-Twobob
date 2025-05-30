@@ -168,7 +168,249 @@ class UltraOptimizedTetrisClient {
       };
     }
   }
+// เพิ่มส่วนนี้ใน constructor ของ UltraOptimizedTetrisClient
+initializeSocket() {
+  // เช็คว่ามี Socket.io library หรือไม่
+  if (typeof io === 'undefined') {
+    console.error('Socket.io library not found! Please include socket.io-client');
+    return;
+  }
 
+  // เชื่อมต่อไปยัง server (ปรับ URL ตามจริง)
+  this.socket = io('http://localhost:3000', {
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    rememberUpgrade: true
+  });
+
+  this.setupSocketEvents();
+}
+
+setupSocketEvents() {
+  // เมื่อเชื่อมต่อสำเร็จ
+  this.socket.on('connect', () => {
+    console.log('Connected to server:', this.socket.id);
+    this.connected = true;
+    this.onConnected();
+  });
+
+  // เมื่อขาดการเชื่อมต่อ
+  this.socket.on('disconnect', (reason) => {
+    console.log('Disconnected:', reason);
+    this.connected = false;
+    this.onDisconnected(reason);
+  });
+
+  // จัดการ connection error
+  this.socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+    this.onConnectionError(error);
+  });
+
+  // Game-specific events
+  this.socket.on('game-state', (gameState) => {
+    this.updateGameState(gameState);
+  });
+
+  this.socket.on('player-joined', (data) => {
+    console.log('Player joined:', data);
+    this.onPlayerJoined(data);
+  });
+
+  this.socket.on('player-left', (data) => {
+    console.log('Player left:', data);
+    this.onPlayerLeft(data);
+  });
+
+  this.socket.on('room-joined', (data) => {
+    this.roomId = data.roomId;
+    this.playerNumber = data.playerNumber;
+    console.log(`Joined room ${this.roomId} as player ${this.playerNumber}`);
+  });
+
+  // Real-time game updates
+  this.socket.on('piece-moved', (data) => {
+    this.handlePieceMove(data);
+  });
+
+  this.socket.on('line-cleared', (data) => {
+    this.handleLineCleared(data);
+    this.playSound('clear');
+  });
+
+  this.socket.on('game-over', (data) => {
+    this.handleGameOver(data);
+    this.playSound('gameOver');
+  });
+
+  // Lag compensation
+  this.socket.on('pong', (data) => {
+    const receiveTime = performance.now();
+    this.lagCompensator.addSample(data.timestamp, receiveTime);
+  });
+}
+
+// Connection callbacks
+onConnected() {
+  // เรียกใช้เมื่อเชื่อมต่อสำเร็จ
+  this.startPingInterval();
+}
+
+onDisconnected(reason) {
+  // จัดการเมื่อขาดการเชื่อมต่อ
+  this.stopPingInterval();
+  
+  if (reason === 'io server disconnect') {
+    // Server บังคับ disconnect - พยายาม reconnect
+    this.socket.connect();
+  }
+}
+
+onConnectionError(error) {
+  // แสดง error message ให้ user
+  console.error('Cannot connect to game server:', error.message);
+}
+
+// Game state management
+updateGameState(gameState) {
+  const oldState = this.gameState;
+  this.gameState = gameState;
+  
+  // Mark dirty regions for efficient rendering
+  this.markDirtyRegions(oldState, gameState);
+  
+  // Client-side prediction validation
+  if (this.clientSidePrediction) {
+    this.validatePredictions(gameState);
+  }
+}
+
+// Network methods
+joinRoom(roomId, playerName) {
+  if (!this.connected) {
+    console.error('Not connected to server');
+    return;
+  }
+
+  this.playerName = playerName;
+  this.socket.emit('join-room', {
+    roomId: roomId,
+    playerName: playerName
+  });
+}
+
+sendMove(moveData) {
+  if (!this.connected) return;
+  
+  // Add client-side prediction
+  if (this.clientSidePrediction) {
+    this.predictMove(moveData);
+  }
+  
+  // Add to network buffer for batching
+  this.optimizedNetworkSend({
+    type: 'move',
+    data: moveData,
+    timestamp: performance.now(),
+    playerId: this.socket.id
+  });
+}
+
+sendRotate() {
+  this.sendMove({ action: 'rotate' });
+  this.playSound('rotate');
+}
+
+sendDrop() {
+  this.sendMove({ action: 'drop' });
+  this.playSound('drop');
+}
+
+sendHorizontalMove(direction) {
+  this.sendMove({ 
+    action: 'move', 
+    direction: direction // 'left' or 'right'
+  });
+  this.playSound('move');
+}
+
+// Ping for lag measurement
+startPingInterval() {
+  this.pingInterval = setInterval(() => {
+    if (this.connected) {
+      this.socket.emit('ping', { timestamp: performance.now() });
+    }
+  }, 1000);
+}
+
+stopPingInterval() {
+  if (this.pingInterval) {
+    clearInterval(this.pingInterval);
+    this.pingInterval = null;
+  }
+}
+
+// Client-side prediction
+predictMove(moveData) {
+  // Apply move immediately on client for responsiveness
+  // Will be validated when server response comes back
+  const prediction = this.applyMoveLocally(moveData);
+  this.inputPredictor.addInput(moveData);
+  
+  return prediction;
+}
+
+validatePredictions(serverState) {
+  // Compare predicted state with server state
+  // Roll back if prediction was wrong
+  if (this.lastPredictedState && 
+      !this.statesMatch(this.lastPredictedState, serverState)) {
+    console.log('Prediction mismatch, rolling back');
+    this.rollbackPrediction(serverState);
+  }
+}
+
+// Utility methods
+markDirtyRegions(oldState, newState) {
+  if (!oldState || !newState) {
+    this.dirtyRegions.add({ full: true });
+    return;
+  }
+  
+  // Compare states and mark changed regions
+  if (oldState.player1?.grid !== newState.player1?.grid) {
+    this.dirtyRegions.add({ 
+      player: 1, 
+      x: 0, 
+      y: 0, 
+      width: 10 * this.TILE_SIZE, 
+      height: 20 * this.TILE_SIZE 
+    });
+  }
+  
+  if (oldState.player2?.grid !== newState.player2?.grid) {
+    this.dirtyRegions.add({ 
+      player: 2, 
+      x: 10 * this.TILE_SIZE + 20, 
+      y: 0, 
+      width: 10 * this.TILE_SIZE, 
+      height: 20 * this.TILE_SIZE 
+    });
+  }
+}
+
+// เรียกใช้ใน initialize method
+initialize() {
+  this.initializeSocket(); // เพิ่มบรรทัดนี้
+  this.initializeRenderer();
+  this.setupAdvancedInputHandling();
+  this.startOptimizedRenderLoop();
+  this.enablePerformanceMonitoring();
+  
+  setInterval(() => this.manageMemory(), 5000);
+  
+  console.log('Ultra-optimized TetrisClient with Socket.io initialized');
+}
   // Async worker communication
   async workerTask(type, data) {
     if (!this.worker) return null;
