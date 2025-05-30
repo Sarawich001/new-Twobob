@@ -1,512 +1,675 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TwoBob Tactics - Tetris Multiplayer</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script> <!-- ตามด้วย client.js -->
+// Client-side game logic
+class TetrisClient {
+  constructor() {
+    this.socket = null;
+    this.roomId = null;
+    this.playerNumber = null;
+    this.playerName = '';
+    this.gameState = null;
+    this.dropInterval = null;
+    this.connected = false;
+    
+    this.TILE_SIZE = 28;
+    this.initializeSocket();
+    this.setupEventListeners();
+    this.createNotificationSystem();
+    
+    // Show connection status
+    this.updateConnectionStatus(false);
+  }
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+  createNotificationSystem() {
+    // Create notification container if it doesn't exist
+    if (!document.getElementById('notification-container')) {
+      const container = document.createElement('div');
+      container.id = 'notification-container';
+      container.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      `;
+      document.body.appendChild(container);
+    }
+  }
+
+  showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      background: ${type === 'error' ? 'rgba(244, 67, 54, 0.9)' : 'rgba(76, 175, 80, 0.9)'};
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-weight: bold;
+      max-width: 300px;
+      word-wrap: break-word;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    const container = document.getElementById('notification-container');
+    container.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+      notification.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      notification.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
         }
+      }, 300);
+    }, 3000);
+  }
 
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            overflow: hidden;
-            height: 100vh;
+  initializeSocket() {
+    this.socket = io();
+    
+    this.socket.on('connect', () => {
+      console.log('Connected to server');
+      this.connected = true;
+      this.updateConnectionStatus(true);
+      this.showNotification('เชื่อมต่อเซิร์ฟเวอร์สำเร็จ');
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      this.connected = false;
+      this.updateConnectionStatus(false);
+      this.showScreen('connection-screen');
+      this.showNotification('การเชื่อมต่อขาดหาย', 'error');
+    });
+
+    this.socket.on('joined-room', (data) => {
+      this.roomId = data.roomId;
+      this.playerNumber = data.playerNumber;
+      this.playerName = data.playerName;
+      this.updateRoomInfo(data.roomPlayers);
+      this.showScreen('waiting-screen');
+      this.showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
+    });
+
+    this.socket.on('player-joined', (data) => {
+      this.updateRoomInfo(data.roomPlayers);
+      this.showNotification('ผู้เล่นใหม่เข้าร่วม');
+    });
+
+    this.socket.on('player-left', () => {
+      this.showNotification('ผู้เล่นอีกคนออกจากห้อง', 'error');
+      this.showScreen('waiting-screen');
+      // Reset ready status when player leaves
+      this.resetReadyState();
+    });
+
+    this.socket.on('player-disconnected', (data) => {
+      this.showNotification(`ผู้เล่น ${data.playerNumber} หลุดการเชื่อมต่อ`, 'error');
+      // Reset ready status when player disconnects
+      this.resetReadyState();
+    });
+
+    this.socket.on('room-full', () => {
+      this.showNotification('ห้องเต็มแล้ว กรุณาลองใหม่อีกครั้ง', 'error');
+      this.showScreen('menu-screen');
+    });
+
+    this.socket.on('player-ready', (data) => {
+      this.updatePlayerReady(data.playerNumber);
+    });
+
+    this.socket.on('game-start', (gameState) => {
+      this.gameState = gameState;
+      this.startGameLoop();
+      this.showScreen('game-screen');
+      this.showNotification('เกมเริ่มแล้ว!');
+    });
+
+    this.socket.on('game-update', (gameState) => {
+      this.gameState = gameState;
+      this.updateGameDisplay();
+    });
+
+    this.socket.on('game-over', (data) => {
+      this.endGame(data);
+    });
+
+    this.socket.on('game-reset', () => {
+      // Reset game state for new round
+      this.gameState = null;
+      this.resetReadyState();
+      this.showScreen('waiting-screen');
+      this.showNotification('🔄 เตรียมตัวสำหรับรอบใหม่!');
+    });
+
+    this.socket.on('error', (message) => {
+      this.showNotification(message, 'error');
+    });
+  }
+
+  setupEventListeners() {
+    // Menu buttons
+    document.getElementById('btn-create-room').addEventListener('click', () => {
+      this.showScreen('create-room-screen');
+    });
+
+    document.getElementById('btn-join-room').addEventListener('click', () => {
+      this.showScreen('join-room-screen');
+    });
+
+    // Room creation
+    document.getElementById('btn-confirm-create').addEventListener('click', () => {
+      this.createRoom();
+    });
+
+    document.getElementById('btn-confirm-join').addEventListener('click', () => {
+      this.joinRoom();
+    });
+
+    // Game controls
+    document.getElementById('btn-ready').addEventListener('click', () => {
+      this.setReady();
+    });
+
+    document.getElementById('btn-leave-room').addEventListener('click', () => {
+      this.leaveRoom();
+    });
+
+    document.getElementById('btn-play-again').addEventListener('click', () => {
+      this.playAgain();
+    });
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      this.handleKeyPress(e);
+    });
+
+    // Touch controls for mobile
+    this.setupTouchControls();
+
+    // Mobile control buttons
+    this.setupMobileButtons();
+  }
+
+  setupMobileButtons() {
+    const buttons = document.querySelectorAll('.control-button');
+    buttons.forEach((button, index) => {
+      button.addEventListener('click', () => {
+        if (!this.gameState || !this.gameState.gameStarted) return;
+        
+        const playerState = this.gameState[`player${this.playerNumber}`];
+        if (!playerState || !playerState.alive) return;
+
+        switch (index) {
+          case 0: // Rotate
+            this.socket.emit('game-action', { type: 'rotate' });
+            break;
+          case 1: // Up/Rotate
+            this.socket.emit('game-action', { type: 'rotate' });
+            break;
+          case 2: // Hard drop
+            this.socket.emit('game-action', { type: 'hard-drop' });
+            break;
+          case 3: // Left
+            this.socket.emit('game-action', { type: 'move-left' });
+            break;
+          case 4: // Down
+            this.socket.emit('game-action', { type: 'move-down' });
+            break;
+          case 5: // Right
+            this.socket.emit('game-action', { type: 'move-right' });
+            break;
         }
+      });
+    });
+  }
 
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
+  // Generate 5-digit random room code
+  generateRoomCode() {
+    return Math.floor(10000 + Math.random() * 90000).toString();
+  }
+
+  createRoom() {
+    const playerName = document.getElementById('create-player-name').value.trim();
+    if (!playerName) {
+      this.showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
+      return;
+    }
+    const roomId = this.generateRoomCode();
+    this.joinGameRoom(roomId, playerName);
+  }
+
+  joinRoom() {
+    const playerName = document.getElementById('join-player-name').value.trim();
+    const roomId = document.getElementById('join-room-id').value.trim();
+    
+    if (!playerName || !roomId) {
+      this.showNotification('กรุณาใส่ข้อมูลให้ครบถ้วน', 'error');
+      return;
+    }
+    
+    // Validate room code format (5 digits)
+    if (!/^\d{5}$/.test(roomId)) {
+      this.showNotification('รหัสห้องต้องเป็นตัวเลข 5 หลัก', 'error');
+      return;
+    }
+    
+    this.joinGameRoom(roomId, playerName);
+  }
+
+  joinGameRoom(roomId, playerName) {
+    if (!this.connected) {
+      this.showNotification('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+      return;
+    }
+    
+    this.socket.emit('join-room', { roomId, playerName });
+  }
+
+  setReady() {
+    this.socket.emit('player-ready');
+    document.getElementById('btn-ready').disabled = true;
+    document.getElementById('btn-ready').textContent = '✅ พร้อมแล้ว';
+    this.showNotification('คุณพร้อมเล่นแล้ว');
+  }
+
+  resetReadyState() {
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn) {
+      readyBtn.disabled = false;
+      readyBtn.textContent = '🎮 พร้อมเล่น';
+    }
+    
+    // Reset ready indicators
+    for (let i = 1; i <= 2; i++) {
+      const indicator = document.getElementById(`ready-indicator-${i}`);
+      if (indicator) {
+        indicator.textContent = `Player ${i}: รอ...`;
+        indicator.style.color = '#666';
+        indicator.style.fontWeight = 'normal';
+      }
+    }
+  }
+
+  leaveRoom() {
+    // Create confirmation modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      backdrop-filter: blur(5px);
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 15px;
+      padding: 30px;
+      text-align: center;
+      color: white;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      max-width: 400px;
+      margin: 20px;
+    `;
+    
+    dialog.innerHTML = `
+      <h3 style="margin-bottom: 20px;">🚪 ออกจากห้อง</h3>
+      <p style="margin-bottom: 30px;">คุณต้องการออกจากห้องหรือไม่?</p>
+      <div style="display: flex; gap: 15px; justify-content: center;">
+        <button id="confirm-leave" style="
+          padding: 12px 25px;
+          background: #f44336;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: all 0.3s ease;
+        ">ออกจากห้อง</button>
+        <button id="cancel-leave" style="
+          padding: 12px 25px;
+          background: rgba(255,255,255,0.2);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: all 0.3s ease;
+        ">ยกเลิก</button>
+      </div>
+    `;
+    
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    // Add hover effects
+    const buttons = dialog.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        btn.style.transform = 'translateY(-2px)';
+        btn.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = 'translateY(0)';
+        btn.style.boxShadow = 'none';
+      });
+    });
+    
+    dialog.querySelector('#confirm-leave').addEventListener('click', () => {
+      this.socket.emit('leave-room');
+      this.roomId = null;
+      this.playerNumber = null;
+      this.gameState = null;
+      this.showScreen('menu-screen');
+      document.body.removeChild(modal);
+      this.showNotification('ออกจากห้องแล้ว');
+    });
+    
+    dialog.querySelector('#cancel-leave').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+  }
+
+  playAgain() {
+    // Clear current game state
+    if (this.dropInterval) {
+      clearInterval(this.dropInterval);
+      this.dropInterval = null;
+    }
+    this.gameState = null;
+    
+    // Reset ready state and go back to waiting screen
+    this.resetReadyState();
+    this.showScreen('waiting-screen');
+    
+    // Request new game from server (if needed)
+    this.socket.emit('request-new-game');
+    
+    // Show notification
+    this.showNotification('🎮 เตรียมตัวสำหรับเกมใหม่!');
+  }
+
+  startGameLoop() {
+    // Clear any existing interval
+    if (this.dropInterval) {
+      clearInterval(this.dropInterval);
+    }
+    
+    this.dropInterval = setInterval(() => {
+      if (this.gameState && this.gameState.gameStarted) {
+        const playerState = this.gameState[`player${this.playerNumber}`];
+        if (playerState && playerState.alive) {
+          this.socket.emit('game-action', { type: 'move-down' });
         }
+      }
+    }, 1000);
+  }
 
-        .screen {
-            display: none;
-            text-align: center;
-            animation: fadeIn 0.5s ease-in;
+  updateGameDisplay() {
+    if (!this.gameState) return;
+
+    // Update player 1 board (left side)
+    this.drawPlayerBoard('player1-board', this.gameState.player1, 1);
+    this.updatePlayerStats('player1-stats', this.gameState.player1);
+
+    // Update player 2 board (right side)  
+    this.drawPlayerBoard('player2-board', this.gameState.player2, 2);
+    this.updatePlayerStats('player2-stats', this.gameState.player2);
+
+    // Highlight current player
+    document.querySelectorAll('.player-board').forEach(board => {
+      board.classList.remove('current-player');
+    });
+    if (this.playerNumber) {
+      const currentBoard = document.getElementById(`player${this.playerNumber}-board`);
+      if (currentBoard) {
+        currentBoard.classList.add('current-player');
+      }
+    }
+  }
+
+  drawPlayerBoard(boardId, playerState, playerNumber) {
+    const boardElement = document.getElementById(boardId);
+    if (!boardElement) return;
+
+    boardElement.innerHTML = '';
+
+    // Draw placed blocks
+    for (let row = 0; row < 20; row++) {
+      for (let col = 0; col < 10; col++) {
+        if (playerState.grid[row][col]) {
+          const block = document.createElement('div');
+          block.className = `tetris-block ${playerState.grid[row][col]}`;
+          block.style.left = (col * this.TILE_SIZE) + 'px';
+          block.style.top = (row * this.TILE_SIZE) + 'px';
+          block.style.width = this.TILE_SIZE + 'px';
+          block.style.height = this.TILE_SIZE + 'px';
+          boardElement.appendChild(block);
         }
+      }
+    }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+    // Draw current falling piece
+    if (playerState.currentPiece && playerState.alive) {
+      for (let row = 0; row < playerState.currentPiece.shape.length; row++) {
+        for (let col = 0; col < playerState.currentPiece.shape[row].length; col++) {
+          if (playerState.currentPiece.shape[row][col]) {
+            const block = document.createElement('div');
+            block.className = `tetris-block ${playerState.currentPiece.color}`;
+            block.style.left = ((playerState.currentX + col) * this.TILE_SIZE) + 'px';
+            block.style.top = ((playerState.currentY + row) * this.TILE_SIZE) + 'px';
+            block.style.width = this.TILE_SIZE + 'px';
+            block.style.height = this.TILE_SIZE + 'px';
+            block.style.opacity = '0.9';
+            block.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
+            boardElement.appendChild(block);
+          }
         }
+      }
+    }
 
-        /* Menu Screen */
-        .menu-screen {
-            display: block;
+    // Show "GAME OVER" overlay if player is dead
+    if (!playerState.alive) {
+      const overlay = document.createElement('div');
+      overlay.className = 'game-over-overlay';
+      overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
+      boardElement.appendChild(overlay);
+    }
+  }
+
+  updatePlayerStats(statsId, playerState) {
+    const statsElement = document.getElementById(statsId);
+    if (!statsElement) return;
+
+    statsElement.querySelector('.score-value').textContent = playerState.score;
+    statsElement.querySelector('.lines-value').textContent = playerState.lines;
+    statsElement.querySelector('.level-value').textContent = playerState.level;
+  }
+
+  handleKeyPress(event) {
+    if (!this.gameState || !this.gameState.gameStarted) return;
+    
+    const playerState = this.gameState[`player${this.playerNumber}`];
+    if (!playerState || !playerState.alive) return;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        this.socket.emit('game-action', { type: 'move-left' });
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        this.socket.emit('game-action', { type: 'move-right' });
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        this.socket.emit('game-action', { type: 'move-down' });
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        this.socket.emit('game-action', { type: 'rotate' });
+        break;
+      case ' ':
+        event.preventDefault();
+        this.socket.emit('game-action', { type: 'hard-drop' });
+        break;
+    }
+  }
+
+  setupTouchControls() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    });
+
+    document.addEventListener('touchend', (e) => {
+      if (!this.gameState || !this.gameState.gameStarted) return;
+
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      const deltaY = e.changedTouches[0].clientY - touchStartY;
+      const threshold = 30;
+
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX > threshold) {
+          this.socket.emit('game-action', { type: 'move-right' });
+        } else if (deltaX < -threshold) {
+          this.socket.emit('game-action', { type: 'move-left' });
         }
-
-        .game-title {
-            font-size: 3rem;
-            font-weight: bold;
-            margin-bottom: 2rem;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      } else {
+        if (deltaY > threshold) {
+          this.socket.emit('game-action', { type: 'hard-drop' });
+        } else if (deltaY < -threshold) {
+          this.socket.emit('game-action', { type: 'rotate' });
         }
+      }
+    });
+  }
 
-        .connection-status {
-            margin-bottom: 2rem;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: bold;
+  endGame(data) {
+    // Clear game loop
+    if (this.dropInterval) {
+      clearInterval(this.dropInterval);
+      this.dropInterval = null;
+    }
+    
+    let message = '';
+    if (data.winner === 'draw') {
+      message = '🤝 เสมอกัน!';
+    } else if (data.winner === this.playerNumber) {
+      message = '🎉 คุณชนะ!';
+    } else {
+      message = '😔 คุณแพ้';
+    }
+
+    document.getElementById('winner-message').textContent = message;
+    document.getElementById('final-score-p1').textContent = data.finalScores.player1;
+    document.getElementById('final-score-p2').textContent = data.finalScores.player2;
+    
+    // Reset play again button
+    const playAgainBtn = document.getElementById('btn-play-again');
+    if (playAgainBtn) {
+      playAgainBtn.disabled = false;
+      playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
+    }
+    
+    this.showScreen('game-over-screen');
+    this.showNotification(message);
+  }
+
+  updateRoomInfo(players) {
+    const roomIdElement = document.getElementById('room-id-display');
+    const playersListElement = document.getElementById('players-list');
+    
+    if (roomIdElement) {
+      roomIdElement.textContent = this.roomId;
+    }
+    
+    if (playersListElement) {
+      playersListElement.innerHTML = '';
+      players.forEach(player => {
+        const li = document.createElement('li');
+        li.textContent = `${player.playerName} (Player ${player.playerNumber})`;
+        if (player.playerNumber === this.playerNumber) {
+          li.classList.add('current-player');
         }
+        playersListElement.appendChild(li);
+      });
+    }
 
-        .connected {
-            background: rgba(76, 175, 80, 0.3);
-            border: 2px solid #4CAF50;
-        }
+    // Enable ready button if room has 2 players
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn && players.length === 2) {
+      readyBtn.disabled = false;
+    }
+  }
 
-        .disconnected {
-            background: rgba(244, 67, 54, 0.3);
-            border: 2px solid #f44336;
-        }
+  updatePlayerReady(playerNumber) {
+    const indicator = document.getElementById(`ready-indicator-${playerNumber}`);
+    if (indicator) {
+      indicator.textContent = `Player ${playerNumber}: ✅ พร้อม`;
+      indicator.style.color = '#4CAF50';
+      indicator.style.fontWeight = 'bold';
+    }
+  }
 
-        .menu-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            max-width: 300px;
-            margin: 0 auto;
-        }
+  updateConnectionStatus(connected) {
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+      statusElement.textContent = connected ? '🟢 เชื่อมต่อแล้ว' : '🔴 ไม่ได้เชื่อมต่อ';
+      statusElement.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
+    }
+  }
 
-        .btn {
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-            color: white;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-decoration: none;
-            display: inline-block;
-        }
+  showScreen(screenId) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(screen => {
+      screen.style.display = 'none';
+    });
+    
+    // Show target screen
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+      targetScreen.style.display = 'block';
+    }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-        }
+    // Reset ready button and state when going back to waiting
+    if (screenId === 'waiting-screen') {
+      this.resetReadyState();
+    }
+  }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
+  showMessage(message) {
+    this.showNotification(message);
+  }
+}
 
-        .btn-single-player {
-            background: linear-gradient(45deg, #ff9500, #ff6b00);
-        }
-
-        .btn-single-player:hover {
-            background: linear-gradient(45deg, #ffb84d, #ff8533);
-        }
-
-        /* Waiting Screen */
-        .room-info {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .room-id {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #ffd700;
-            margin-bottom: 1rem;
-        }
-
-        .players-list {
-            list-style: none;
-            margin: 1rem 0;
-        }
-
-        .players-list li {
-            padding: 10px;
-            margin: 5px 0;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-        }
-
-        .players-list li.current-player {
-            background: rgba(255, 215, 0, 0.3);
-            border: 2px solid #ffd700;
-        }
-
-        /* Game Screen */
-        .game-container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .player-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .player-board {
-            position: relative;
-            width: 280px;
-            height: 560px;
-            background: rgba(0,0,0,0.8);
-            border: 3px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .player-board.current-player {
-            border-color: #ffd700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-        }
-
-        .tetris-block {
-            position: absolute;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 2px;
-        }
-
-        .block-i { background: #00f0f0; }
-        .block-o { background: #f0f000; }
-        .block-t { background: #a000f0; }
-        .block-s { background: #00f000; }
-        .block-z { background: #f00000; }
-        .block-j { background: #0000f0; }
-        .block-l { background: #f0a000; }
-
-        .player-stats {
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-top: 1rem;
-            min-width: 200px;
-            backdrop-filter: blur(10px);
-        }
-
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-weight: bold;
-        }
-
-        .game-over-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        }
-
-        .game-over-text {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #ff6b6b;
-            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
-        }
-
-        /* Game Over Screen */
-        .winner-announcement {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
-            font-weight: bold;
-        }
-
-        .final-scores {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .score-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 1rem 0;
-            font-size: 1.2rem;
-        }
-
-        /* Mobile Controls */
-        .mobile-controls {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            border-radius: 15px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
-        }
-
-        .control-button {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 5px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .control-button:active {
-            background: rgba(255,255,255,0.4);
-            transform: scale(0.95);
-        }
-
-        /* Form Styles */
-        .form-group {
-            margin: 1rem 0;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 15px;
-            font-size: 1rem;
-            border: none;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            backdrop-filter: blur(10px);
-        }
-
-        .form-input::placeholder {
-            color: rgba(255,255,255,0.7);
-        }
-
-        .form-input:focus {
-            outline: 2px solid #4ecdc4;
-            background: rgba(255,255,255,0.2);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .game-container {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .player-board {
-                width: 200px;
-                height: 400px;
-            }
-
-            .game-title {
-                font-size: 2rem;
-            }
-
-            .mobile-controls {
-                display: block;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 10px;
-            }
-
-            .player-board {
-                width: 150px;
-                height: 300px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Menu Screen -->
-        <div id="menu-screen" class="screen menu-screen">
-            <h1 class="game-title">🎮 TwoBob Tactics</h1>
-            <div id="connection-status" class="connection-status disconnected">
-                🔴 ไม่ได้เชื่อมต่อ
-            </div>
-            <div class="menu-buttons">
-                <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
-                <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
-                <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
-            </div>
-        </div>
-
-        <!-- Connection Screen -->
-        <div id="connection-screen" class="screen">
-            <h2>⚠️ การเชื่อมต่อขาดหาย</h2>
-            <p>กำลังพยายามเชื่อมต่อใหม่...</p>
-        </div>
-
-        <!-- Create Room Dialog -->
-        <div id="create-room-screen" class="screen">
-            <h2>🏠 สร้างห้องใหม่</h2>
-            <div class="form-group">
-                <input id="create-player-name" class="form-input" type="text" placeholder="ชื่อผู้เล่น" maxlength="20">
-            </div>
-            <div class="menu-buttons">
-                <button id="btn-confirm-create" class="btn">✅ สร้างห้อง</button>
-                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
-            </div>
-        </div>
-
-        <!-- Join Room Dialog -->
-        <div id="join-room-screen" class="screen">
-            <h2>🚪 เข้าร่วมห้อง</h2>
-            <div class="form-group">
-                <input id="join-player-name" class="form-input" type="text" placeholder="ชื่อผู้เล่น" maxlength="20">
-            </div>
-            <div class="form-group">
-                <input id="join-room-id" class="form-input" type="text" placeholder="รหัสห้อง" maxlength="10">
-            </div>
-            <div class="menu-buttons">
-                <button id="btn-confirm-join" class="btn">✅ เข้าร่วม</button>
-                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
-            </div>
-        </div>
-
-        <!-- Waiting Screen -->
-        <div id="waiting-screen" class="screen">
-            <div class="room-info">
-                <div class="room-id">
-                    ห้อง: <span id="room-id-display">-</span>
-                </div>
-                <h3>ผู้เล่นในห้อง:</h3>
-                <ul id="players-list" class="players-list">
-                </ul>
-                <div id="ready-indicators">
-                    <div id="ready-indicator-1">Player 1: รอ...</div>
-                    <div id="ready-indicator-2">Player 2: รอ...</div>
-                </div>
-            </div>
-            <div class="menu-buttons">
-                <button id="btn-ready" class="btn" disabled>🎮 พร้อมเล่น</button>
-                <button id="btn-leave-room" class="btn">🚪 ออกจากห้อง</button>
-            </div>
-        </div>
-
-        <!-- Game Screen -->
-        <div id="game-screen" class="screen">
-            <div class="game-container">
-                <div class="player-section">
-                    <h3>Player 1</h3>
-                    <div id="player1-board" class="player-board"></div>
-                    <div id="player1-stats" class="player-stats">
-                        <div class="stat-row">
-                            <span>คะแนน:</span>
-                            <span class="score-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>แถว:</span>
-                            <span class="lines-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>เลเวล:</span>
-                            <span class="level-value">1</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="player-section">
-                    <h3>Player 2</h3>
-                    <div id="player2-board" class="player-board"></div>
-                    <div id="player2-stats" class="player-stats">
-                        <div class="stat-row">
-                            <span>คะแนน:</span>
-                            <span class="score-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>แถว:</span>
-                            <span class="lines-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>เลเวล:</span>
-                            <span class="level-value">1</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mobile Controls -->
-            <div class="mobile-controls">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button">↶</button>
-                    <button class="control-button">↑</button>
-                    <button class="control-button">💧</button>
-                    <button class="control-button">←</button>
-                    <button class="control-button">↓</button>
-                    <button class="control-button">→</button>
-                </div>
-                <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
-                    หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
-                </div>
-            </div>
-        </div>
-
-        <!-- Game Over Screen -->
-        <div id="game-over-screen" class="screen">
-            <div id="winner-message" class="winner-announcement">🎉 คุณชนะ!</div>
-            <div class="final-scores">
-                <h3>คะแนนสุดท้าย</h3>
-                <div class="score-row">
-                    <span>Player 1:</span>
-                    <span id="final-score-p1">0</span>
-                </div>
-                <div class="score-row">
-                    <span>Player 2:</span>
-                    <span id="final-score-p2">0</span>
-                </div>
-            </div>
-            <div class="menu-buttons">
-                <button id="btn-play-again" class="btn">🔄 เล่นอีกครั้ง</button>
-                <button onclick="window.location.reload()" class="btn">🏠 กลับเมนู</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Instructions -->
-    <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
-        <strong>การควบคุม:</strong><br>
-        ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
-        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
-    </div>
-
-    <script>
-        // Show create room screen
-        document.getElementById('btn-create-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('create-room-screen').style.display = 'block';
-        });
-
-        // Show join room screen  
-        document.getElementById('btn-join-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('join-room-screen').style.display = 'block';
-        });
-    </script>
-</body>
-</html>
+// Initialize client when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  new TetrisClient();
+});
