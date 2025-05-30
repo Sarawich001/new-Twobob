@@ -1,482 +1,512 @@
-// Optimized Tetris Client with Performance Improvements
-class OptimizedTetrisClient {
-  constructor() {
-    this.socket = null;
-    this.roomId = null;
-    this.playerNumber = null;
-    this.playerName = '';
-    this.gameState = null;
-    this.dropInterval = null;
-    this.connected = false;
-    
-    this.TILE_SIZE = 28;
-    
-    // Performance optimizations
-    this.lastFrameTime = 0;
-    this.targetFPS = 60;
-    this.frameTime = 1000 / this.targetFPS;
-    this.animationFrameId = null;
-    
-    // Input optimization
-    this.keyStates = {};
-    this.lastKeyTime = {};
-    this.keyRepeatDelay = 150; // ms before key repeat starts
-    this.keyRepeatRate = 50;   // ms between key repeats
-    
-    // Rendering optimization
-    this.canvasCache = new Map();
-    this.needsRedraw = { player1: true, player2: true };
-    this.previousGameState = null;
-    
-    // DOM element cache
-    this.cachedElements = {};
-    
-    this.initializeSocket();
-    this.setupEventListeners();
-    this.createNotificationSystem();
-    this.initializeRenderingOptimizations();
-    
-    // Show connection status
-    this.updateConnectionStatus(false);
-  }
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TwoBob Tactics - Tetris Multiplayer</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script> <!-- ตามด้วย client.js -->
 
-  // Cache frequently accessed DOM elements
-  cacheElement(id) {
-    if (!this.cachedElements[id]) {
-      this.cachedElements[id] = document.getElementById(id);
-    }
-    return this.cachedElements[id];
-  }
-
-  // Initialize rendering optimizations
-  initializeRenderingOptimizations() {
-    // Pre-create block elements for object pooling
-    this.blockPool = [];
-    this.poolSize = 200; // Adjust based on needs
-    
-    for (let i = 0; i < this.poolSize; i++) {
-      const block = document.createElement('div');
-      block.className = 'tetris-block';
-      block.style.position = 'absolute';
-      block.style.width = this.TILE_SIZE + 'px';
-      block.style.height = this.TILE_SIZE + 'px';
-      block.style.display = 'none';
-      this.blockPool.push(block);
-    }
-  }
-
-  // Object pooling for blocks
-  getBlockFromPool() {
-    for (let block of this.blockPool) {
-      if (block.style.display === 'none') {
-        return block;
-      }
-    }
-    // If pool is exhausted, create new block
-    const block = document.createElement('div');
-    block.className = 'tetris-block';
-    block.style.position = 'absolute';
-    block.style.width = this.TILE_SIZE + 'px';
-    block.style.height = this.TILE_SIZE + 'px';
-    this.blockPool.push(block);
-    return block;
-  }
-
-  // Return block to pool
-  returnBlockToPool(block) {
-    block.style.display = 'none';
-    block.className = 'tetris-block';
-    if (block.parentNode) {
-      block.parentNode.removeChild(block);
-    }
-  }
-
-  createNotificationSystem() {
-    if (!document.getElementById('notification-container')) {
-      const container = document.createElement('div');
-      container.id = 'notification-container';
-      container.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      `;
-      document.body.appendChild(container);
-    }
-  }
-
-  // Optimized notification with reduced DOM manipulation
-  showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      background: ${type === 'error' ? 'rgba(244, 67, 54, 0.9)' : 'rgba(76, 175, 80, 0.9)'};
-      color: white;
-      padding: 15px 20px;
-      border-radius: 10px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      font-weight: bold;
-      max-width: 300px;
-      word-wrap: break-word;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      will-change: transform;
-    `;
-    notification.textContent = message;
-    
-    const container = this.cacheElement('notification-container');
-    container.appendChild(notification);
-    
-    // Use requestAnimationFrame for smooth animations
-    requestAnimationFrame(() => {
-      notification.style.transform = 'translateX(0)';
-    });
-    
-    // Auto remove with cleanup
-    setTimeout(() => {
-      notification.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      }, 300);
-    }, 3000);
-  }
 
-  initializeSocket() {
-    this.socket = io();
-    
-    this.socket.on('connect', () => {
-      console.log('Connected to server');
-      this.connected = true;
-      this.updateConnectionStatus(true);
-      this.showNotification('เชื่อมต่อเซิร์ฟเวอร์สำเร็จ');
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      this.connected = false;
-      this.updateConnectionStatus(false);
-      this.showScreen('connection-screen');
-      this.showNotification('การเชื่อมต่อขาดหาย', 'error');
-    });
-
-    // ... (other socket events remain the same but with optimized calls)
-    
-    this.socket.on('game-update', (gameState) => {
-      // Only update if game state actually changed
-      if (this.hasGameStateChanged(gameState)) {
-        this.gameState = gameState;
-        this.scheduleRender();
-      }
-    });
-  }
-
-  // Check if game state has meaningful changes
-  hasGameStateChanged(newState) {
-    if (!this.previousGameState) return true;
-    
-    // Deep comparison of relevant game state parts
-    const player1Changed = this.hasPlayerStateChanged(
-      this.previousGameState.player1, 
-      newState.player1
-    );
-    const player2Changed = this.hasPlayerStateChanged(
-      this.previousGameState.player2, 
-      newState.player2
-    );
-    
-    if (player1Changed) this.needsRedraw.player1 = true;
-    if (player2Changed) this.needsRedraw.player2 = true;
-    
-    return player1Changed || player2Changed;
-  }
-
-  hasPlayerStateChanged(oldState, newState) {
-    if (!oldState || !newState) return true;
-    
-    return oldState.score !== newState.score ||
-           oldState.lines !== newState.lines ||
-           oldState.level !== newState.level ||
-           oldState.alive !== newState.alive ||
-           oldState.currentX !== newState.currentX ||
-           oldState.currentY !== newState.currentY ||
-           JSON.stringify(oldState.grid) !== JSON.stringify(newState.grid) ||
-           JSON.stringify(oldState.currentPiece) !== JSON.stringify(newState.currentPiece);
-  }
-
-  // Optimized input handling with key states
-  setupEventListeners() {
-    // Menu buttons (unchanged)
-    this.cacheElement('btn-create-room').addEventListener('click', () => {
-      this.showScreen('create-room-screen');
-    });
-
-    this.cacheElement('btn-join-room').addEventListener('click', () => {
-      this.showScreen('join-room-screen');
-    });
-
-    // Optimized keyboard controls with key state tracking
-    document.addEventListener('keydown', (e) => {
-      this.handleKeyDown(e);
-    });
-
-    document.addEventListener('keyup', (e) => {
-      this.handleKeyUp(e);
-    });
-
-    // ... (other event listeners)
-  }
-
-  handleKeyDown(event) {
-    const key = event.key;
-    const now = Date.now();
-    
-    // Prevent default for game keys
-    if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(key)) {
-      event.preventDefault();
-    }
-    
-    if (!this.gameState || !this.gameState.gameStarted) return;
-    
-    const playerState = this.gameState[`player${this.playerNumber}`];
-    if (!playerState || !playerState.alive) return;
-
-    // Handle key repeat logic
-    if (this.keyStates[key]) {
-      if (now - this.lastKeyTime[key] < this.keyRepeatRate) {
-        return; // Too soon for repeat
-      }
-    } else {
-      this.keyStates[key] = true;
-      this.lastKeyTime[key] = now;
-    }
-
-    this.processKeyAction(key);
-    this.lastKeyTime[key] = now;
-  }
-
-  handleKeyUp(event) {
-    this.keyStates[event.key] = false;
-  }
-
-  processKeyAction(key) {
-    const actionMap = {
-      'ArrowLeft': 'move-left',
-      'ArrowRight': 'move-right',
-      'ArrowDown': 'move-down',
-      'ArrowUp': 'rotate',
-      ' ': 'hard-drop'
-    };
-
-    if (actionMap[key]) {
-      this.socket.emit('game-action', { type: actionMap[key] });
-    }
-  }
-
-  // Optimized game loop with requestAnimationFrame
-  startGameLoop() {
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-    }
-    
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-    
-    // Separate drop logic from rendering
-    this.dropInterval = setInterval(() => {
-      if (this.gameState && this.gameState.gameStarted) {
-        const playerState = this.gameState[`player${this.playerNumber}`];
-        if (playerState && playerState.alive) {
-          this.socket.emit('game-action', { type: 'move-down' });
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
         }
-      }
-    }, 1000);
-    
-    // Start render loop
-    this.renderLoop();
-  }
 
-  renderLoop(currentTime = 0) {
-    const deltaTime = currentTime - this.lastFrameTime;
-    
-    if (deltaTime >= this.frameTime) {
-      this.updateGameDisplay();
-      this.lastFrameTime = currentTime - (deltaTime % this.frameTime);
-    }
-    
-    this.animationFrameId = requestAnimationFrame((time) => this.renderLoop(time));
-  }
-
-  scheduleRender() {
-    if (!this.animationFrameId) {
-      this.animationFrameId = requestAnimationFrame(() => this.renderLoop());
-    }
-  }
-
-  // Optimized game display update with selective rendering
-  updateGameDisplay() {
-    if (!this.gameState) return;
-
-    // Only redraw what needs to be redrawn
-    if (this.needsRedraw.player1) {
-      this.drawPlayerBoard('player1-board', this.gameState.player1, 1);
-      this.updatePlayerStats('player1-stats', this.gameState.player1);
-      this.needsRedraw.player1 = false;
-    }
-
-    if (this.needsRedraw.player2) {
-      this.drawPlayerBoard('player2-board', this.gameState.player2, 2);
-      this.updatePlayerStats('player2-stats', this.gameState.player2);
-      this.needsRedraw.player2 = false;
-    }
-
-    // Update current player highlight (less frequent)
-    this.updateCurrentPlayerHighlight();
-    
-    // Store previous state for comparison
-    this.previousGameState = JSON.parse(JSON.stringify(this.gameState));
-  }
-
-  // Optimized board drawing with object pooling
-  drawPlayerBoard(boardId, playerState, playerNumber) {
-    const boardElement = this.cacheElement(boardId);
-    if (!boardElement) return;
-
-    // Return all current blocks to pool
-    const currentBlocks = boardElement.querySelectorAll('.tetris-block');
-    currentBlocks.forEach(block => this.returnBlockToPool(block));
-
-    // Draw placed blocks
-    for (let row = 0; row < 20; row++) {
-      for (let col = 0; col < 10; col++) {
-        if (playerState.grid[row][col]) {
-          const block = this.getBlockFromPool();
-          block.className = `tetris-block ${playerState.grid[row][col]}`;
-          block.style.left = (col * this.TILE_SIZE) + 'px';
-          block.style.top = (row * this.TILE_SIZE) + 'px';
-          block.style.display = 'block';
-          block.style.opacity = '1';
-          block.style.boxShadow = '';
-          boardElement.appendChild(block);
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
         }
-      }
-    }
 
-    // Draw current falling piece
-    if (playerState.currentPiece && playerState.alive) {
-      for (let row = 0; row < playerState.currentPiece.shape.length; row++) {
-        for (let col = 0; col < playerState.currentPiece.shape[row].length; col++) {
-          if (playerState.currentPiece.shape[row][col]) {
-            const block = this.getBlockFromPool();
-            block.className = `tetris-block ${playerState.currentPiece.color}`;
-            block.style.left = ((playerState.currentX + col) * this.TILE_SIZE) + 'px';
-            block.style.top = ((playerState.currentY + row) * this.TILE_SIZE) + 'px';
-            block.style.display = 'block';
-            block.style.opacity = '0.9';
-            block.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
-            boardElement.appendChild(block);
-          }
+        .screen {
+            display: none;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
         }
-      }
-    }
 
-    // Show "GAME OVER" overlay if player is dead
-    if (!playerState.alive) {
-      const overlay = document.createElement('div');
-      overlay.className = 'game-over-overlay';
-      overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
-      boardElement.appendChild(overlay);
-    }
-  }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-  // Cached stats update to avoid unnecessary DOM queries
-  updatePlayerStats(statsId, playerState) {
-    const statsElement = this.cacheElement(statsId);
-    if (!statsElement) return;
+        /* Menu Screen */
+        .menu-screen {
+            display: block;
+        }
 
-    // Cache stat elements
-    if (!statsElement._scoreElement) {
-      statsElement._scoreElement = statsElement.querySelector('.score-value');
-      statsElement._linesElement = statsElement.querySelector('.lines-value');
-      statsElement._levelElement = statsElement.querySelector('.level-value');
-    }
+        .game-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
 
-    statsElement._scoreElement.textContent = playerState.score;
-    statsElement._linesElement.textContent = playerState.lines;
-    statsElement._levelElement.textContent = playerState.level;
-  }
+        .connection-status {
+            margin-bottom: 2rem;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+        }
 
-  updateCurrentPlayerHighlight() {
-    // Use cached class list manipulation
-    const boards = document.querySelectorAll('.player-board');
-    boards.forEach(board => {
-      board.classList.remove('current-player');
-    });
-    
-    if (this.playerNumber) {
-      const currentBoard = this.cacheElement(`player${this.playerNumber}-board`);
-      if (currentBoard) {
-        currentBoard.classList.add('current-player');
-      }
-    }
-  }
+        .connected {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4CAF50;
+        }
 
-  // Cleanup method for memory management
-  cleanup() {
-    // Clear intervals and animation frames
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-      this.dropInterval = null;
-    }
-    
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-    
-    // Return all blocks to pool
-    this.blockPool.forEach(block => this.returnBlockToPool(block));
-    
-    // Clear caches
-    this.cachedElements = {};
-    this.canvasCache.clear();
-  }
+        .disconnected {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid #f44336;
+        }
 
-  // ... (rest of the methods remain similar but with optimizations applied)
-  
-  endGame(data) {
-    this.cleanup();
-    
-    let message = '';
-    if (data.winner === 'draw') {
-      message = '🤝 เสมอกัน!';
-    } else if (data.winner === this.playerNumber) {
-      message = '🎉 คุณชนะ!';
-    } else {
-      message = '😔 คุณแพ้';
-    }
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 300px;
+            margin: 0 auto;
+        }
 
-    this.cacheElement('winner-message').textContent = message;
-    this.cacheElement('final-score-p1').textContent = data.finalScores.player1;
-    this.cacheElement('final-score-p2').textContent = data.finalScores.player2;
-    
-    const playAgainBtn = this.cacheElement('btn-play-again');
-    if (playAgainBtn) {
-      playAgainBtn.disabled = false;
-      playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
-    }
-    
-    this.showScreen('game-over-screen');
-    this.showNotification(message);
-  }
-}
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+            display: inline-block;
+        }
 
-// Initialize optimized client when page loads
-document.addEventListener('DOMContentLoaded', () => {
-  new OptimizedTetrisClient();
-});
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-single-player {
+            background: linear-gradient(45deg, #ff9500, #ff6b00);
+        }
+
+        .btn-single-player:hover {
+            background: linear-gradient(45deg, #ffb84d, #ff8533);
+        }
+
+        /* Waiting Screen */
+        .room-info {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .room-id {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 1rem;
+        }
+
+        .players-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .players-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .players-list li.current-player {
+            background: rgba(255, 215, 0, 0.3);
+            border: 2px solid #ffd700;
+        }
+
+        /* Game Screen */
+        .game-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .player-board {
+            position: relative;
+            width: 280px;
+            height: 560px;
+            background: rgba(0,0,0,0.8);
+            border: 3px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .player-board.current-player {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .tetris-block {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .block-i { background: #00f0f0; }
+        .block-o { background: #f0f000; }
+        .block-t { background: #a000f0; }
+        .block-s { background: #00f000; }
+        .block-z { background: #f00000; }
+        .block-j { background: #0000f0; }
+        .block-l { background: #f0a000; }
+
+        .player-stats {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1rem;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .game-over-text {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        /* Game Over Screen */
+        .winner-announcement {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            font-weight: bold;
+        }
+
+        .final-scores {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+        }
+
+        /* Mobile Controls */
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin: 1rem 0;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .form-input:focus {
+            outline: 2px solid #4ecdc4;
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .player-board {
+                width: 200px;
+                height: 400px;
+            }
+
+            .game-title {
+                font-size: 2rem;
+            }
+
+            .mobile-controls {
+                display: block;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            .player-board {
+                width: 150px;
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Menu Screen -->
+        <div id="menu-screen" class="screen menu-screen">
+            <h1 class="game-title">🎮 TwoBob Tactics</h1>
+            <div id="connection-status" class="connection-status disconnected">
+                🔴 ไม่ได้เชื่อมต่อ
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
+                <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
+                <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
+            </div>
+        </div>
+
+        <!-- Connection Screen -->
+        <div id="connection-screen" class="screen">
+            <h2>⚠️ การเชื่อมต่อขาดหาย</h2>
+            <p>กำลังพยายามเชื่อมต่อใหม่...</p>
+        </div>
+
+        <!-- Create Room Dialog -->
+        <div id="create-room-screen" class="screen">
+            <h2>🏠 สร้างห้องใหม่</h2>
+            <div class="form-group">
+                <input id="create-player-name" class="form-input" type="text" placeholder="ชื่อผู้เล่น" maxlength="20">
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-confirm-create" class="btn">✅ สร้างห้อง</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
+            </div>
+        </div>
+
+        <!-- Join Room Dialog -->
+        <div id="join-room-screen" class="screen">
+            <h2>🚪 เข้าร่วมห้อง</h2>
+            <div class="form-group">
+                <input id="join-player-name" class="form-input" type="text" placeholder="ชื่อผู้เล่น" maxlength="20">
+            </div>
+            <div class="form-group">
+                <input id="join-room-id" class="form-input" type="text" placeholder="รหัสห้อง" maxlength="10">
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-confirm-join" class="btn">✅ เข้าร่วม</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
+            </div>
+        </div>
+
+        <!-- Waiting Screen -->
+        <div id="waiting-screen" class="screen">
+            <div class="room-info">
+                <div class="room-id">
+                    ห้อง: <span id="room-id-display">-</span>
+                </div>
+                <h3>ผู้เล่นในห้อง:</h3>
+                <ul id="players-list" class="players-list">
+                </ul>
+                <div id="ready-indicators">
+                    <div id="ready-indicator-1">Player 1: รอ...</div>
+                    <div id="ready-indicator-2">Player 2: รอ...</div>
+                </div>
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-ready" class="btn" disabled>🎮 พร้อมเล่น</button>
+                <button id="btn-leave-room" class="btn">🚪 ออกจากห้อง</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="game-container">
+                <div class="player-section">
+                    <h3>Player 1</h3>
+                    <div id="player1-board" class="player-board"></div>
+                    <div id="player1-stats" class="player-stats">
+                        <div class="stat-row">
+                            <span>คะแนน:</span>
+                            <span class="score-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>แถว:</span>
+                            <span class="lines-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>เลเวล:</span>
+                            <span class="level-value">1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="player-section">
+                    <h3>Player 2</h3>
+                    <div id="player2-board" class="player-board"></div>
+                    <div id="player2-stats" class="player-stats">
+                        <div class="stat-row">
+                            <span>คะแนน:</span>
+                            <span class="score-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>แถว:</span>
+                            <span class="lines-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>เลเวล:</span>
+                            <span class="level-value">1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Controls -->
+            <div class="mobile-controls">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <button class="control-button">↶</button>
+                    <button class="control-button">↑</button>
+                    <button class="control-button">💧</button>
+                    <button class="control-button">←</button>
+                    <button class="control-button">↓</button>
+                    <button class="control-button">→</button>
+                </div>
+                <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
+                    หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="screen">
+            <div id="winner-message" class="winner-announcement">🎉 คุณชนะ!</div>
+            <div class="final-scores">
+                <h3>คะแนนสุดท้าย</h3>
+                <div class="score-row">
+                    <span>Player 1:</span>
+                    <span id="final-score-p1">0</span>
+                </div>
+                <div class="score-row">
+                    <span>Player 2:</span>
+                    <span id="final-score-p2">0</span>
+                </div>
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-play-again" class="btn">🔄 เล่นอีกครั้ง</button>
+                <button onclick="window.location.reload()" class="btn">🏠 กลับเมนู</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
+        <strong>การควบคุม:</strong><br>
+        ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
+        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
+    </div>
+
+    <script>
+        // Show create room screen
+        document.getElementById('btn-create-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('create-room-screen').style.display = 'block';
+        });
+
+        // Show join room screen  
+        document.getElementById('btn-join-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('join-room-screen').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
