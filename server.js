@@ -81,7 +81,7 @@ class GameRoom {
            this.gameState.player2.ready;
   }
 
-  // เพิ่มฟังก์ชันสำหรับรีเซ็ตเกม
+  // Reset game state for new round
   resetGame() {
     this.gameState = {
       player1: this.createInitialPlayerState(),
@@ -181,16 +181,20 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', ({ roomId, playerName }) => {
     try {
-      // Leave any existing room
+      // Leave any existing room first
       if (players.has(socket.id)) {
         const oldRoomId = players.get(socket.id).roomId;
-        socket.leave(oldRoomId);
-        if (rooms.has(oldRoomId)) {
-          const shouldDelete = rooms.get(oldRoomId).removePlayer(socket.id);
-          if (shouldDelete) {
-            rooms.delete(oldRoomId);
-          } else {
-            io.to(oldRoomId).emit('player-left');
+        if (oldRoomId) {
+          socket.leave(oldRoomId);
+          if (rooms.has(oldRoomId)) {
+            const oldRoom = rooms.get(oldRoomId);
+            const shouldDelete = oldRoom.removePlayer(socket.id);
+            if (shouldDelete) {
+              rooms.delete(oldRoomId);
+            } else {
+              // Notify remaining players
+              io.to(oldRoomId).emit('player-left');
+            }
           }
         }
       }
@@ -210,11 +214,10 @@ io.on('connection', (socket) => {
       const playerNumber = room.addPlayer(socket.id, playerName);
       socket.join(roomId);
       
-      // เก็บ roomId ใน socket เพื่อใช้ในภายหลัง
-      socket.roomId = roomId;
+      // Store player info
+      players.set(socket.id, { roomId, playerNumber, playerName });
       
-      players.set(socket.id, { roomId, playerNumber });
-      
+      // Send join confirmation to player
       socket.emit('joined-room', { 
         roomId, 
         playerNumber,
@@ -222,6 +225,7 @@ io.on('connection', (socket) => {
         roomPlayers: room.players 
       });
       
+      // Notify other players in room
       socket.to(roomId).emit('player-joined', { 
         playerName, 
         playerNumber,
@@ -231,16 +235,22 @@ io.on('connection', (socket) => {
       console.log(`Player ${playerName} joined room ${roomId} as Player ${playerNumber}`);
     } catch (error) {
       console.error('Error joining room:', error);
-      socket.emit('error', 'Failed to join room');
+      socket.emit('error', 'ไม่สามารถเข้าร่วมห้องได้');
     }
   });
 
   socket.on('player-ready', () => {
     const playerInfo = players.get(socket.id);
-    if (!playerInfo) return;
+    if (!playerInfo) {
+      socket.emit('error', 'คุณไม่ได้อยู่ในห้องใดๆ');
+      return;
+    }
 
     const room = rooms.get(playerInfo.roomId);
-    if (!room) return;
+    if (!room) {
+      socket.emit('error', 'ห้องไม่มีอยู่แล้ว');
+      return;
+    }
 
     const playerKey = `player${playerInfo.playerNumber}`;
     room.gameState[playerKey].ready = true;
@@ -251,41 +261,17 @@ io.on('connection', (socket) => {
     room.gameState[playerKey].currentX = 4;
     room.gameState[playerKey].currentY = 0;
 
+    // Notify all players in room
     io.to(playerInfo.roomId).emit('player-ready', { 
       playerNumber: playerInfo.playerNumber 
     });
 
+    // Start game if both players are ready
     if (room.bothPlayersReady()) {
       room.gameState.gameStarted = true;
       io.to(playerInfo.roomId).emit('game-start', room.gameState);
+      console.log(`Game started in room ${playerInfo.roomId}`);
     }
-  });
-
-  // แก้ไข request-new-game handler
-  socket.on('request-new-game', () => {
-    console.log('Player requested new game');
-    
-    const playerInfo = players.get(socket.id);
-    if (!playerInfo) {
-      socket.emit('error', 'คุณไม่ได้อยู่ในห้องใดๆ');
-      return;
-    }
-
-    const roomId = playerInfo.roomId;
-    const room = rooms.get(roomId);
-    
-    if (!room) {
-      socket.emit('error', 'ห้องไม่มีอยู่แล้ว');
-      return;
-    }
-
-    // รีเซ็ตเกมสถานะ
-    room.resetGame();
-    
-    // ส่งสัญญาณ reset ไปยังผู้เล่นทั้งหมดในห้อง
-    io.to(roomId).emit('game-reset');
-    
-    console.log(`Game reset for room ${roomId}`);
   });
 
   socket.on('leave-room', () => {
@@ -299,14 +285,38 @@ io.on('connection', (socket) => {
       
       if (shouldDelete) {
         rooms.delete(playerInfo.roomId);
+        console.log(`Room ${playerInfo.roomId} deleted`);
       } else {
+        // Notify remaining players
         io.to(playerInfo.roomId).emit('player-left');
       }
     }
     
-    // ล้าง roomId จาก socket
-    socket.roomId = null;
     players.delete(socket.id);
+    console.log(`Player ${playerInfo.playerName} left room ${playerInfo.roomId}`);
+  });
+
+  // Handle new game request (client expects game-reset event)
+  socket.on('request-new-game', () => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) {
+      socket.emit('error', 'คุณไม่ได้อยู่ในห้องใดๆ');
+      return;
+    }
+
+    const room = rooms.get(playerInfo.roomId);
+    if (!room) {
+      socket.emit('error', 'ห้องไม่มีอยู่แล้ว');
+      return;
+    }
+
+    // Reset game state
+    room.resetGame();
+    
+    // Send reset signal to all players in room
+    io.to(playerInfo.roomId).emit('game-reset');
+    
+    console.log(`Game reset requested for room ${playerInfo.roomId}`);
   });
 
   socket.on('game-action', (action) => {
@@ -319,9 +329,10 @@ io.on('connection', (socket) => {
     const playerKey = `player${playerInfo.playerNumber}`;
     const playerState = room.gameState[playerKey];
     
-    if (!playerState.alive) return;
+    if (!playerState || !playerState.alive) return;
 
     let updated = false;
+    let shouldCheckGameOver = false;
 
     switch (action.type) {
       case 'move-left':
@@ -341,44 +352,11 @@ io.on('connection', (socket) => {
       case 'move-down':
         if (canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY + 1)) {
           playerState.currentY++;
+          playerState.score += 1; // Soft drop points
           updated = true;
         } else {
-          // Place piece
-          playerState.grid = placePiece(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY);
-          
-          // Clear lines
-          const { grid: newGrid, linesCleared } = clearLines(playerState.grid);
-          playerState.grid = newGrid;
-          playerState.lines += linesCleared;
-          
-          // Calculate score
-          const lineScore = { 1: 100, 2: 300, 3: 500, 4: 800 };
-          playerState.score += (lineScore[linesCleared] || 0) * playerState.level;
-          playerState.level = Math.floor(playerState.lines / 10) + 1;
-          
-          // Check game over
-          if (playerState.grid[0].some(cell => cell !== 0)) {
-            playerState.alive = false;
-            const otherPlayerKey = playerInfo.playerNumber === 1 ? 'player2' : 'player1';
-            room.gameState.winner = room.gameState[otherPlayerKey].alive ? 
-              (playerInfo.playerNumber === 1 ? 2 : 1) : 'draw';
-            
-            io.to(playerInfo.roomId).emit('game-over', {
-              winner: room.gameState.winner,
-              finalScores: {
-                player1: room.gameState.player1.score,
-                player2: room.gameState.player2.score
-              }
-            });
-            return;
-          }
-          
-          // Spawn new piece
-          playerState.currentPiece = playerState.nextPiece;
-          playerState.nextPiece = createRandomPiece();
-          playerState.currentX = 4;
-          playerState.currentY = 0;
-          
+          // Place piece and handle line clearing
+          shouldCheckGameOver = true;
           updated = true;
         }
         break;
@@ -388,21 +366,126 @@ io.on('connection', (socket) => {
           shape: rotateMatrix(playerState.currentPiece.shape),
           color: playerState.currentPiece.color
         };
-        if (canMove(playerState.grid, rotated, playerState.currentX, playerState.currentY)) {
-          playerState.currentPiece.shape = rotated.shape;
-          updated = true;
+        
+        // Try to rotate, with wall kicks
+        let rotateX = playerState.currentX;
+        let rotateY = playerState.currentY;
+        
+        // Basic wall kick attempts
+        const wallKicks = [
+          [0, 0],   // No kick
+          [-1, 0],  // Left kick
+          [1, 0],   // Right kick
+          [0, -1],  // Up kick
+          [-1, -1], // Left-up kick
+          [1, -1]   // Right-up kick
+        ];
+        
+        for (const [kickX, kickY] of wallKicks) {
+          if (canMove(playerState.grid, rotated, rotateX + kickX, rotateY + kickY)) {
+            playerState.currentPiece.shape = rotated.shape;
+            playerState.currentX = rotateX + kickX;
+            playerState.currentY = rotateY + kickY;
+            updated = true;
+            break;
+          }
         }
         break;
 
       case 'hard-drop':
+        let dropDistance = 0;
         while (canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY + 1)) {
           playerState.currentY++;
-          playerState.score += 2;
+          dropDistance++;
         }
+        playerState.score += dropDistance * 2; // Hard drop points
+        shouldCheckGameOver = true;
         updated = true;
         break;
     }
 
+    // Handle piece placement and line clearing
+    if (shouldCheckGameOver) {
+      // Place the piece
+      playerState.grid = placePiece(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY);
+      
+      // Clear completed lines
+      const { grid: newGrid, linesCleared } = clearLines(playerState.grid);
+      playerState.grid = newGrid;
+      playerState.lines += linesCleared;
+      
+      // Calculate score based on lines cleared
+      if (linesCleared > 0) {
+        const lineScores = { 1: 100, 2: 300, 3: 500, 4: 800 };
+        const baseScore = lineScores[linesCleared] || 0;
+        playerState.score += baseScore * playerState.level;
+      }
+      
+      // Update level
+      playerState.level = Math.floor(playerState.lines / 10) + 1;
+      
+      // Check for game over (blocks at top)
+      if (playerState.grid[0].some(cell => cell !== 0) || playerState.grid[1].some(cell => cell !== 0)) {
+        playerState.alive = false;
+        
+        // Determine winner
+        const otherPlayerNumber = playerInfo.playerNumber === 1 ? 2 : 1;
+        const otherPlayerKey = `player${otherPlayerNumber}`;
+        const otherPlayerState = room.gameState[otherPlayerKey];
+        
+        let winner;
+        if (otherPlayerState.alive) {
+          winner = otherPlayerNumber;
+        } else {
+          winner = 'draw';
+        }
+        
+        room.gameState.winner = winner;
+        
+        // Send game over event
+        io.to(playerInfo.roomId).emit('game-over', {
+          winner: winner,
+          finalScores: {
+            player1: room.gameState.player1.score,
+            player2: room.gameState.player2.score
+          }
+        });
+        
+        console.log(`Game over in room ${playerInfo.roomId}. Winner: ${winner}`);
+        return;
+      }
+      
+      // Spawn new piece
+      playerState.currentPiece = playerState.nextPiece;
+      playerState.nextPiece = createRandomPiece();
+      playerState.currentX = 4;
+      playerState.currentY = 0;
+      
+      // Check if new piece can be placed (another game over condition)
+      if (!canMove(playerState.grid, playerState.currentPiece, playerState.currentX, playerState.currentY)) {
+        playerState.alive = false;
+        
+        const otherPlayerNumber = playerInfo.playerNumber === 1 ? 2 : 1;
+        const otherPlayerKey = `player${otherPlayerNumber}`;
+        const otherPlayerState = room.gameState[otherPlayerKey];
+        
+        let winner = otherPlayerState.alive ? otherPlayerNumber : 'draw';
+        room.gameState.winner = winner;
+        
+        io.to(playerInfo.roomId).emit('game-over', {
+          winner: winner,
+          finalScores: {
+            player1: room.gameState.player1.score,
+            player2: room.gameState.player2.score
+          }
+        });
+        
+        console.log(`Game over in room ${playerInfo.roomId}. Winner: ${winner}`);
+        return;
+      }
+    }
+
+    // Send game update if anything changed
     if (updated) {
       io.to(playerInfo.roomId).emit('game-update', room.gameState);
     }
@@ -411,15 +494,17 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
     
-    if (players.has(socket.id)) {
-      const playerInfo = players.get(socket.id);
+    const playerInfo = players.get(socket.id);
+    if (playerInfo) {
       const room = rooms.get(playerInfo.roomId);
       
       if (room) {
         const shouldDelete = room.removePlayer(socket.id);
         if (shouldDelete) {
           rooms.delete(playerInfo.roomId);
+          console.log(`Room ${playerInfo.roomId} deleted due to disconnect`);
         } else {
+          // Notify remaining players
           io.to(playerInfo.roomId).emit('player-disconnected', {
             playerNumber: playerInfo.playerNumber
           });
@@ -427,15 +512,32 @@ io.on('connection', (socket) => {
       }
       
       players.delete(socket.id);
+      console.log(`Player ${playerInfo.playerName} disconnected from room ${playerInfo.roomId}`);
     }
-    
-    // ล้าง roomId จาก socket
-    socket.roomId = null;
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 TwoBob Tactics Server running on port ${PORT}`);
-  console.log(`📱 Game URL: http://localhost:${PORT}`);
+  console.log(`🎮 Tetris Server running on port ${PORT}`);
+  console.log(`🌐 Game URL: http://localhost:${PORT}`);
+  console.log(`📊 Active rooms: ${rooms.size}`);
 });
+
+// Cleanup empty rooms periodically
+setInterval(() => {
+  const emptyRooms = [];
+  for (const [roomId, room] of rooms.entries()) {
+    if (room.players.length === 0) {
+      emptyRooms.push(roomId);
+    }
+  }
+  
+  emptyRooms.forEach(roomId => {
+    rooms.delete(roomId);
+  });
+  
+  if (emptyRooms.length > 0) {
+    console.log(`Cleaned up ${emptyRooms.length} empty rooms`);
+  }
+}, 60000); // Check every minute
