@@ -1,4 +1,4 @@
-// Client-side game logic
+// Optimized Client-side game logic
 class TetrisClient {
   constructor() {
     this.socket = null;
@@ -9,18 +9,167 @@ class TetrisClient {
     this.dropInterval = null;
     this.connected = false;
     
+    // Performance optimizations
     this.TILE_SIZE = 28;
+    this.renderRequestId = null;
+    this.lastRenderTime = 0;
+    this.FPS_LIMIT = 60;
+    this.FRAME_TIME = 1000 / this.FPS_LIMIT;
+    
+    // Input throttling
+    this.lastInputTime = 0;
+    this.INPUT_THROTTLE = 50; // 20 inputs per second max
+    this.inputBuffer = [];
+    
+    // Cache DOM elements
+    this.cachedElements = new Map();
+    this.boardCache = new Map();
+    
+    // Pre-create block elements pool
+    this.blockPool = [];
+    this.MAX_POOL_SIZE = 200;
+    this.initializeBlockPool();
+    
+    // Connection retry logic
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
+    
     this.initializeSocket();
     this.setupEventListeners();
     this.createNotificationSystem();
+    this.cacheCommonElements();
     
     // Show connection status
     this.updateConnectionStatus(false);
+    
+    // Start render loop
+    this.startRenderLoop();
+  }
+
+  // Pre-create block elements for better performance
+  initializeBlockPool() {
+    for (let i = 0; i < this.MAX_POOL_SIZE; i++) {
+      const block = document.createElement('div');
+      block.className = 'tetris-block';
+      block.style.position = 'absolute';
+      block.style.width = this.TILE_SIZE + 'px';
+      block.style.height = this.TILE_SIZE + 'px';
+      block.style.display = 'none';
+      this.blockPool.push(block);
+    }
+  }
+
+  getBlockFromPool() {
+    if (this.blockPool.length > 0) {
+      const block = this.blockPool.pop();
+      block.style.display = 'block';
+      return block;
+    }
+    
+    // Create new block if pool is empty
+    const block = document.createElement('div');
+    block.className = 'tetris-block';
+    block.style.position = 'absolute';
+    block.style.width = this.TILE_SIZE + 'px';
+    block.style.height = this.TILE_SIZE + 'px';
+    return block;
+  }
+
+  returnBlockToPool(block) {
+    if (this.blockPool.length < this.MAX_POOL_SIZE) {
+      block.style.display = 'none';
+      block.className = 'tetris-block';
+      block.style.opacity = '';
+      block.style.boxShadow = '';
+      this.blockPool.push(block);
+    }
+  }
+
+  // Cache frequently accessed DOM elements
+  cacheCommonElements() {
+    const elementsToCache = [
+      'player1-board', 'player2-board',
+      'player1-stats', 'player2-stats',
+      'connection-status', 'notification-container',
+      'btn-ready', 'room-id-display', 'players-list'
+    ];
+    
+    elementsToCache.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        this.cachedElements.set(id, element);
+      }
+    });
+  }
+
+  getCachedElement(id) {
+    if (this.cachedElements.has(id)) {
+      return this.cachedElements.get(id);
+    }
+    
+    const element = document.getElementById(id);
+    if (element) {
+      this.cachedElements.set(id, element);
+    }
+    return element;
+  }
+
+  // Optimized render loop with frame limiting
+  startRenderLoop() {
+    const render = (currentTime) => {
+      if (currentTime - this.lastRenderTime >= this.FRAME_TIME) {
+        this.processInputBuffer();
+        if (this.gameState) {
+          this.updateGameDisplay();
+        }
+        this.lastRenderTime = currentTime;
+      }
+      this.renderRequestId = requestAnimationFrame(render);
+    };
+    
+    this.renderRequestId = requestAnimationFrame(render);
+  }
+
+  // Input buffering and throttling
+  processInputBuffer() {
+    const now = Date.now();
+    if (now - this.lastInputTime < this.INPUT_THROTTLE) {
+      return;
+    }
+    
+    if (this.inputBuffer.length > 0) {
+      // Process only the latest input of each type
+      const latestInputs = new Map();
+      
+      this.inputBuffer.forEach(input => {
+        latestInputs.set(input.type, input);
+      });
+      
+      latestInputs.forEach(input => {
+        if (this.socket && this.connected) {
+          this.socket.emit('game-action', input);
+        }
+      });
+      
+      this.inputBuffer = [];
+      this.lastInputTime = now;
+    }
+  }
+
+  queueInput(actionType) {
+    // Don't queue duplicate actions
+    const existingIndex = this.inputBuffer.findIndex(input => input.type === actionType);
+    if (existingIndex !== -1) {
+      return; // Input already queued
+    }
+    
+    this.inputBuffer.push({ type: actionType });
   }
 
   createNotificationSystem() {
     // Create notification container if it doesn't exist
-    if (!document.getElementById('notification-container')) {
+    if (!this.getCachedElement('notification-container')) {
       const container = document.createElement('div');
       container.id = 'notification-container';
       container.style.cssText = `
@@ -31,8 +180,10 @@ class TetrisClient {
         display: flex;
         flex-direction: column;
         gap: 10px;
+        pointer-events: none;
       `;
       document.body.appendChild(container);
+      this.cachedElements.set('notification-container', container);
     }
   }
 
@@ -50,70 +201,106 @@ class TetrisClient {
       word-wrap: break-word;
       transform: translateX(100%);
       transition: transform 0.3s ease;
+      pointer-events: auto;
     `;
     notification.textContent = message;
     
-    const container = document.getElementById('notification-container');
-    container.appendChild(notification);
-    
-    // Animate in
-    setTimeout(() => {
-      notification.style.transform = 'translateX(0)';
-    }, 10);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      notification.style.transform = 'translateX(100%)';
+    const container = this.getCachedElement('notification-container');
+    if (container) {
+      container.appendChild(notification);
+      
+      // Animate in
+      requestAnimationFrame(() => {
+        notification.style.transform = 'translateX(0)';
+      });
+      
+      // Auto remove after 3 seconds
       setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 3000);
+    }
   }
 
   initializeSocket() {
-    this.socket = io();
+    this.socket = io({
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      rememberUpgrade: true,
+      timeout: 5000,
+      forceNew: false
+    });
     
+    this.setupSocketHandlers();
+  }
+
+  setupSocketHandlers() {
     this.socket.on('connect', () => {
       console.log('Connected to server');
       this.connected = true;
+      this.reconnectAttempts = 0;
       this.updateConnectionStatus(true);
       this.showNotification('เชื่อมต่อเซิร์ฟเวอร์สำเร็จ');
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
       this.connected = false;
       this.updateConnectionStatus(false);
       this.showScreen('connection-screen');
       this.showNotification('การเชื่อมต่อขาดหาย', 'error');
+      
+      // Auto-reconnect logic
+      if (reason === 'io server disconnect') {
+        // Server disconnected the client, don't auto-reconnect
+        return;
+      }
+      
+      this.attemptReconnect();
     });
 
+    this.socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      this.connected = false;
+      this.updateConnectionStatus(false);
+      this.attemptReconnect();
+    });
+
+    // Game event handlers with error handling
     this.socket.on('joined-room', (data) => {
-      this.roomId = data.roomId;
-      this.playerNumber = data.playerNumber;
-      this.playerName = data.playerName;
-      this.updateRoomInfo(data.roomPlayers);
-      this.showScreen('waiting-screen');
-      this.showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
+      try {
+        this.roomId = data.roomId;
+        this.playerNumber = data.playerNumber;
+        this.playerName = data.playerName;
+        this.updateRoomInfo(data.roomPlayers);
+        this.showScreen('waiting-screen');
+        this.showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
+      } catch (error) {
+        console.error('Error handling joined-room:', error);
+      }
     });
 
     this.socket.on('player-joined', (data) => {
-      this.updateRoomInfo(data.roomPlayers);
-      this.showNotification('ผู้เล่นใหม่เข้าร่วม');
+      try {
+        this.updateRoomInfo(data.roomPlayers);
+        this.showNotification('ผู้เล่นใหม่เข้าร่วม');
+      } catch (error) {
+        console.error('Error handling player-joined:', error);
+      }
     });
 
     this.socket.on('player-left', () => {
       this.showNotification('ผู้เล่นอีกคนออกจากห้อง', 'error');
       this.showScreen('waiting-screen');
-      // Reset ready status when player leaves
       this.resetReadyState();
     });
 
     this.socket.on('player-disconnected', (data) => {
       this.showNotification(`ผู้เล่น ${data.playerNumber} หลุดการเชื่อมต่อ`, 'error');
-      // Reset ready status when player disconnects
       this.resetReadyState();
     });
 
@@ -133,9 +320,10 @@ class TetrisClient {
       this.showNotification('เกมเริ่มแล้ว!');
     });
 
+    // Optimized game-update handler
     this.socket.on('game-update', (gameState) => {
+      // Update state immediately, rendering will be handled by the render loop
       this.gameState = gameState;
-      this.updateGameDisplay();
     });
 
     this.socket.on('game-over', (data) => {
@@ -143,7 +331,6 @@ class TetrisClient {
     });
 
     this.socket.on('game-reset', () => {
-      // Reset game state for new round
       this.gameState = null;
       this.resetReadyState();
       this.showScreen('waiting-screen');
@@ -155,79 +342,120 @@ class TetrisClient {
     });
   }
 
+  attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.showNotification('ไม่สามารถเชื่อมต่อได้ กรุณารีเฟรชหน้า', 'error');
+      return;
+    }
+    
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
+    
+    this.showNotification(`กำลังลองเชื่อมต่อใหม่... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`, 'error');
+    
+    setTimeout(() => {
+      if (!this.connected) {
+        this.socket.connect();
+      }
+    }, delay);
+  }
+
   setupEventListeners() {
-    // Menu buttons
-    document.getElementById('btn-create-room').addEventListener('click', () => {
+    // Menu buttons with debouncing
+    this.addClickListener('btn-create-room', () => {
       this.showScreen('create-room-screen');
     });
 
-    document.getElementById('btn-join-room').addEventListener('click', () => {
+    this.addClickListener('btn-join-room', () => {
       this.showScreen('join-room-screen');
     });
 
     // Room creation
-    document.getElementById('btn-confirm-create').addEventListener('click', () => {
+    this.addClickListener('btn-confirm-create', () => {
       this.createRoom();
     });
 
-    document.getElementById('btn-confirm-join').addEventListener('click', () => {
+    this.addClickListener('btn-confirm-join', () => {
       this.joinRoom();
     });
 
     // Game controls
-    document.getElementById('btn-ready').addEventListener('click', () => {
+    this.addClickListener('btn-ready', () => {
       this.setReady();
     });
 
-    document.getElementById('btn-leave-room').addEventListener('click', () => {
+    this.addClickListener('btn-leave-room', () => {
       this.leaveRoom();
     });
 
-    document.getElementById('btn-play-again').addEventListener('click', () => {
+    this.addClickListener('btn-play-again', () => {
       this.playAgain();
     });
 
-    // Keyboard controls
-    document.addEventListener('keydown', (e) => {
-      this.handleKeyPress(e);
-    });
+    // Optimized keyboard controls
+    this.setupKeyboardControls();
 
     // Touch controls for mobile
     this.setupTouchControls();
 
     // Mobile control buttons
     this.setupMobileButtons();
+
+    // Handle page visibility changes
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Pause input processing when tab is not visible
+        this.inputBuffer = [];
+      }
+    });
+  }
+
+  addClickListener(elementId, handler, debounceMs = 200) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      let lastClick = 0;
+      element.addEventListener('click', (e) => {
+        const now = Date.now();
+        if (now - lastClick > debounceMs) {
+          handler(e);
+          lastClick = now;
+        }
+      });
+    }
+  }
+
+  setupKeyboardControls() {
+    let keysPressed = new Set();
+    
+    document.addEventListener('keydown', (e) => {
+      if (keysPressed.has(e.key)) return; // Prevent key repeat
+      keysPressed.add(e.key);
+      this.handleKeyPress(e);
+    });
+    
+    document.addEventListener('keyup', (e) => {
+      keysPressed.delete(e.key);
+    });
   }
 
   setupMobileButtons() {
     const buttons = document.querySelectorAll('.control-button');
     buttons.forEach((button, index) => {
-      button.addEventListener('click', () => {
-        if (!this.gameState || !this.gameState.gameStarted) return;
-        
-        const playerState = this.gameState[`player${this.playerNumber}`];
-        if (!playerState || !playerState.alive) return;
+      // Add touch events for better mobile responsiveness
+      ['touchstart', 'click'].forEach(eventType => {
+        button.addEventListener(eventType, (e) => {
+          e.preventDefault();
+          
+          if (!this.gameState || !this.gameState.gameStarted) return;
+          
+          const playerState = this.gameState[`player${this.playerNumber}`];
+          if (!playerState || !playerState.alive) return;
 
-        switch (index) {
-          case 0: // Rotate
-            this.socket.emit('game-action', { type: 'rotate' });
-            break;
-          case 1: // Up/Rotate
-            this.socket.emit('game-action', { type: 'rotate' });
-            break;
-          case 2: // Hard drop
-            this.socket.emit('game-action', { type: 'hard-drop' });
-            break;
-          case 3: // Left
-            this.socket.emit('game-action', { type: 'move-left' });
-            break;
-          case 4: // Down
-            this.socket.emit('game-action', { type: 'move-down' });
-            break;
-          case 5: // Right
-            this.socket.emit('game-action', { type: 'move-right' });
-            break;
-        }
+          const actions = ['rotate', 'rotate', 'hard-drop', 'move-left', 'move-down', 'move-right'];
+          if (actions[index]) {
+            this.queueInput(actions[index]);
+          }
+        }, { passive: false });
       });
     });
   }
@@ -238,21 +466,32 @@ class TetrisClient {
   }
 
   createRoom() {
-    const playerName = document.getElementById('create-player-name').value.trim();
+    const playerName = document.getElementById('create-player-name')?.value.trim();
     if (!playerName) {
       this.showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
       return;
     }
+    
+    if (playerName.length > 50) {
+      this.showNotification('ชื่อผู้เล่นยาวเกินไป', 'error');
+      return;
+    }
+    
     const roomId = this.generateRoomCode();
     this.joinGameRoom(roomId, playerName);
   }
 
   joinRoom() {
-    const playerName = document.getElementById('join-player-name').value.trim();
-    const roomId = document.getElementById('join-room-id').value.trim();
+    const playerName = document.getElementById('join-player-name')?.value.trim();
+    const roomId = document.getElementById('join-room-id')?.value.trim();
     
     if (!playerName || !roomId) {
       this.showNotification('กรุณาใส่ข้อมูลให้ครบถ้วน', 'error');
+      return;
+    }
+    
+    if (playerName.length > 50) {
+      this.showNotification('ชื่อผู้เล่นยาวเกินไป', 'error');
       return;
     }
     
@@ -271,18 +510,33 @@ class TetrisClient {
       return;
     }
     
-    this.socket.emit('join-room', { roomId, playerName });
+    // Sanitize inputs
+    const sanitizedRoomId = roomId.replace(/[^0-9]/g, '').substring(0, 5);
+    const sanitizedPlayerName = playerName.substring(0, 50);
+    
+    this.socket.emit('join-room', { 
+      roomId: sanitizedRoomId, 
+      playerName: sanitizedPlayerName 
+    });
   }
 
   setReady() {
+    if (!this.connected) {
+      this.showNotification('ไม่ได้เชื่อมต่อเซิร์ฟเวอร์', 'error');
+      return;
+    }
+    
     this.socket.emit('player-ready');
-    document.getElementById('btn-ready').disabled = true;
-    document.getElementById('btn-ready').textContent = '✅ พร้อมแล้ว';
+    const readyBtn = this.getCachedElement('btn-ready');
+    if (readyBtn) {
+      readyBtn.disabled = true;
+      readyBtn.textContent = '✅ พร้อมแล้ว';
+    }
     this.showNotification('คุณพร้อมเล่นแล้ว');
   }
 
   resetReadyState() {
-    const readyBtn = document.getElementById('btn-ready');
+    const readyBtn = this.getCachedElement('btn-ready');
     if (readyBtn) {
       readyBtn.disabled = false;
       readyBtn.textContent = '🎮 พร้อมเล่น';
@@ -300,7 +554,24 @@ class TetrisClient {
   }
 
   leaveRoom() {
-    // Create confirmation modal
+    // Improved modal with better performance
+    this.showConfirmDialog(
+      '🚪 ออกจากห้อง',
+      'คุณต้องการออกจากห้องหรือไม่?',
+      () => {
+        if (this.socket && this.connected) {
+          this.socket.emit('leave-room');
+        }
+        this.roomId = null;
+        this.playerNumber = null;
+        this.gameState = null;
+        this.showScreen('menu-screen');
+        this.showNotification('ออกจากห้องแล้ว');
+      }
+    );
+  }
+
+  showConfirmDialog(title, message, onConfirm) {
     const modal = document.createElement('div');
     modal.style.cssText = `
       position: fixed;
@@ -329,10 +600,10 @@ class TetrisClient {
     `;
     
     dialog.innerHTML = `
-      <h3 style="margin-bottom: 20px;">🚪 ออกจากห้อง</h3>
-      <p style="margin-bottom: 30px;">คุณต้องการออกจากห้องหรือไม่?</p>
+      <h3 style="margin-bottom: 20px;">${title}</h3>
+      <p style="margin-bottom: 30px;">${message}</p>
       <div style="display: flex; gap: 15px; justify-content: center;">
-        <button id="confirm-leave" style="
+        <button class="confirm-btn" style="
           padding: 12px 25px;
           background: #f44336;
           color: white;
@@ -341,8 +612,8 @@ class TetrisClient {
           cursor: pointer;
           font-weight: bold;
           transition: all 0.3s ease;
-        ">ออกจากห้อง</button>
-        <button id="cancel-leave" style="
+        ">ยืนยัน</button>
+        <button class="cancel-btn" style="
           padding: 12px 25px;
           background: rgba(255,255,255,0.2);
           color: white;
@@ -358,37 +629,23 @@ class TetrisClient {
     modal.appendChild(dialog);
     document.body.appendChild(modal);
     
-    // Add hover effects
-    const buttons = dialog.querySelectorAll('button');
-    buttons.forEach(btn => {
-      btn.addEventListener('mouseenter', () => {
-        btn.style.transform = 'translateY(-2px)';
-        btn.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-      });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.transform = 'translateY(0)';
-        btn.style.boxShadow = 'none';
-      });
+    // Event handlers
+    const closeModal = () => {
+      if (modal.parentNode) {
+        document.body.removeChild(modal);
+      }
+    };
+    
+    dialog.querySelector('.confirm-btn').addEventListener('click', () => {
+      onConfirm();
+      closeModal();
     });
     
-    dialog.querySelector('#confirm-leave').addEventListener('click', () => {
-      this.socket.emit('leave-room');
-      this.roomId = null;
-      this.playerNumber = null;
-      this.gameState = null;
-      this.showScreen('menu-screen');
-      document.body.removeChild(modal);
-      this.showNotification('ออกจากห้องแล้ว');
-    });
+    dialog.querySelector('.cancel-btn').addEventListener('click', closeModal);
     
-    dialog.querySelector('#cancel-leave').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
-    
-    // Close on backdrop click
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
-        document.body.removeChild(modal);
+        closeModal();
       }
     });
   }
@@ -400,15 +657,17 @@ class TetrisClient {
       this.dropInterval = null;
     }
     this.gameState = null;
+    this.inputBuffer = [];
     
     // Reset ready state and go back to waiting screen
     this.resetReadyState();
     this.showScreen('waiting-screen');
     
-    // Request new game from server (if needed)
-    this.socket.emit('request-new-game');
+    // Request new game from server
+    if (this.socket && this.connected) {
+      this.socket.emit('request-new-game');
+    }
     
-    // Show notification
     this.showNotification('🎮 เตรียมตัวสำหรับเกมใหม่!');
   }
 
@@ -418,95 +677,154 @@ class TetrisClient {
       clearInterval(this.dropInterval);
     }
     
-    this.dropInterval = setInterval(() => {
+    // Adaptive drop speed based on level
+    const getDropSpeed = (level) => {
+      return Math.max(100, 1000 - (level - 1) * 50);
+    };
+    
+    const gameLoop = () => {
       if (this.gameState && this.gameState.gameStarted) {
         const playerState = this.gameState[`player${this.playerNumber}`];
         if (playerState && playerState.alive) {
-          this.socket.emit('game-action', { type: 'move-down' });
+          this.queueInput('move-down');
+          // Schedule next drop based on current level
+          const dropSpeed = getDropSpeed(playerState.level);
+          this.dropInterval = setTimeout(gameLoop, dropSpeed);
         }
       }
-    }, 1000);
+    };
+    
+    // Start the game loop
+    this.dropInterval = setTimeout(gameLoop, 1000);
   }
 
+  // Optimized game display with object pooling and caching
   updateGameDisplay() {
     if (!this.gameState) return;
 
-    // Update player 1 board (left side)
+    // Update both players' boards
     this.drawPlayerBoard('player1-board', this.gameState.player1, 1);
     this.updatePlayerStats('player1-stats', this.gameState.player1);
-
-    // Update player 2 board (right side)  
     this.drawPlayerBoard('player2-board', this.gameState.player2, 2);
     this.updatePlayerStats('player2-stats', this.gameState.player2);
 
-    // Highlight current player
-    document.querySelectorAll('.player-board').forEach(board => {
-      board.classList.remove('current-player');
-    });
+    // Highlight current player (cached)
+    this.highlightCurrentPlayer();
+  }
+
+  highlightCurrentPlayer() {
+    const boards = document.querySelectorAll('.player-board');
+    boards.forEach(board => board.classList.remove('current-player'));
+    
     if (this.playerNumber) {
-      const currentBoard = document.getElementById(`player${this.playerNumber}-board`);
+      const currentBoard = this.getCachedElement(`player${this.playerNumber}-board`);
       if (currentBoard) {
         currentBoard.classList.add('current-player');
       }
     }
   }
 
+  // Highly optimized board drawing with object pooling
   drawPlayerBoard(boardId, playerState, playerNumber) {
-    const boardElement = document.getElementById(boardId);
+    const boardElement = this.getCachedElement(boardId);
     if (!boardElement) return;
 
-    boardElement.innerHTML = '';
+    // Generate cache key for this board state
+    const cacheKey = this.generateBoardCacheKey(playerState);
+    const lastCacheKey = this.boardCache.get(boardId);
+    
+    // Skip rendering if board hasn't changed
+    if (cacheKey === lastCacheKey) {
+      return;
+    }
+    
+    this.boardCache.set(boardId, cacheKey);
+    
+    // Return all current blocks to pool
+    const currentBlocks = Array.from(boardElement.children);
+    currentBlocks.forEach(block => {
+      if (block.classList.contains('tetris-block')) {
+        boardElement.removeChild(block);
+        this.returnBlockToPool(block);
+      }
+    });
 
-    // Draw placed blocks
+    // Draw placed blocks efficiently
+    this.drawStaticBlocks(boardElement, playerState.grid);
+    
+    // Draw current falling piece
+    if (playerState.currentPiece && playerState.alive) {
+      this.drawFallingPiece(boardElement, playerState);
+    }
+
+    // Show game over overlay if needed
+    if (!playerState.alive) {
+      this.showGameOverOverlay(boardElement);
+    }
+  }
+
+  generateBoardCacheKey(playerState) {
+    // Create a simple hash of the board state
+    const gridHash = playerState.grid.map(row => row.join('')).join('');
+    const pieceHash = playerState.currentPiece ? 
+      `${playerState.currentX}-${playerState.currentY}-${JSON.stringify(playerState.currentPiece.shape)}` : 
+      '';
+    return `${gridHash}-${pieceHash}-${playerState.alive}`;
+  }
+
+  drawStaticBlocks(boardElement, grid) {
     for (let row = 0; row < 20; row++) {
       for (let col = 0; col < 10; col++) {
-        if (playerState.grid[row][col]) {
-          const block = document.createElement('div');
-          block.className = `tetris-block ${playerState.grid[row][col]}`;
+        if (grid[row][col]) {
+          const block = this.getBlockFromPool();
+          block.className = `tetris-block ${grid[row][col]}`;
           block.style.left = (col * this.TILE_SIZE) + 'px';
           block.style.top = (row * this.TILE_SIZE) + 'px';
-          block.style.width = this.TILE_SIZE + 'px';
-          block.style.height = this.TILE_SIZE + 'px';
           boardElement.appendChild(block);
         }
       }
     }
+  }
 
-    // Draw current falling piece
-    if (playerState.currentPiece && playerState.alive) {
-      for (let row = 0; row < playerState.currentPiece.shape.length; row++) {
-        for (let col = 0; col < playerState.currentPiece.shape[row].length; col++) {
-          if (playerState.currentPiece.shape[row][col]) {
-            const block = document.createElement('div');
-            block.className = `tetris-block ${playerState.currentPiece.color}`;
-            block.style.left = ((playerState.currentX + col) * this.TILE_SIZE) + 'px';
-            block.style.top = ((playerState.currentY + row) * this.TILE_SIZE) + 'px';
-            block.style.width = this.TILE_SIZE + 'px';
-            block.style.height = this.TILE_SIZE + 'px';
-            block.style.opacity = '0.9';
-            block.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
-            boardElement.appendChild(block);
-          }
+  drawFallingPiece(boardElement, playerState) {
+    const piece = playerState.currentPiece;
+    for (let row = 0; row < piece.shape.length; row++) {
+      for (let col = 0; col < piece.shape[row].length; col++) {
+        if (piece.shape[row][col]) {
+          const block = this.getBlockFromPool();
+          block.className = `tetris-block ${piece.color}`;
+          block.style.left = ((playerState.currentX + col) * this.TILE_SIZE) + 'px';
+          block.style.top = ((playerState.currentY + row) * this.TILE_SIZE) + 'px';
+          block.style.opacity = '0.9';
+          block.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
+          boardElement.appendChild(block);
         }
       }
     }
+  }
 
-    // Show "GAME OVER" overlay if player is dead
-    if (!playerState.alive) {
-      const overlay = document.createElement('div');
+  showGameOverOverlay(boardElement) {
+    let overlay = boardElement.querySelector('.game-over-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
       overlay.className = 'game-over-overlay';
       overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
       boardElement.appendChild(overlay);
     }
   }
 
+  // Cached stats update
   updatePlayerStats(statsId, playerState) {
-    const statsElement = document.getElementById(statsId);
+    const statsElement = this.getCachedElement(statsId);
     if (!statsElement) return;
 
-    statsElement.querySelector('.score-value').textContent = playerState.score;
-    statsElement.querySelector('.lines-value').textContent = playerState.lines;
-    statsElement.querySelector('.level-value').textContent = playerState.level;
+    const scoreElement = statsElement.querySelector('.score-value');
+    const linesElement = statsElement.querySelector('.lines-value');
+    const levelElement = statsElement.querySelector('.level-value');
+    
+    if (scoreElement) scoreElement.textContent = playerState.score;
+    if (linesElement) linesElement.textContent = playerState.lines;
+    if (levelElement) levelElement.textContent = playerState.level;
   }
 
   handleKeyPress(event) {
@@ -515,120 +833,154 @@ class TetrisClient {
     const playerState = this.gameState[`player${this.playerNumber}`];
     if (!playerState || !playerState.alive) return;
 
-    switch (event.key) {
-      case 'ArrowLeft':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-left' });
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-right' });
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-down' });
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'rotate' });
-        break;
-      case ' ':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'hard-drop' });
-        break;
+    // Map keys to actions
+    const keyActions = {
+      'ArrowLeft': 'move-left',
+      'ArrowRight': 'move-right',
+      'ArrowDown': 'move-down',
+      'ArrowUp': 'rotate',
+      ' ': 'hard-drop',
+      'a': 'move-left',
+      'd': 'move-right',
+      's': 'move-down',
+      'w': 'rotate'
+    };
+
+    const action = keyActions[event.key];
+    if (action) {
+      event.preventDefault();
+      this.queueInput(action);
     }
   }
 
+  // Touch controls for mobile devices
   setupTouchControls() {
-    let touchStartX = 0;
-    let touchStartY = 0;
+    const gameScreen = document.getElementById('game-screen');
+    if (!gameScreen) return;
 
-    document.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    });
+    let startX = 0;
+    let startY = 0;
+    let endX = 0;
+    let endY = 0;
 
-    document.addEventListener('touchend', (e) => {
+    gameScreen.addEventListener('touchstart', (e) => {
       if (!this.gameState || !this.gameState.gameStarted) return;
+      
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+    }, { passive: true });
 
-      const deltaX = e.changedTouches[0].clientX - touchStartX;
-      const deltaY = e.changedTouches[0].clientY - touchStartY;
-      const threshold = 30;
+    gameScreen.addEventListener('touchend', (e) => {
+      if (!this.gameState || !this.gameState.gameStarted) return;
+      
+      const touch = e.changedTouches[0];
+      endX = touch.clientX;
+      endY = touch.clientY;
 
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      const threshold = 50;
+
+      // Determine swipe direction
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (deltaX > threshold) {
-          this.socket.emit('game-action', { type: 'move-right' });
-        } else if (deltaX < -threshold) {
-          this.socket.emit('game-action', { type: 'move-left' });
+        // Horizontal swipe
+        if (Math.abs(deltaX) > threshold) {
+          if (deltaX > 0) {
+            this.queueInput('move-right');
+          } else {
+            this.queueInput('move-left');
+          }
         }
       } else {
-        if (deltaY > threshold) {
-          this.socket.emit('game-action', { type: 'hard-drop' });
-        } else if (deltaY < -threshold) {
-          this.socket.emit('game-action', { type: 'rotate' });
+        // Vertical swipe
+        if (Math.abs(deltaY) > threshold) {
+          if (deltaY > 0) {
+            this.queueInput('hard-drop');
+          } else {
+            this.queueInput('rotate');
+          }
         }
+      }
+    }, { passive: true });
+
+    // Tap to rotate
+    gameScreen.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        // Two finger tap to rotate
+        e.preventDefault();
+        this.queueInput('rotate');
       }
     });
   }
 
-  endGame(data) {
-    // Clear game loop
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-      this.dropInterval = null;
-    }
-    
-    let message = '';
-    if (data.winner === 'draw') {
-      message = '🤝 เสมอกัน!';
-    } else if (data.winner === this.playerNumber) {
-      message = '🎉 คุณชนะ!';
-    } else {
-      message = '😔 คุณแพ้';
-    }
+  // Screen management functions
+  showScreen(screenId) {
+    // Hide all screens first
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(screen => {
+      screen.style.display = 'none';
+    });
 
-    document.getElementById('winner-message').textContent = message;
-    document.getElementById('final-score-p1').textContent = data.finalScores.player1;
-    document.getElementById('final-score-p2').textContent = data.finalScores.player2;
-    
-    // Reset play again button
-    const playAgainBtn = document.getElementById('btn-play-again');
-    if (playAgainBtn) {
-      playAgainBtn.disabled = false;
-      playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
-    }
-    
-    this.showScreen('game-over-screen');
-    this.showNotification(message);
-  }
-
-  updateRoomInfo(players) {
-    const roomIdElement = document.getElementById('room-id-display');
-    const playersListElement = document.getElementById('players-list');
-    
-    if (roomIdElement) {
-      roomIdElement.textContent = this.roomId;
-    }
-    
-    if (playersListElement) {
-      playersListElement.innerHTML = '';
-      players.forEach(player => {
-        const li = document.createElement('li');
-        li.textContent = `${player.playerName} (Player ${player.playerNumber})`;
-        if (player.playerNumber === this.playerNumber) {
-          li.classList.add('current-player');
-        }
-        playersListElement.appendChild(li);
+    // Show target screen with animation
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+      targetScreen.style.display = 'flex';
+      targetScreen.style.opacity = '0';
+      targetScreen.style.transform = 'translateY(20px)';
+      
+      requestAnimationFrame(() => {
+        targetScreen.style.transition = 'all 0.3s ease';
+        targetScreen.style.opacity = '1';
+        targetScreen.style.transform = 'translateY(0)';
       });
     }
+  }
 
-    // Enable ready button if room has 2 players
-    const readyBtn = document.getElementById('btn-ready');
-    if (readyBtn && players.length === 2) {
-      readyBtn.disabled = false;
+  // Update room information display
+  updateRoomInfo(roomPlayers) {
+    const roomIdDisplay = this.getCachedElement('room-id-display');
+    if (roomIdDisplay) {
+      roomIdDisplay.textContent = `ห้อง: ${this.roomId}`;
+    }
+
+    const playersList = this.getCachedElement('players-list');
+    if (playersList) {
+      playersList.innerHTML = '';
+      
+      roomPlayers.forEach((player, index) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player-info';
+        playerDiv.style.cssText = `
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px;
+          margin: 10px 0;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          backdrop-filter: blur(10px);
+        `;
+        
+        const isCurrentPlayer = player.playerNumber === this.playerNumber;
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = `${player.name} ${isCurrentPlayer ? '(คุณ)' : ''}`;
+        nameSpan.style.fontWeight = isCurrentPlayer ? 'bold' : 'normal';
+        nameSpan.style.color = isCurrentPlayer ? '#4CAF50' : 'white';
+        
+        const statusSpan = document.createElement('span');
+        statusSpan.id = `ready-indicator-${player.playerNumber}`;
+        statusSpan.textContent = `Player ${player.playerNumber}: รอ...`;
+        statusSpan.style.color = '#666';
+        
+        playerDiv.appendChild(nameSpan);
+        playerDiv.appendChild(statusSpan);
+        playersList.appendChild(playerDiv);
+      });
     }
   }
 
+  // Update player ready status
   updatePlayerReady(playerNumber) {
     const indicator = document.getElementById(`ready-indicator-${playerNumber}`);
     if (indicator) {
@@ -638,38 +990,381 @@ class TetrisClient {
     }
   }
 
+  // Connection status indicator
   updateConnectionStatus(connected) {
-    const statusElement = document.getElementById('connection-status');
+    const statusElement = this.getCachedElement('connection-status');
     if (statusElement) {
       statusElement.textContent = connected ? '🟢 เชื่อมต่อแล้ว' : '🔴 ไม่ได้เชื่อมต่อ';
-      statusElement.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
+      statusElement.style.color = connected ? '#4CAF50' : '#f44336';
+      statusElement.style.fontWeight = 'bold';
+    }
+
+    // Update global connection indicator
+    const globalIndicator = document.querySelector('.connection-indicator');
+    if (globalIndicator) {
+      globalIndicator.className = `connection-indicator ${connected ? 'connected' : 'disconnected'}`;
     }
   }
 
-  showScreen(screenId) {
-    // Hide all screens
-    document.querySelectorAll('.screen').forEach(screen => {
-      screen.style.display = 'none';
+  // Game over handling
+  endGame(data) {
+    // Clear game loop
+    if (this.dropInterval) {
+      clearInterval(this.dropInterval);
+      this.dropInterval = null;
+    }
+
+    // Clear input buffer
+    this.inputBuffer = [];
+
+    // Show game over screen
+    this.showScreen('game-over-screen');
+
+    // Update winner display
+    const winnerElement = document.getElementById('winner-display');
+    if (winnerElement) {
+      if (data.winner === this.playerNumber) {
+        winnerElement.innerHTML = '🎉 คุณชนะ! 🎉';
+        winnerElement.style.color = '#4CAF50';
+        this.showNotification('🎉 ยินดีด้วย! คุณชนะ!');
+        
+        // Celebration effect
+        this.createCelebrationEffect();
+      } else if (data.winner === 0) {
+        winnerElement.innerHTML = '🤝 เสมอ';
+        winnerElement.style.color = '#FF9800';
+        this.showNotification('🤝 เกมเสมอ!');
+      } else {
+        winnerElement.innerHTML = '😔 คุณแพ้';
+        winnerElement.style.color = '#f44336';
+        this.showNotification('😔 เสียใจด้วย คุณแพ้');
+      }
+    }
+
+    // Update final scores
+    const finalScoreElement = document.getElementById('final-scores');
+    if (finalScoreElement && this.gameState) {
+      finalScoreElement.innerHTML = `
+        <div class="score-comparison">
+          <div class="player-final-score">
+            <h4>Player 1: ${this.gameState.player1.name}</h4>
+            <p>คะแนน: ${this.gameState.player1.score}</p>
+            <p>เส้น: ${this.gameState.player1.lines}</p>
+            <p>เลเวล: ${this.gameState.player1.level}</p>
+          </div>
+          <div class="player-final-score">
+            <h4>Player 2: ${this.gameState.player2.name}</h4>
+            <p>คะแนน: ${this.gameState.player2.score}</p>
+            <p>เส้น: ${this.gameState.player2.lines}</p>
+            <p>เลเวล: ${this.gameState.player2.level}</p>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Celebration effect for winner
+  createCelebrationEffect() {
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
+    
+    for (let i = 0; i < 50; i++) {
+      setTimeout(() => {
+        const confetti = document.createElement('div');
+        confetti.style.cssText = `
+          position: fixed;
+          width: 10px;
+          height: 10px;
+          background: ${colors[Math.floor(Math.random() * colors.length)]};
+          left: ${Math.random() * window.innerWidth}px;
+          top: -10px;
+          z-index: 9999;
+          border-radius: 50%;
+          pointer-events: none;
+          animation: confetti-fall 3s linear forwards;
+        `;
+        
+        document.body.appendChild(confetti);
+        
+        setTimeout(() => {
+          if (confetti.parentNode) {
+            confetti.parentNode.removeChild(confetti);
+          }
+        }, 3000);
+      }, i * 100);
+    }
+  }
+
+  // Performance monitoring
+  startPerformanceMonitoring() {
+    let frameCount = 0;
+    let lastTime = performance.now();
+    
+    const monitor = () => {
+      frameCount++;
+      const currentTime = performance.now();
+      
+      if (currentTime - lastTime >= 1000) {
+        const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+        
+        // Log performance if FPS drops below 30
+        if (fps < 30) {
+          console.warn(`Low FPS detected: ${fps}`);
+          this.optimizePerformance();
+        }
+        
+        frameCount = 0;
+        lastTime = currentTime;
+      }
+      
+      if (this.gameState) {
+        requestAnimationFrame(monitor);
+      }
+    };
+    
+    requestAnimationFrame(monitor);
+  }
+
+  // Performance optimization when FPS drops
+  optimizePerformance() {
+    // Reduce visual effects
+    const blocks = document.querySelectorAll('.tetris-block');
+    blocks.forEach(block => {
+      block.style.transition = 'none';
+      block.style.boxShadow = 'none';
     });
     
-    // Show target screen
-    const targetScreen = document.getElementById(screenId);
-    if (targetScreen) {
-      targetScreen.style.display = 'block';
+    // Increase input throttle
+    this.INPUT_THROTTLE = Math.min(100, this.INPUT_THROTTLE * 1.5);
+    
+    // Clear some caches if they're too large
+    if (this.boardCache.size > 100) {
+      this.boardCache.clear();
     }
+    
+    console.log('Performance optimizations applied');
+  }
 
-    // Reset ready button and state when going back to waiting
-    if (screenId === 'waiting-screen') {
-      this.resetReadyState();
+  // Cleanup function
+  cleanup() {
+    // Cancel render loop
+    if (this.renderRequestId) {
+      cancelAnimationFrame(this.renderRequestId);
+      this.renderRequestId = null;
+    }
+    
+    // Clear intervals
+    if (this.dropInterval) {
+      clearInterval(this.dropInterval);
+      this.dropInterval = null;
+    }
+    
+    // Disconnect socket
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    
+    // Clear caches
+    this.cachedElements.clear();
+    this.boardCache.clear();
+    
+    // Return all blocks to pool
+    this.blockPool.forEach(block => {
+      if (block.parentNode) {
+        block.parentNode.removeChild(block);
+      }
+    });
+    this.blockPool = [];
+    
+    // Clear input buffer
+    this.inputBuffer = [];
+    
+    console.log('TetrisClient cleaned up');
+  }
+
+  // Add error boundary for better error handling
+  handleError(error, context = 'Unknown') {
+    console.error(`Error in ${context}:`, error);
+    this.showNotification(`เกิดข้อผิดพลาด: ${context}`, 'error');
+    
+    // Try to recover from certain errors
+    if (context.includes('render') || context.includes('display')) {
+      // Clear board cache and force re-render
+      this.boardCache.clear();
+      if (this.gameState) {
+        this.updateGameDisplay();
+      }
     }
   }
 
-  showMessage(message) {
-    this.showNotification(message);
+  // Mobile responsiveness adjustments
+  adjustForMobile() {
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile) {
+      // Adjust tile size for mobile
+      this.TILE_SIZE = Math.max(20, Math.min(25, window.innerWidth / 16));
+      
+      // Show mobile controls
+      const mobileControls = document.querySelector('.mobile-controls');
+      if (mobileControls) {
+        mobileControls.style.display = 'flex';
+      }
+      
+      // Adjust input throttle for touch devices
+      this.INPUT_THROTTLE = 100;
+    } else {
+      // Hide mobile controls on desktop
+      const mobileControls = document.querySelector('.mobile-controls');
+      if (mobileControls) {
+        mobileControls.style.display = 'none';
+      }
+    }
+    
+    // Recreate block pool with new tile size
+    this.blockPool.forEach(block => {
+      block.style.width = this.TILE_SIZE + 'px';
+      block.style.height = this.TILE_SIZE + 'px';
+    });
+  }
+
+  // Initialize responsive design
+  initializeResponsiveDesign() {
+    // Initial adjustment
+    this.adjustForMobile();
+    
+    // Listen for resize events
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.adjustForMobile();
+        this.boardCache.clear(); // Force re-render with new size
+      }, 250);
+    });
+    
+    // Listen for orientation changes on mobile
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        this.adjustForMobile();
+        this.boardCache.clear();
+      }, 500);
+    });
   }
 }
 
-// Initialize client when page loads
+// Add CSS animations for confetti effect
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-10px) rotateZ(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh) rotateZ(720deg);
+      opacity: 0;
+    }
+  }
+  
+  .tetris-block {
+    transition: all 0.1s ease;
+  }
+  
+  .current-player {
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+    border: 2px solid #4CAF50;
+  }
+  
+  .game-over-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f44336;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 100;
+  }
+  
+  .connection-indicator {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1001;
+  }
+  
+  .connection-indicator.connected {
+    background: rgba(76, 175, 80, 0.8);
+    color: white;
+  }
+  
+  .connection-indicator.disconnected {
+    background: rgba(244, 67, 54, 0.8);
+    color: white;
+  }
+  
+  @media (max-width: 768px) {
+    .tetris-block {
+      border-width: 1px;
+    }
+    
+    .player-board {
+      transform: scale(0.8);
+    }
+    
+    .mobile-controls {
+      display: flex !important;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px;
+    }
+    
+    .control-button {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      font-size: 20px;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .control-button:active {
+      transform: scale(0.9);
+    }
+  }
+`;
+document.head.appendChild(style);
+
+// Initialize the game when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new TetrisClient();
+  window.tetrisClient = new TetrisClient();
+  
+  // Initialize responsive design
+  window.tetrisClient.initializeResponsiveDesign();
+  
+  // Start performance monitoring
+  window.tetrisClient.startPerformanceMonitoring();
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (window.tetrisClient) {
+      window.tetrisClient.cleanup();
+    }
+  });
 });
