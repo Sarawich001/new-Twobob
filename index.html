@@ -202,6 +202,18 @@
             text-align: center;
         }
 
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+        }
+
+        .connected { background: #4caf50; }
+        .disconnected { background: #f44336; }
+
         @media (max-width: 768px) {
             .game-area {
                 flex-direction: column;
@@ -221,6 +233,8 @@
     </style>
 </head>
 <body>
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
+    
     <div class="container">
         <h1 class="title">🎮 Tetris Multiplayer</h1>
         
@@ -249,6 +263,7 @@
         <div class="status hidden" id="gameStatus">
             <h3>สถานะ: <span id="statusText">รอผู้เล่น...</span></h3>
             <div id="playersList"></div>
+            <div id="roomCode" style="font-size: 1.2em; margin: 10px 0; color: #4ecdc4;"></div>
             <button class="btn" id="readyBtn" onclick="playerReady()" style="display: none;">พร้อม!</button>
             <button class="btn" onclick="leaveRoom()">ออกจากห้อง</button>
         </div>
@@ -258,7 +273,7 @@
             <!-- Player 1 -->
             <div class="player-section">
                 <div class="player-info">
-                    <h3>Player 1</h3>
+                    <h3 id="player1Name">Player 1</h3>
                     <div>Score: <span id="score1">0</span></div>
                     <div>Lines: <span id="lines1">0</span></div>
                     <div>Level: <span id="level1">1</span></div>
@@ -271,7 +286,7 @@
             <!-- Player 2 -->
             <div class="player-section">
                 <div class="player-info">
-                    <h3>Player 2</h3>
+                    <h3 id="player2Name">Player 2</h3>
                     <div>Score: <span id="score2">0</span></div>
                     <div>Lines: <span id="lines2">0</span></div>
                     <div>Level: <span id="level2">1</span></div>
@@ -305,42 +320,78 @@
         let gameState = null;
         let myPlayerNumber = null;
         let isGameActive = false;
+        let currentRoomId = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        let autoFallInterval = null;
 
         // Initialize socket connection
         function initSocket() {
-            // Try to connect to current host
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host;
-            
-            socket = io(`${protocol}//${host}`, {
-                transports: ['websocket', 'polling'],
-                timeout: 5000,
-                reconnectionAttempts: 3
-            });
+            try {
+                // For local development
+                const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                    ? `http://localhost:3000` 
+                    : window.location.origin;
+                
+                socket = io(serverUrl, {
+                    transports: ['websocket', 'polling'],
+                    timeout: 10000,
+                    reconnectionAttempts: maxReconnectAttempts,
+                    reconnectionDelay: 1000
+                });
 
+                setupSocketEvents();
+                
+            } catch (error) {
+                console.error('Socket initialization error:', error);
+                updateConnectionStatus('disconnected', 'Connection Failed');
+            }
+        }
+
+        function setupSocketEvents() {
             // Connection events
             socket.on('connect', () => {
                 console.log('Connected to server');
-                updateStatus('เชื่อมต่อสำเร็จ');
+                updateConnectionStatus('connected', 'Connected');
+                reconnectAttempts = 0;
+                
+                // If we were in a room, try to rejoin
+                if (currentRoomId && document.getElementById('playerName').value) {
+                    const playerName = document.getElementById('playerName').value;
+                    socket.emit('join-room', { roomId: currentRoomId, playerName });
+                }
             });
 
-            socket.on('disconnect', () => {
-                console.log('Disconnected from server');
-                updateStatus('การเชื่อมต่อขาดหาย');
-                showReconnectOption();
+            socket.on('disconnect', (reason) => {
+                console.log('Disconnected from server:', reason);
+                updateConnectionStatus('disconnected', 'Disconnected');
+                isGameActive = false;
+                disableControls();
+                stopAutoFall();
+                
+                if (reason === 'io server disconnect') {
+                    // Server disconnected the socket, try to reconnect
+                    setTimeout(() => {
+                        if (reconnectAttempts < maxReconnectAttempts) {
+                            reconnectAttempts++;
+                            initSocket();
+                        }
+                    }, 2000);
+                }
             });
 
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
-                updateStatus('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
-                showLocalGameOption();
+                updateConnectionStatus('disconnected', 'Connection Error');
             });
 
             // Game events
             socket.on('joined-room', (data) => {
                 console.log('Joined room:', data);
                 myPlayerNumber = data.playerNumber;
-                updateStatus(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
+                currentRoomId = data.roomId;
+                updateStatus(`เข้าร่วมห้อง ${data.roomId} สำเร็จ (Player ${data.playerNumber})`);
+                document.getElementById('roomCode').textContent = `Room Code: ${data.roomId}`;
                 updatePlayersList(data.roomPlayers);
                 showGameStatus();
                 
@@ -356,6 +407,7 @@
             socket.on('player-ready', (data) => {
                 console.log('Player ready:', data);
                 updateStatus(`Player ${data.playerNumber} พร้อมแล้ว`);
+                updatePlayersList(data.roomPlayers);
             });
 
             socket.on('game-start', (data) => {
@@ -366,9 +418,10 @@
                 showGameArea();
                 updateGameDisplay();
                 
-                // Enable keyboard controls for current player only
+                // Enable keyboard controls and auto-fall for current player
                 if (myPlayerNumber) {
                     enableControls();
+                    startAutoFall();
                 }
             });
 
@@ -381,6 +434,7 @@
                 console.log('Game over:', data);
                 isGameActive = false;
                 disableControls();
+                stopAutoFall();
                 showGameOver(data);
             });
 
@@ -402,11 +456,49 @@
                 updateStatus('ผู้เล่นออกจากห้อง');
                 isGameActive = false;
                 disableControls();
+                stopAutoFall();
+            });
+
+            socket.on('player-disconnected', (data) => {
+                updateStatus(`Player ${data.playerNumber} หลุดการเชื่อมต่อ`);
+                isGameActive = false;
+                disableControls();
+                stopAutoFall();
             });
 
             socket.on('error', (message) => {
                 alert(message);
             });
+        }
+
+        function updateConnectionStatus(status, text) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = `connection-status ${status}`;
+            statusEl.textContent = text;
+        }
+
+        // Auto-fall mechanism
+        function startAutoFall() {
+            stopAutoFall(); // Clear any existing interval
+            
+            const getDropSpeed = () => {
+                if (!gameState || !gameState[`player${myPlayerNumber}`]) return 1000;
+                const level = gameState[`player${myPlayerNumber}`].level;
+                return Math.max(100, 1000 - (level - 1) * 50);
+            };
+
+            autoFallInterval = setInterval(() => {
+                if (isGameActive && socket && socket.connected) {
+                    socket.emit('game-action', { type: 'move-down' });
+                }
+            }, getDropSpeed());
+        }
+
+        function stopAutoFall() {
+            if (autoFallInterval) {
+                clearInterval(autoFallInterval);
+                autoFallInterval = null;
+            }
         }
 
         // Menu functions
@@ -425,11 +517,13 @@
             document.getElementById('mainMenu').classList.remove('hidden');
             document.getElementById('roomForm').classList.add('hidden');
             document.getElementById('gameStatus').classList.add('hidden');
+            currentRoomId = null;
+            myPlayerNumber = null;
         }
 
         function joinRoom() {
             const playerName = document.getElementById('playerName').value.trim();
-            const roomId = document.getElementById('roomId').value.trim();
+            const roomId = document.getElementById('roomId').value.trim().toUpperCase();
 
             if (!playerName || !roomId) {
                 alert('กรุณากรอกชื่อและรหัสห้อง');
@@ -437,31 +531,46 @@
             }
 
             if (!socket || !socket.connected) {
+                alert('กำลังเชื่อมต่อเซิร์ฟเวอร์...');
                 initSocket();
-                // Wait for connection before joining
-                socket.on('connect', () => {
-                    socket.emit('join-room', { roomId, playerName });
-                });
+                
+                const checkConnection = setInterval(() => {
+                    if (socket && socket.connected) {
+                        clearInterval(checkConnection);
+                        socket.emit('join-room', { roomId, playerName });
+                        document.getElementById('roomForm').classList.add('hidden');
+                    }
+                }, 500);
+                
+                setTimeout(() => {
+                    clearInterval(checkConnection);
+                    if (!socket || !socket.connected) {
+                        alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+                    }
+                }, 10000);
             } else {
                 socket.emit('join-room', { roomId, playerName });
+                document.getElementById('roomForm').classList.add('hidden');
             }
-
-            document.getElementById('roomForm').classList.add('hidden');
         }
 
         function leaveRoom() {
-            if (socket) {
+            if (socket && socket.connected) {
                 socket.emit('leave-room');
             }
+            isGameActive = false;
+            disableControls();
+            stopAutoFall();
             backToMenu();
             hideGameArea();
             hideGameStatus();
         }
 
         function playerReady() {
-            if (socket) {
+            if (socket && socket.connected) {
                 socket.emit('player-ready');
                 document.getElementById('readyBtn').style.display = 'none';
+                updateStatus('รอผู้เล่นอีกคน...');
             }
         }
 
@@ -491,8 +600,20 @@
             const list = document.getElementById('playersList');
             if (players && players.length > 0) {
                 list.innerHTML = players.map(p => 
-                    `<div>Player ${p.playerNumber}: ${p.playerName}</div>`
+                    `<div>Player ${p.playerNumber}: ${p.playerName} ${gameState && gameState[`player${p.playerNumber}`] && gameState[`player${p.playerNumber}`].ready ? '(พร้อม)' : ''}</div>`
                 ).join('');
+                
+                // Update player names in game area
+                players.forEach(p => {
+                    const nameEl = document.getElementById(`player${p.playerNumber}Name`);
+                    if (nameEl) {
+                        nameEl.textContent = `${p.playerName} (P${p.playerNumber})`;
+                        if (p.playerNumber === myPlayerNumber) {
+                            nameEl.style.color = '#4ecdc4';
+                            nameEl.textContent += ' (คุณ)';
+                        }
+                    }
+                });
             }
         }
 
@@ -531,24 +652,33 @@
                 if (!playerState) continue;
 
                 // Update score display
-                document.getElementById(`score${playerNum}`).textContent = playerState.score;
-                document.getElementById(`lines${playerNum}`).textContent = playerState.lines;
-                document.getElementById(`level${playerNum}`).textContent = playerState.level;
+                const scoreEl = document.getElementById(`score${playerNum}`);
+                const linesEl = document.getElementById(`lines${playerNum}`);
+                const levelEl = document.getElementById(`level${playerNum}`);
+                
+                if (scoreEl) scoreEl.textContent = playerState.score;
+                if (linesEl) linesEl.textContent = playerState.lines;
+                if (levelEl) levelEl.textContent = playerState.level;
 
                 // Update grid
-                const grid = document.getElementById(`grid${playerNum}`).children;
+                const gridEl = document.getElementById(`grid${playerNum}`);
+                if (!gridEl) continue;
+                
+                const cells = gridEl.children;
                 for (let y = 0; y < 20; y++) {
                     for (let x = 0; x < 10; x++) {
                         const cellIndex = y * 10 + x;
-                        const cell = grid[cellIndex];
-                        const cellValue = playerState.grid[y][x];
-                        
-                        // Clear previous classes
-                        cell.className = 'cell';
-                        
-                        // Add color class if cell is filled
-                        if (cellValue !== 0) {
-                            cell.classList.add(cellValue);
+                        if (cellIndex < cells.length) {
+                            const cell = cells[cellIndex];
+                            const cellValue = playerState.grid[y][x];
+                            
+                            // Clear previous classes
+                            cell.className = 'cell';
+                            
+                            // Add color class if cell is filled
+                            if (cellValue !== 0) {
+                                cell.classList.add(cellValue);
+                            }
                         }
                     }
                 }
@@ -564,8 +694,10 @@
                                 
                                 if (gridX >= 0 && gridX < 10 && gridY >= 0 && gridY < 20) {
                                     const cellIndex = gridY * 10 + gridX;
-                                    const cell = grid[cellIndex];
-                                    cell.classList.add(piece.color);
+                                    if (cellIndex < cells.length) {
+                                        const cell = cells[cellIndex];
+                                        cell.classList.add(piece.color);
+                                    }
                                 }
                             }
                         }
@@ -574,25 +706,45 @@
 
                 // Update next piece
                 if (playerState.nextPiece) {
-                    const nextGrid = document.getElementById(`next${playerNum}`).children;
-                    // Clear next piece grid
-                    for (let i = 0; i < 16; i++) {
-                        nextGrid[i].className = 'cell';
-                    }
-                    
-                    // Draw next piece
-                    const nextPiece = playerState.nextPiece;
-                    for (let py = 0; py < nextPiece.shape.length; py++) {
-                        for (let px = 0; px < nextPiece.shape[py].length; px++) {
-                            if (nextPiece.shape[py][px]) {
-                                const cellIndex = py * 4 + px;
-                                if (cellIndex < 16) {
-                                    nextGrid[cellIndex].classList.add(nextPiece.color);
+                    const nextGridEl = document.getElementById(`next${playerNum}`);
+                    if (nextGridEl) {
+                        const nextCells = nextGridEl.children;
+                        // Clear next piece grid
+                        for (let i = 0; i < nextCells.length; i++) {
+                            nextCells[i].className = 'cell';
+                        }
+                        
+                        // Draw next piece
+                        const nextPiece = playerState.nextPiece;
+                        for (let py = 0; py < nextPiece.shape.length; py++) {
+                            for (let px = 0; px < nextPiece.shape[py].length; px++) {
+                                if (nextPiece.shape[py][px]) {
+                                    const cellIndex = py * 4 + px;
+                                    if (cellIndex < nextCells.length) {
+                                        nextCells[cellIndex].classList.add(nextPiece.color);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // Visual indicator for dead players
+                const playerSection = gridEl.closest('.player-section');
+                if (playerSection) {
+                    if (!playerState.alive) {
+                        playerSection.style.opacity = '0.5';
+                        playerSection.style.filter = 'grayscale(100%)';
+                    } else {
+                        playerSection.style.opacity = '1';
+                        playerSection.style.filter = 'none';
+                    }
+                }
+            }
+
+            // Update auto-fall speed based on current level
+            if (myPlayerNumber && isGameActive) {
+                startAutoFall(); // Restart with new speed
             }
         }
 
@@ -606,7 +758,7 @@
         }
 
         function handleKeyDown(event) {
-            if (!isGameActive || !socket) return;
+            if (!isGameActive || !socket || !socket.connected) return;
 
             let action = null;
 
@@ -648,7 +800,7 @@
             if (data.winner === 'draw') {
                 winnerText = 'เสมอ!';
             } else if (data.winner === myPlayerNumber) {
-                winnerText = 'คุณชนะ!';
+                winnerText = '🎉 คุณชนะ! 🎉';
             } else {
                 winnerText = `Player ${data.winner} ชนะ!`;
             }
@@ -667,7 +819,7 @@
         }
 
         function requestNewGame() {
-            if (socket) {
+            if (socket && socket.connected) {
                 socket.emit('request-new-game');
             }
             hideGameOver();
@@ -685,24 +837,23 @@
 2. รอผู้เล่นคนที่ 2 เข้าร่วม
 3. กดปุ่ม "พร้อม" เมื่อทั้งคู่พร้อม
 4. ใช้ลูกศรควบคุม และ Space เป็น Hard Drop
-5. ผู้เล่นที่อยู่ได้นานที่สุดชนะ!`);
-        }
+5. บล็อกจะตกลงมาเองตามเลเวล
+6. ผู้เล่นที่อยู่ได้นานที่สุดชนะ!
 
-        function showReconnectOption() {
-            if (confirm('การเชื่อมต่อขาดหาย ต้องการเชื่อมต่อใหม่?')) {
-                initSocket();
-            }
-        }
-
-        function showLocalGameOption() {
-            alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+การควบคุม:
+← → : เลื่อนซ้าย/ขวา
+↓ : เลื่อนลงเร็วขึ้น  
+↑ : หมุนบล็อก
+Space : วางแบบเร็ว (Hard Drop)`);
         }
 
         // Initialize on page load
         window.addEventListener('load', () => {
-            // Auto-initialize socket connection
             initSocket();
         });
-    </script>
-</body>
-</html>
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (socket && socket.connected) {
+                socket.emit('leave-room');
+                socket.disconnect();
