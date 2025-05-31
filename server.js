@@ -1,393 +1,371 @@
-// Optimized Server-Side Performance
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const path = require('path');
 
-class OptimizedGameServer {
-  constructor() {
-    this.app = express();
-    this.server = http.createServer(this.app);
-    this.io = socketIo(this.server, {
-      cors: { origin: "*", methods: ["GET", "POST"] }
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Handle all routes by serving index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Game server logic
+const rooms = new Map();
+const players = new Map();
+
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+
+  socket.on('create-room', ({ playerName }) => {
+    const roomId = generateRoomId();
+    rooms.set(roomId, {
+      players: [{
+        id: socket.id,
+        name: playerName,
+        ready: false
+      }],
+      gameState: null
     });
-
-    this.rooms = new Map();
-    this.players = new Map();
-    this.actionQueue = new Map(); // Rate limiting
     
-    // Performance monitoring
-    this.metrics = {
-      activeConnections: 0,
-      messagesPerSecond: 0,
-      lastMessageCount: 0
-    };
-
-    this.initializeServer();
-    this.startMetricsCollection();
-  }
-
-  initializeServer() {
-    this.io.on('connection', (socket) => {
-      this.metrics.activeConnections++;
-      this.setupSocketHandlers(socket);
-      
-      socket.on('disconnect', () => {
-        this.metrics.activeConnections--;
-        this.handleDisconnect(socket);
-      });
+    players.set(socket.id, {
+      roomId,
+      playerNumber: 1
     });
-  }
-
-  setupSocketHandlers(socket) {
-    // Rate limiting setup
-    this.actionQueue.set(socket.id, {
-      lastAction: 0,
-      actionCount: 0,
-      windowStart: Date.now()
-    });
-
-    socket.on('join-room', (data) => this.handleJoinRoom(socket, data));
-    socket.on('player-ready', () => this.handlePlayerReady(socket));
-    socket.on('game-action', (action) => this.handleGameAction(socket, action));
-    socket.on('leave-room', () => this.handleLeaveRoom(socket));
-    socket.on('request-new-game', () => this.handleNewGame(socket));
-  }
-
-  // Rate limiting for game actions
-  isActionAllowed(socketId) {
-    const now = Date.now();
-    const queue = this.actionQueue.get(socketId);
     
-    if (!queue) return false;
+    socket.join(roomId);
+    socket.emit('room-joined', { roomId, playerNumber: 1 });
+    updateRoomPlayers(roomId);
+  });
 
-    // Reset window every second
-    if (now - queue.windowStart > 1000) {
-      queue.actionCount = 0;
-      queue.windowStart = now;
+  socket.on('join-room', ({ roomId, playerName }) => {
+    if (!rooms.has(roomId)) {
+      return socket.emit('error', 'ห้องไม่พบ');
     }
-
-    // Allow max 20 actions per second
-    if (queue.actionCount >= 20) {
-      return false;
+    
+    const room = rooms.get(roomId);
+    if (room.players.length >= 2) {
+      return socket.emit('error', 'ห้องเต็มแล้ว');
     }
+    
+    const playerNumber = room.players.length + 1;
+    room.players.push({
+      id: socket.id,
+      name: playerName,
+      ready: false
+    });
+    
+    players.set(socket.id, {
+      roomId,
+      playerNumber
+    });
+    
+    socket.join(roomId);
+    socket.emit('room-joined', { roomId, playerNumber });
+    updateRoomPlayers(roomId);
+    
+    // Notify other player
+    socket.to(roomId).emit('player-joined');
+  });
 
-    // Minimum 30ms between actions
-    if (now - queue.lastAction < 30) {
-      return false;
-    }
-
-    queue.actionCount++;
-    queue.lastAction = now;
-    return true;
-  }
-
-  handleGameAction(socket, action) {
-    // Rate limiting check
-    if (!this.isActionAllowed(socket.id)) {
-      socket.emit('rate-limited');
-      return;
-    }
-
-    const playerInfo = this.players.get(socket.id);
+  socket.on('player-ready', () => {
+    const playerInfo = players.get(socket.id);
     if (!playerInfo) return;
+    
+    const room = rooms.get(playerInfo.roomId);
+    const player = room.players.find(p => p.id === socket.id);
+    player.ready = true;
+    
+    socket.emit('player-ready-update', playerInfo.playerNumber);
+    socket.to(playerInfo.roomId).emit('player-ready-update', playerInfo.playerNumber);
+    
+    // Check if both players are ready
+    if (room.players.length === 2 && room.players.every(p => p.ready)) {
+      startGame(playerInfo.roomId);
+    }
+  });
 
-    const room = this.rooms.get(playerInfo.roomId);
-    if (!room || !room.gameState.gameStarted) return;
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+    
+    const roomId = playerInfo.roomId;
+    players.delete(socket.id);
+    
+    if (rooms.has(roomId)) {
+      const room = rooms.get(roomId);
+      room.players = room.players.filter(p => p.id !== socket.id);
+      
+      if (room.players.length === 0) {
+        rooms.delete(roomId);
+      } else {
+        // Notify remaining player
+        io.to(roomId).emit('player-left');
+      }
+    }
+  });
 
-    const playerKey = `player${playerInfo.playerNumber}`;
+  // Gameplay events
+  socket.on('game-action', (action) => {
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo || !playerInfo.roomId) return;
+    
+    const room = rooms.get(playerInfo.roomId);
+    if (!room || !room.gameState) return;
+    
+    // Process game action and update state
+    processGameAction(room, playerInfo.playerNumber, action);
+    
+    // Broadcast updated state
+    io.to(playerInfo.roomId).emit('game-state-update', room.gameState);
+  });
+
+  function generateRoomId() {
+    return Math.random().toString(36).substr(2, 5).toUpperCase();
+  }
+
+  function updateRoomPlayers(roomId) {
+    const room = rooms.get(roomId);
+    io.to(roomId).emit('room-players-update', room.players);
+  }
+
+  function startGame(roomId) {
+    const room = rooms.get(roomId);
+    
+    // Initialize game state
+    room.gameState = {
+      player1: createPlayerState(),
+      player2: createPlayerState(),
+      gameStarted: true,
+      winner: null
+    };
+    
+    io.to(roomId).emit('game-started', room.gameState);
+  }
+
+  function createPlayerState() {
+    return {
+      grid: Array(20).fill().map(() => Array(10).fill(null)),
+      currentPiece: generateRandomPiece(),
+      nextPiece: generateRandomPiece(),
+      currentX: 4,
+      currentY: 0,
+      score: 0,
+      lines: 0,
+      level: 1,
+      alive: true
+    };
+  }
+
+  function generateRandomPiece() {
+    const pieces = ['i', 'o', 't', 's', 'z', 'j', 'l'];
+    const type = pieces[Math.floor(Math.random() * pieces.length)];
+    return {
+      type,
+      shape: getPieceShape(type),
+      color: getPieceColor(type)
+    };
+  }
+
+  function getPieceShape(type) {
+    const shapes = {
+      i: [[1,1,1,1]],
+      o: [[1,1],[1,1]],
+      t: [[0,1,0],[1,1,1]],
+      s: [[0,1,1],[1,1,0]],
+      z: [[1,1,0],[0,1,1]],
+      j: [[1,0,0],[1,1,1]],
+      l: [[0,0,1],[1,1,1]]
+    };
+    return shapes[type];
+  }
+
+  function getPieceColor(type) {
+    const colors = {
+      i: 'cyan',
+      o: 'yellow',
+      t: 'purple',
+      s: 'green',
+      z: 'red',
+      j: 'blue',
+      l: 'orange'
+    };
+    return colors[type];
+  }
+
+  function processGameAction(room, playerNumber, action) {
+    // Implement game logic here
+    // This is a simplified version - actual implementation would be more complex
+    const playerKey = `player${playerNumber}`;
     const playerState = room.gameState[playerKey];
     
-    if (!playerState.alive) return;
-
-    // Process action and get delta changes
-    const delta = this.processGameAction(room, playerState, action, playerInfo.playerNumber);
-    
-    if (delta) {
-      // Send only delta updates instead of full state
-      this.io.to(playerInfo.roomId).emit('game-delta', {
-        playerNumber: playerInfo.playerNumber,
-        changes: delta
-      });
-    }
-  }
-
-  processGameAction(room, playerState, action, playerNumber) {
-    const delta = { changes: [] };
+    if (!playerState || !playerState.alive) return;
     
     switch (action.type) {
       case 'move-left':
-        if (this.canMove(playerState.grid, playerState.currentPiece, 
-                       playerState.currentX - 1, playerState.currentY)) {
-          const oldX = playerState.currentX;
+        if (isValidMove(playerState, -1, 0)) {
           playerState.currentX--;
-          delta.changes.push({
-            type: 'position',
-            from: { x: oldX, y: playerState.currentY },
-            to: { x: playerState.currentX, y: playerState.currentY }
-          });
         }
         break;
-
       case 'move-right':
-        if (this.canMove(playerState.grid, playerState.currentPiece,
-                       playerState.currentX + 1, playerState.currentY)) {
-          const oldX = playerState.currentX;
+        if (isValidMove(playerState, 1, 0)) {
           playerState.currentX++;
-          delta.changes.push({
-            type: 'position',
-            from: { x: oldX, y: playerState.currentY },
-            to: { x: playerState.currentX, y: playerState.currentY }
-          });
         }
         break;
-
       case 'move-down':
-        if (this.canMove(playerState.grid, playerState.currentPiece,
-                       playerState.currentX, playerState.currentY + 1)) {
-          const oldY = playerState.currentY;
+        if (isValidMove(playerState, 0, 1)) {
           playerState.currentY++;
-          delta.changes.push({
-            type: 'position',
-            from: { x: playerState.currentX, y: oldY },
-            to: { x: playerState.currentX, y: playerState.currentY }
-          });
         } else {
-          // Handle piece placement
-          return this.handlePiecePlacement(room, playerState, playerNumber);
+          lockPiece(room, playerNumber);
         }
         break;
-
       case 'rotate':
-        const rotated = this.rotateMatrix(playerState.currentPiece.shape);
-        if (this.canMove(playerState.grid, { shape: rotated, color: playerState.currentPiece.color },
-                       playerState.currentX, playerState.currentY)) {
-          playerState.currentPiece.shape = rotated;
-          delta.changes.push({
-            type: 'rotation',
-            shape: rotated
-          });
-        }
+        rotatePiece(playerState);
         break;
-
       case 'hard-drop':
-        let dropDistance = 0;
-        while (this.canMove(playerState.grid, playerState.currentPiece,
-                          playerState.currentX, playerState.currentY + 1)) {
+        while (isValidMove(playerState, 0, 1)) {
           playerState.currentY++;
-          dropDistance++;
-          playerState.score += 2;
         }
-        if (dropDistance > 0) {
-          delta.changes.push({
-            type: 'hard-drop',
-            distance: dropDistance,
-            newY: playerState.currentY,
-            scoreGain: dropDistance * 2
-          });
-        }
+        lockPiece(room, playerNumber);
         break;
     }
-
-    return delta.changes.length > 0 ? delta : null;
   }
 
-  handlePiecePlacement(room, playerState, playerNumber) {
-    const delta = { changes: [] };
+  function isValidMove(playerState, deltaX, deltaY) {
+    // Simplified collision detection
+    const newX = playerState.currentX + deltaX;
+    const newY = playerState.currentY + deltaY;
     
-    // Place piece on grid
-    const newGrid = this.placePiece(
-      playerState.grid,
-      playerState.currentPiece,
-      playerState.currentX,
-      playerState.currentY
-    );
-    
-    // Clear lines efficiently
-    const clearedLines = [];
-    let linesCleared = 0;
-    
-    for (let row = 19; row >= 0; row--) {
-      if (newGrid[row].every(cell => cell !== 0)) {
-        clearedLines.push(row);
-        newGrid.splice(row, 1);
-        newGrid.unshift(Array(10).fill(0));
-        linesCleared++;
-        row++; // Check same row again since we shifted
+    for (let y = 0; y < playerState.currentPiece.shape.length; y++) {
+      for (let x = 0; x < playerState.currentPiece.shape[y].length; x++) {
+        if (playerState.currentPiece.shape[y][x]) {
+          const boardX = newX + x;
+          const boardY = newY + y;
+          
+          if (boardX < 0 || boardX >= 10 || boardY >= 20) {
+            return false;
+          }
+          
+          if (boardY >= 0 && playerState.grid[boardY][boardX]) {
+            return false;
+          }
+        }
       }
     }
     
-    playerState.grid = newGrid;
-    playerState.lines += linesCleared;
-    
-    // Calculate score efficiently
-    const lineScores = [0, 100, 300, 500, 800];
-    const scoreGain = lineScores[linesCleared] * playerState.level;
-    playerState.score += scoreGain;
-    playerState.level = Math.floor(playerState.lines / 10) + 1;
-    
-    // Add placement delta
-    delta.changes.push({
-      type: 'piece-placed',
-      piece: playerState.currentPiece,
-      position: { x: playerState.currentX, y: playerState.currentY },
-      linesCleared: clearedLines,
-      scoreGain,
-      newStats: {
-        score: playerState.score,
-        lines: playerState.lines,
-        level: playerState.level
+    return true;
+  }
+
+  function rotatePiece(playerState) {
+    const newShape = [];
+    for (let x = 0; x < playerState.currentPiece.shape[0].length; x++) {
+      newShape.push([]);
+      for (let y = playerState.currentPiece.shape.length - 1; y >= 0; y--) {
+        newShape[x].push(playerState.currentPiece.shape[y][x]);
       }
-    });
+    }
     
-    // Check game over
-    if (newGrid[0].some(cell => cell !== 0)) {
+    const oldShape = playerState.currentPiece.shape;
+    playerState.currentPiece.shape = newShape;
+    
+    // If rotation causes collision, revert
+    if (!isValidMove(playerState, 0, 0)) {
+      playerState.currentPiece.shape = oldShape;
+    }
+  }
+
+  function lockPiece(room, playerNumber) {
+    const playerKey = `player${playerNumber}`;
+    const playerState = room.gameState[playerKey];
+    
+    // Add piece to grid
+    for (let y = 0; y < playerState.currentPiece.shape.length; y++) {
+      for (let x = 0; x < playerState.currentPiece.shape[y].length; x++) {
+        if (playerState.currentPiece.shape[y][x]) {
+          const boardY = playerState.currentY + y;
+          const boardX = playerState.currentX + x;
+          
+          if (boardY >= 0) {
+            playerState.grid[boardY][boardX] = `block-${playerState.currentPiece.type}`;
+          }
+        }
+      }
+    }
+    
+    // Check for completed lines
+    const linesCleared = checkLines(playerState);
+    if (linesCleared > 0) {
+      playerState.score += calculateScore(linesCleared, playerState.level);
+      playerState.lines += linesCleared;
+      playerState.level = Math.floor(playerState.lines / 10) + 1;
+    }
+    
+    // Check for game over
+    if (playerState.currentY <= 0) {
       playerState.alive = false;
-      const otherPlayerKey = playerNumber === 1 ? 'player2' : 'player1';
-      room.gameState.winner = room.gameState[otherPlayerKey].alive ? 
-        (playerNumber === 1 ? 2 : 1) : 'draw';
+      checkGameOver(room);
+    }
+    
+    // Get new piece
+    playerState.currentPiece = playerState.nextPiece;
+    playerState.nextPiece = generateRandomPiece();
+    playerState.currentX = 4;
+    playerState.currentY = 0;
+  }
+
+  function checkLines(playerState) {
+    let linesCleared = 0;
+    
+    for (let y = playerState.grid.length - 1; y >= 0; y--) {
+      if (playerState.grid[y].every(cell => cell)) {
+        // Remove line
+        playerState.grid.splice(y, 1);
+        playerState.grid.unshift(Array(10).fill(null));
+        linesCleared++;
+        y++; // Check same row again
+      }
+    }
+    
+    return linesCleared;
+  }
+
+  function calculateScore(lines, level) {
+    const points = [0, 40, 100, 300, 1200];
+    return points[lines] * level;
+  }
+
+  function checkGameOver(room) {
+    if (!room.gameState.player1.alive || !room.gameState.player2.alive) {
+      room.gameState.gameStarted = false;
       
-      delta.changes.push({
-        type: 'game-over',
-        winner: room.gameState.winner,
+      let winner = null;
+      if (!room.gameState.player1.alive && !room.gameState.player2.alive) {
+        winner = 0; // Draw
+      } else if (!room.gameState.player1.alive) {
+        winner = 2;
+      } else {
+        winner = 1;
+      }
+      
+      room.gameState.winner = winner;
+      io.to(room.id).emit('game-over', {
+        winner,
         finalScores: {
           player1: room.gameState.player1.score,
           player2: room.gameState.player2.score
         }
       });
-    } else {
-      // Spawn new piece
-      playerState.currentPiece = playerState.nextPiece;
-      playerState.nextPiece = this.createRandomPiece();
-      playerState.currentX = 4;
-      playerState.currentY = 0;
-      
-      delta.changes.push({
-        type: 'new-piece',
-        currentPiece: playerState.currentPiece,
-        nextPiece: playerState.nextPiece
-      });
     }
-    
-    return delta;
   }
-
-  // Optimized grid operations using bit manipulation
-  canMove(grid, piece, newX, newY) {
-    for (let y = 0; y < piece.shape.length; y++) {
-      for (let x = 0; x < piece.shape[y].length; x++) {
-        if (piece.shape[y][x]) {
-          const gridX = newX + x;
-          const gridY = newY + y;
-          
-          // Boundary checks
-          if (gridX < 0 || gridX >= 10 || gridY >= 20) return false;
-          
-          // Collision check
-          if (gridY >= 0 && grid[gridY][gridX] !== 0) return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  // Optimized piece placement
-  placePiece(grid, piece, x, y) {
-    // Create shallow copy for better performance
-    const newGrid = grid.map(row => row.slice());
-    
-    for (let py = 0; py < piece.shape.length; py++) {
-      for (let px = 0; px < piece.shape[py].length; px++) {
-        if (piece.shape[py][px]) {
-          const gridY = y + py;
-          const gridX = x + px;
-          if (gridY >= 0 && gridY < 20 && gridX >= 0 && gridX < 10) {
-            newGrid[gridY][gridX] = piece.color;
-          }
-        }
-      }
-    }
-    return newGrid;
-  }
-
-  // Memory-efficient piece creation with object pooling
-  createRandomPiece() {
-    const pieces = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
-    const pieceType = pieces[Math.floor(Math.random() * pieces.length)];
-    
-    // Use prototype-based creation instead of deep cloning
-    return Object.create(this.getPiecePrototype(pieceType));
-  }
-
-  getPiecePrototype(type) {
-    const prototypes = {
-      I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'block-i' },
-      O: { shape: [[1,1],[1,1]], color: 'block-o' },
-      T: { shape: [[0,1,0],[1,1,1],[0,0,0]], color: 'block-t' },
-      S: { shape: [[0,1,1],[1,1,0],[0,0,0]], color: 'block-s' },
-      Z: { shape: [[1,1,0],[0,1,1],[0,0,0]], color: 'block-z' },
-      J: { shape: [[1,0,0],[1,1,1],[0,0,0]], color: 'block-j' },
-      L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'block-l' }
-    };
-    
-    return prototypes[type];
-  }
-
-  // Optimized matrix rotation using transposition
-  rotateMatrix(matrix) {
-    const rows = matrix.length;
-    const cols = matrix[0].length;
-    
-    // Transpose and reverse each row
-    return matrix[0].map((_, colIndex) =>
-      matrix.map(row => row[colIndex]).reverse()
-    );
-  }
-
-  // Performance monitoring
-  startMetricsCollection() {
-    setInterval(() => {
-      const now = Date.now();
-      const messageCount = this.metrics.messagesPerSecond;
-      
-      console.log(`📊 Server Metrics:
-        Active Connections: ${this.metrics.activeConnections}
-        Messages/sec: ${messageCount}
-        Active Rooms: ${this.rooms.size}
-        Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
-      `);
-      
-      this.metrics.lastMessageCount = messageCount;
-      this.metrics.messagesPerSecond = 0;
-    }, 5000);
-  }
-
-  // Graceful cleanup
-  cleanup() {
-    // Clear all intervals and timeouts
-    this.rooms.forEach(room => {
-      if (room.dropInterval) {
-        clearInterval(room.dropInterval);
-      }
-    });
-    
-    // Clear action queues
-    this.actionQueue.clear();
-  }
-
-  start(port = 3000) {
-    this.server.listen(port, () => {
-      console.log(`🚀 Optimized Tetris Server running on port ${port}`);
-      console.log(`⚡ Performance optimizations active`);
-    });
-  }
-}
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 Server shutting down gracefully...');
-  server.cleanup();
-  process.exit(0);
 });
 
-const server = new OptimizedGameServer();
-server.start();
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
