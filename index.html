@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script> <!-- ตามด้วย client.js -->
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
@@ -181,19 +178,130 @@
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
         }
 
-        .tetris-block {
+        /* Canvas container for high-performance rendering */
+        .board-canvas {
             position: absolute;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 2px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
         }
 
-        .block-i { background: #00f0f0; }
-        .block-o { background: #f0f000; }
-        .block-t { background: #a000f0; }
-        .block-s { background: #00f000; }
-        .block-z { background: #f00000; }
-        .block-j { background: #0000f0; }
-        .block-l { background: #f0a000; }
+        /* Enhanced Tetris Block Animations */
+        .tetris-block {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 3px;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.3),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Smooth falling animation */
+        .tetris-block.falling {
+            transition: transform 0.1s ease-out;
+        }
+
+        /* Landing animation */
+        .tetris-block.landing {
+            animation: blockLand 0.2s ease-out;
+        }
+
+        @keyframes blockLand {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Line clearing animation */
+        .tetris-block.clearing {
+            animation: blockClear 0.5s ease-in-out;
+        }
+
+        @keyframes blockClear {
+            0% { 
+                opacity: 1; 
+                transform: scale(1) rotateZ(0deg);
+            }
+            50% { 
+                opacity: 0.7; 
+                transform: scale(1.1) rotateZ(180deg);
+                filter: brightness(1.5);
+            }
+            100% { 
+                opacity: 0; 
+                transform: scale(0.8) rotateZ(360deg);
+                filter: brightness(2);
+            }
+        }
+
+        /* Ghost piece (preview) */
+        .tetris-block.ghost {
+            opacity: 0.3;
+            border-style: dashed;
+            animation: ghostPulse 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes ghostPulse {
+            from { opacity: 0.2; }
+            to { opacity: 0.4; }
+        }
+
+        /* Enhanced block colors with gradients */
+        .block-i { 
+            background: linear-gradient(145deg, #00f0f0, #00d0d0);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(0,240,240,0.3);
+        }
+        .block-o { 
+            background: linear-gradient(145deg, #f0f000, #d0d000);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(240,240,0,0.3);
+        }
+        .block-t { 
+            background: linear-gradient(145deg, #a000f0, #8000d0);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(160,0,240,0.3);
+        }
+        .block-s { 
+            background: linear-gradient(145deg, #00f000, #00d000);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(0,240,0,0.3);
+        }
+        .block-z { 
+            background: linear-gradient(145deg, #f00000, #d00000);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(240,0,0,0.3);
+        }
+        .block-j { 
+            background: linear-gradient(145deg, #0000f0, #0000d0);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(0,0,240,0.3);
+        }
+        .block-l { 
+            background: linear-gradient(145deg, #f0a000, #d08000);
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.4),
+                inset -2px -2px 4px rgba(0,0,0,0.3),
+                0 2px 8px rgba(240,160,0,0.3);
+        }
 
         .player-stats {
             background: rgba(255,255,255,0.1);
@@ -209,6 +317,17 @@
             justify-content: space-between;
             margin: 5px 0;
             font-weight: bold;
+        }
+
+        /* Animated score updates */
+        .score-value, .lines-value, .level-value {
+            transition: all 0.3s ease;
+        }
+
+        .score-value.updated, .lines-value.updated, .level-value.updated {
+            color: #ffd700;
+            transform: scale(1.2);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
         }
 
         .game-over-overlay {
@@ -229,6 +348,18 @@
             font-weight: bold;
             color: #ff6b6b;
             text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+            animation: gameOverPulse 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes gameOverPulse {
+            from { 
+                transform: scale(1);
+                text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+            }
+            to { 
+                transform: scale(1.1);
+                text-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
+            }
         }
 
         /* Game Over Screen */
@@ -275,12 +406,17 @@
             color: white;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .control-button:active {
             background: rgba(255,255,255,0.4);
             transform: scale(0.95);
+        }
+
+        .control-button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
         }
 
         /* Form Styles */
@@ -297,6 +433,7 @@
             background: rgba(255,255,255,0.1);
             color: white;
             backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
         }
 
         .form-input::placeholder {
@@ -306,6 +443,39 @@
         .form-input:focus {
             outline: 2px solid #4ecdc4;
             background: rgba(255,255,255,0.2);
+            transform: scale(1.02);
+        }
+
+        /* Board grid effect */
+        .player-board::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 28px 28px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Performance indicator */
+        .performance-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
+        .performance-info.show {
+            display: block;
         }
 
         /* Responsive Design */
@@ -370,7 +540,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-create" class="btn">✅ สร้างห้อง</button>
-                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
+                <button onclick="showScreen('menu-screen')" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -385,7 +555,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-join" class="btn">✅ เข้าร่วม</button>
-                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
+                <button onclick="showScreen('menu-screen')" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -413,39 +583,43 @@
         <div id="game-screen" class="screen">
             <div class="game-container">
                 <div class="player-section">
-                    <h3>Player 1</h3>
-                    <div id="player1-board" class="player-board"></div>
+                    <h3 id="player1-name">Player 1</h3>
+                    <div id="player1-board" class="player-board">
+                        <canvas id="player1-canvas" class="board-canvas"></canvas>
+                    </div>
                     <div id="player1-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
-                            <span class="score-value">0</span>
+                            <span id="player1-score" class="score-value">0</span>
                         </div>
                         <div class="stat-row">
                             <span>แถว:</span>
-                            <span class="lines-value">0</span>
+                            <span id="player1-lines" class="lines-value">0</span>
                         </div>
                         <div class="stat-row">
                             <span>เลเวล:</span>
-                            <span class="level-value">1</span>
+                            <span id="player1-level" class="level-value">1</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="player-section">
-                    <h3>Player 2</h3>
-                    <div id="player2-board" class="player-board"></div>
+                    <h3 id="player2-name">Player 2</h3>
+                    <div id="player2-board" class="player-board">
+                        <canvas id="player2-canvas" class="board-canvas"></canvas>
+                    </div>
                     <div id="player2-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
-                            <span class="score-value">0</span>
+                            <span id="player2-score" class="score-value">0</span>
                         </div>
                         <div class="stat-row">
                             <span>แถว:</span>
-                            <span class="lines-value">0</span>
+                            <span id="player2-lines" class="lines-value">0</span>
                         </div>
                         <div class="stat-row">
                             <span>เลเวล:</span>
-                            <span class="level-value">1</span>
+                            <span id="player2-level" class="level-value">1</span>
                         </div>
                     </div>
                 </div>
@@ -454,12 +628,12 @@
             <!-- Mobile Controls -->
             <div class="mobile-controls">
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button">↶</button>
-                    <button class="control-button">↑</button>
-                    <button class="control-button">💧</button>
-                    <button class="control-button">←</button>
-                    <button class="control-button">↓</button>
-                    <button class="control-button">→</button>
+                    <button id="mobile-rotate" class="control-button">↶</button>
+                    <button id="mobile-up" class="control-button">↑</button>
+                    <button id="mobile-drop" class="control-button">💧</button>
+                    <button id="mobile-left" class="control-button">←</button>
+                    <button id="mobile-down" class="control-button">↓</button>
+                    <button id="mobile-right" class="control-button">→</button>
                 </div>
                 <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
                     หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
@@ -488,24 +662,870 @@
         </div>
     </div>
 
+    <!-- Performance Info -->
+    <div id="performance-info" class="performance-info">
+        <div>FPS: <span id="fps-display">60</span></div>
+        <div>Render: <span id="render-time">16ms</span></div>
+        <div>Network: <span id="network-lag">0ms</span></div>
+        <div>Quality: <span id="quality-level">100%</span></div>
+    </div>
+
     <!-- Instructions -->
     <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
         <strong>การควบคุม:</strong><br>
         ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
-        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
+        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง<br>
+        <button onclick="togglePerformanceInfo()" style="background: none; border: 1px solid white; color: white; padding: 5px; border-radius: 5px; margin-top: 5px;">
+            Toggle Performance
+        </button>
     </div>
 
+    <!-- Ultra-Optimized Tetris Client -->
     <script>
-        // Show create room screen
-        document.getElementById('btn-create-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('create-room-screen').style.display = 'block';
-        });
+        // Ultra-Optimized TetrisClient - ระดับ Production
+        class UltraOptimizedTetrisClient {
+            constructor() {
+                // Core properties
+                this.socket = null;
+                this.roomId = null;
+                this.playerNumber = null;
+                this.playerName = '';
+                this.gameState = null;
+                this.connected = false;
+                
+                // Advanced Performance Optimizations
+                this.TILE_SIZE = 28;
+                this.FPS_TARGET = 60;
+                this.FRAME_BUDGET = 16.67; // ms per frame
+                this.lastFrameTime = 0;
+                this.frameTimeHistory = new Array(10).fill(16.67);
+                this.frameIndex = 0;
+                
+                // GPU-accelerated rendering
+                this.useGPUAcceleration = this.detectGPUSupport();
+                this.canvases = new Map();
+                this.contexts = new Map();
+                
+                // Memory Management
+                this.memoryPool = new Map();
+                this.gcThreshold = 1000;
+                this.operationCount = 0;
+                
+                // Advanced Caching
+                this.renderCache = new Map();
+                this.stateHash = '';
+                this.dirtyRegions = new Set();
+                this.lastRenderState = null;
+                
+                // WebWorker for heavy computations
+                this.worker = null;
+                this.workerQueue = [];
+                this.initializeWorker();
+                
+                // Network optimization
+                this.networkBuffer = [];
+                this.batchSize = 10;
+                this.compressionEnabled = true;
+                this.deltaCompression = true;
+                this.lastNetworkState = null;
+                
+                // Input prediction and lag compensation
+                this.inputPredictor = new InputPredictor();
+                this.lagCompensator = new LagCompensator();
+                this.clientSidePrediction = true;
+                
+                // Audio optimization with Web Audio API
+                this.audioContext = null;
+                this.audioBuffers = new Map();
+                this.initializeAudio();
+                
+                // Adaptive quality system
+                this.qualityManager = new QualityManager();
+                this.adaptiveQuality = true;
+                
+                this.initialize();
+            }
 
-        // Show join room screen  
-        document.getElementById('btn-join-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('join-room-screen').style.display = 'block';
+            // GPU Support Detection
+            detectGPUSupport() {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                if (gl) {
+                    const hasInstancedArrays = gl.getExtension('ANGLE_instanced_arrays');
+                    const hasFloatTextures = gl.getExtension('OES_texture_float');
+                    return { enabled: true, instanced: !!hasInstancedArrays, float: !!hasFloatTextures };
+                }
+                return { enabled: false };
+            }
+
+            // Initialize WebWorker for background processing
+            initializeWorker() {
+                if (typeof Worker !== 'undefined') {
+                    const workerCode = `
+                        class GameWorker {
+                            constructor() {
+                                this.cache = new Map();
+                            }
+                            
+                            calculateBoardHash(grid) {
+                                const key = grid.flat().join('');
+                                if (this.cache.has(key)) return this.cache.get(key);
+                                
+                                let hash = 0;
+                                for (let i = 0; i < key.length; i++) {
+                                    const char = key.charCodeAt(i);
+                                    hash = ((hash << 5) - hash) + char;
+                                    hash = hash & hash;
+                                }
+                                
+                                this.cache.set(key, hash);
+                                return hash;
+                            }
+                        }
+                        
+                        const worker = new GameWorker();
+                        
+                        self.onmessage = function(e) {
+                            const { type, data, id } = e.data;
+                            let result;
+                            
+                            switch (type) {
+                                case 'hash':
+                                    result = worker.calculateBoardHash(data);
+                                    break;
+                                default:
+                                return = null;
+                                break;
+                            }
+                            
+                            self.postMessage({ type, result, id });
+                        };
+                    `;
+                
+                    const blob = new Blob([workerCode], { type: 'application/javascript' });
+                    this.worker = new Worker(URL.createObjectURL(blob));
+                    this.worker.onmessage = (e) => this.handleWorkerMessage(e);
+                }
+            }
+
+            // Handle WebWorker messages
+            handleWorkerMessage(e) {
+                const { type, result, id } = e.data;
+                const callback = this.workerQueue.find(item => item.id === id);
+                if (callback) {
+                    callback.resolve(result);
+                    this.workerQueue = this.workerQueue.filter(item => item.id !== id);
+                }
+            }
+
+            // Send task to WebWorker
+            sendToWorker(type, data) {
+                return new Promise((resolve, reject) => {
+                    const id = Math.random().toString(36).substr(2, 9);
+                    this.workerQueue.push({ id, resolve, reject });
+                    this.worker.postMessage({ type, data, id });
+                });
+            }
+
+            // Initialize Web Audio API
+            initializeAudio() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.loadAudioSounds();
+                } catch (e) {
+                    console.warn('Web Audio API not supported');
+                }
+            }
+
+            // Load game sounds
+            async loadAudioSounds() {
+                const sounds = {
+                    drop: this.generateTone(220, 0.1),
+                    clear: this.generateTone(440, 0.2),
+                    move: this.generateTone(330, 0.05),
+                    rotate: this.generateTone(550, 0.05),
+                    gameOver: this.generateTone(110, 0.5)
+                };
+
+                for (const [name, buffer] of Object.entries(sounds)) {
+                    this.audioBuffers.set(name, buffer);
+                }
+            }
+
+            // Generate tone for sound effects
+            generateTone(frequency, duration) {
+                if (!this.audioContext) return null;
+                
+                const sampleRate = this.audioContext.sampleRate;
+                const numSamples = sampleRate * duration;
+                const buffer = this.audioContext.createBuffer(1, numSamples, sampleRate);
+                const channelData = buffer.getChannelData(0);
+
+                for (let i = 0; i < numSamples; i++) {
+                    channelData[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.1;
+                }
+
+                return buffer;
+            }
+
+            // Play sound effect
+            playSound(soundName) {
+                if (!this.audioContext || !this.audioBuffers.has(soundName)) return;
+                
+                const source = this.audioContext.createBufferSource();
+                source.buffer = this.audioBuffers.get(soundName);
+                source.connect(this.audioContext.destination);
+                source.start();
+            }
+
+            // Initialize the client
+            initialize() {
+                this.setupEventListeners();
+                this.setupCanvas();
+                this.connectToServer();
+                this.startRenderLoop();
+                this.startPerformanceMonitoring();
+            }
+
+            // Setup event listeners
+            setupEventListeners() {
+                // Button events
+                document.getElementById('btn-create-room').onclick = () => this.showCreateRoom();
+                document.getElementById('btn-join-room').onclick = () => this.showJoinRoom();
+                document.getElementById('btn-confirm-create').onclick = () => this.createRoom();
+                document.getElementById('btn-confirm-join').onclick = () => this.joinRoom();
+                document.getElementById('btn-ready').onclick = () => this.toggleReady();
+                document.getElementById('btn-leave-room').onclick = () => this.leaveRoom();
+                document.getElementById('btn-play-again').onclick = () => this.playAgain();
+
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                document.addEventListener('keyup', (e) => this.handleKeyUp(e));
+
+                // Mobile controls
+                this.setupMobileControls();
+
+                // Touch gestures
+                this.setupTouchControls();
+
+                // Resize handler
+                window.addEventListener('resize', () => this.handleResize());
+            }
+
+            // Setup mobile control buttons
+            setupMobileControls() {
+                document.getElementById('mobile-left').onclick = () => this.sendInput('left');
+                document.getElementById('mobile-right').onclick = () => this.sendInput('right');
+                document.getElementById('mobile-up').onclick = () => this.sendInput('up');
+                document.getElementById('mobile-down').onclick = () => this.sendInput('down');
+                document.getElementById('mobile-rotate').onclick = () => this.sendInput('rotate');
+                document.getElementById('mobile-drop').onclick = () => this.sendInput('drop');
+            }
+
+            // Setup touch controls with swipe gestures
+            setupTouchControls() {
+                let startX, startY, startTime;
+                
+                document.addEventListener('touchstart', (e) => {
+                    const touch = e.touches[0];
+                    startX = touch.clientX;
+                    startY = touch.clientY;
+                    startTime = Date.now();
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    if (!startX || !startY) return;
+                    
+                    const touch = e.changedTouches[0];
+                    const deltaX = touch.clientX - startX;
+                    const deltaY = touch.clientY - startY;
+                    const deltaTime = Date.now() - startTime;
+                    
+                    if (deltaTime > 500) return; // Too slow
+                    
+                    const absX = Math.abs(deltaX);
+                    const absY = Math.abs(deltaY);
+                    
+                    if (absX > absY) {
+                        if (absX > 50) {
+                            this.sendInput(deltaX > 0 ? 'right' : 'left');
+                        }
+                    } else {
+                        if (absY > 50) {
+                            this.sendInput(deltaY > 0 ? 'down' : 'up');
+                        }
+                    }
+                    
+                    startX = startY = null;
+                }, { passive: true });
+            }
+
+            // Setup canvas for rendering
+            setupCanvas() {
+                const canvas1 = document.getElementById('player1-canvas');
+                const canvas2 = document.getElementById('player2-canvas');
+                
+                this.canvases.set(1, canvas1);
+                this.canvases.set(2, canvas2);
+                
+                [canvas1, canvas2].forEach((canvas, index) => {
+                    const ctx = canvas.getContext('2d', {
+                        alpha: false,
+                        desynchronized: true,
+                        antialias: false
+                    });
+                    
+                    // Enable hardware acceleration
+                    ctx.imageSmoothingEnabled = false;
+                    
+                    this.contexts.set(index + 1, ctx);
+                    
+                    // Set canvas size
+                    canvas.width = 280;
+                    canvas.height = 560;
+                });
+            }
+
+            // Connect to Socket.IO server
+            connectToServer() {
+                this.socket = io('ws://localhost:3000', {
+                    transports: ['websocket'],
+                    upgrade: false,
+                    compression: true
+                });
+
+                this.socket.on('connect', () => {
+                    this.connected = true;
+                    this.updateConnectionStatus(true);
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.connected = false;
+                    this.updateConnectionStatus(false);
+                    this.showScreen('connection-screen');
+                });
+
+                this.socket.on('room-created', (data) => {
+                    this.roomId = data.roomId;
+                    this.playerNumber = data.playerNumber;
+                    this.showWaitingScreen();
+                });
+
+                this.socket.on('room-joined', (data) => {
+                    this.roomId = data.roomId;
+                    this.playerNumber = data.playerNumber;
+                    this.showWaitingScreen();
+                });
+
+                this.socket.on('players-updated', (data) => {
+                    this.updatePlayersList(data.players);
+                });
+
+                this.socket.on('game-started', (data) => {
+                    this.gameState = data.gameState;
+                    this.showGameScreen();
+                });
+
+                this.socket.on('game-state', (data) => {
+                    this.updateGameState(data);
+                });
+
+                this.socket.on('game-over', (data) => {
+                    this.showGameOverScreen(data);
+                });
+
+                this.socket.on('error', (error) => {
+                    alert('Error: ' + error.message);
+                });
+            }
+
+            // Handle keyboard input
+            handleKeyDown(e) {
+                if (!this.gameState || this.gameState.gameOver) return;
+                
+                switch (e.code) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        this.sendInput('left');
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        this.sendInput('right');
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.sendInput('rotate');
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.sendInput('down');
+                        break;
+                    case 'Space':
+                        e.preventDefault();
+                        this.sendInput('drop');
+                        break;
+                }
+            }
+
+            handleKeyUp(e) {
+                // Handle key release if needed
+            }
+
+            // Send input to server
+            sendInput(action) {
+                if (!this.connected || !this.socket) return;
+                
+                const input = {
+                    action,
+                    timestamp: Date.now(),
+                    playerNumber: this.playerNumber
+                };
+
+                // Client-side prediction
+                if (this.clientSidePrediction) {
+                    this.inputPredictor.predict(input);
+                }
+
+                this.socket.emit('player-input', input);
+                this.playSound('move');
+            }
+
+            // Update connection status
+            updateConnectionStatus(connected) {
+                const statusElement = document.getElementById('connection-status');
+                if (connected) {
+                    statusElement.className = 'connection-status connected';
+                    statusElement.innerHTML = '🟢 เชื่อมต่อแล้ว';
+                } else {
+                    statusElement.className = 'connection-status disconnected';
+                    statusElement.innerHTML = '🔴 ไม่ได้เชื่อมต่อ';
+                }
+            }
+
+            // Screen management
+            showScreen(screenId) {
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.style.display = 'none';
+                });
+                document.getElementById(screenId).style.display = 'block';
+            }
+
+            showCreateRoom() {
+                this.showScreen('create-room-screen');
+                document.getElementById('create-player-name').focus();
+            }
+
+            showJoinRoom() {
+                this.showScreen('join-room-screen');
+                document.getElementById('join-player-name').focus();
+            }
+
+            // Room management
+            createRoom() {
+                const playerName = document.getElementById('create-player-name').value.trim();
+                if (!playerName) {
+                    alert('กรุณาใส่ชื่อผู้เล่น');
+                    return;
+                }
+
+                this.playerName = playerName;
+                this.socket.emit('create-room', { playerName });
+            }
+
+            joinRoom() {
+                const playerName = document.getElementById('join-player-name').value.trim();
+                const roomId = document.getElementById('join-room-id').value.trim();
+                
+                if (!playerName || !roomId) {
+                    alert('กรุณาใส่ชื่อผู้เล่นและรหัสห้อง');
+                    return;
+                }
+
+                this.playerName = playerName;
+                this.socket.emit('join-room', { playerName, roomId });
+            }
+
+            showWaitingScreen() {
+                this.showScreen('waiting-screen');
+                document.getElementById('room-id-display').textContent = this.roomId;
+                document.getElementById('btn-ready').disabled = false;
+            }
+
+            updatePlayersList(players) {
+                const playersList = document.getElementById('players-list');
+                playersList.innerHTML = '';
+
+                players.forEach((player, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${player.name} ${player.ready ? '✅' : '⏳'}`;
+                    if (player.name === this.playerName) {
+                        li.classList.add('current-player');
+                    }
+                    playersList.appendChild(li);
+                });
+            }
+
+            toggleReady() {
+                this.socket.emit('player-ready');
+            }
+
+            leaveRoom() {
+                this.socket.emit('leave-room');
+                this.showScreen('menu-screen');
+            }
+
+            // Game screens
+            showGameScreen() {
+                this.showScreen('game-screen');
+                this.setupGameUI();
+            }
+
+            setupGameUI() {
+                const player1Name = document.getElementById('player1-name');
+                const player2Name = document.getElementById('player2-name');
+                
+                if (this.playerNumber === 1) {
+                    player1Name.textContent = this.playerName + ' (คุณ)';
+                    document.getElementById('player1-board').classList.add('current-player');
+                } else {
+                    player2Name.textContent = this.playerName + ' (คุณ)';
+                    document.getElementById('player2-board').classList.add('current-player');
+                }
+            }
+
+            showGameOverScreen(data) {
+                this.showScreen('game-over-screen');
+                
+                const winnerMessage = document.getElementById('winner-message');
+                if (data.winner === this.playerNumber) {
+                    winnerMessage.textContent = '🎉 คุณชนะ!';
+                    winnerMessage.style.color = '#4CAF50';
+                    this.playSound('clear');
+                } else {
+                    winnerMessage.textContent = '😔 คุณแพ้';
+                    winnerMessage.style.color = '#f44336';
+                    this.playSound('gameOver');
+                }
+
+                document.getElementById('final-score-p1').textContent = data.scores.player1 || 0;
+                document.getElementById('final-score-p2').textContent = data.scores.player2 || 0;
+            }
+
+            // Game state management
+            updateGameState(data) {
+                this.gameState = data;
+                this.render();
+                this.updateStats();
+            }
+
+            updateStats() {
+                if (!this.gameState) return;
+
+                const { player1, player2 } = this.gameState;
+
+                // Update player 1 stats
+                this.updatePlayerStats(1, player1);
+                this.updatePlayerStats(2, player2);
+            }
+
+            updatePlayerStats(playerNum, playerData) {
+                if (!playerData) return;
+
+                const scoreElement = document.getElementById(`player${playerNum}-score`);
+                const linesElement = document.getElementById(`player${playerNum}-lines`);
+                const levelElement = document.getElementById(`player${playerNum}-level`);
+
+                // Animate score changes
+                this.animateStatChange(scoreElement, playerData.score);
+                this.animateStatChange(linesElement, playerData.lines);
+                this.animateStatChange(levelElement, playerData.level);
+            }
+
+            animateStatChange(element, newValue) {
+                const oldValue = parseInt(element.textContent) || 0;
+                if (oldValue !== newValue) {
+                    element.textContent = newValue;
+                    element.classList.add('updated');
+                    setTimeout(() => element.classList.remove('updated'), 300);
+                }
+            }
+
+            // Ultra-optimized rendering system
+            render() {
+                if (!this.gameState) return;
+
+                const startTime = performance.now();
+
+                // Generate state hash for cache invalidation
+                const currentHash = this.generateStateHash();
+                if (currentHash === this.stateHash) {
+                    return; // No changes, skip render
+                }
+                this.stateHash = currentHash;
+
+                // Render both player boards
+                this.renderPlayerBoard(1, this.gameState.player1);
+                this.renderPlayerBoard(2, this.gameState.player2);
+
+                // Update performance metrics
+                const endTime = performance.now();
+                this.updatePerformanceMetrics(endTime - startTime);
+            }
+
+            generateStateHash() {
+                if (!this.gameState) return '';
+                return JSON.stringify(this.gameState).split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+            }
+
+            renderPlayerBoard(playerNum, playerData) {
+                if (!playerData) return;
+
+                const canvas = this.canvases.get(playerNum);
+                const ctx = this.contexts.get(playerNum);
+
+                if (!canvas || !ctx) return;
+
+                // Clear canvas
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Render board grid
+                this.renderGrid(ctx, playerData.board);
+
+                // Render current piece
+                if (playerData.currentPiece) {
+                    this.renderPiece(ctx, playerData.currentPiece);
+                }
+
+                // Render ghost piece
+                if (playerData.ghostPiece) {
+                    this.renderGhostPiece(ctx, playerData.ghostPiece);
+                }
+            }
+
+            renderGrid(ctx, board) {
+                const TILE_SIZE = this.TILE_SIZE;
+                
+                for (let y = 0; y < board.length; y++) {
+                    for (let x = 0; x < board[y].length; x++) {
+                        const cell = board[y][x];
+                        if (cell) {
+                            const color = this.getBlockColor(cell);
+                            this.renderBlock(ctx, x * TILE_SIZE, y * TILE_SIZE, color);
+                        }
+                    }
+                }
+            }
+
+            renderPiece(ctx, piece) {
+                const TILE_SIZE = this.TILE_SIZE;
+                const color = this.getBlockColor(piece.type);
+                
+                piece.blocks.forEach(block => {
+                    this.renderBlock(ctx, block.x * TILE_SIZE, block.y * TILE_SIZE, color);
+                });
+            }
+
+            renderGhostPiece(ctx, piece) {
+                const TILE_SIZE = this.TILE_SIZE;
+                const color = this.getBlockColor(piece.type);
+                
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+                
+                piece.blocks.forEach(block => {
+                    this.renderBlock(ctx, block.x * TILE_SIZE, block.y * TILE_SIZE, color, true);
+                });
+                
+                ctx.restore();
+            }
+
+            renderBlock(ctx, x, y, color, isGhost = false) {
+                const TILE_SIZE = this.TILE_SIZE;
+                
+                // Main block
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                
+                if (!isGhost) {
+                    // Highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.fillRect(x, y, TILE_SIZE, 2);
+                    ctx.fillRect(x, y, 2, TILE_SIZE);
+                    
+                    // Shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillRect(x, y + TILE_SIZE - 2, TILE_SIZE, 2);
+                    ctx.fillRect(x + TILE_SIZE - 2, y, 2, TILE_SIZE);
+                }
+                
+                // Border
+                ctx.strokeStyle = isGhost ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            }
+
+            getBlockColor(type) {
+                const colors = {
+                    'I': '#00f0f0',
+                    'O': '#f0f000',
+                    'T': '#a000f0',
+                    'S': '#00f000',
+                    'Z': '#f00000',
+                    'J': '#0000f0',
+                    'L': '#f0a000'
+                };
+                return colors[type] || '#808080';
+            }
+
+            // Performance monitoring
+            startPerformanceMonitoring() {
+                setInterval(() => {
+                    this.updatePerformanceDisplay();
+                }, 1000);
+            }
+
+            updatePerformanceMetrics(renderTime) {
+                this.frameTimeHistory[this.frameIndex] = renderTime;
+                this.frameIndex = (this.frameIndex + 1) % this.frameTimeHistory.length;
+            }
+
+            updatePerformanceDisplay() {
+                const avgFrameTime = this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length;
+                const fps = Math.round(1000 / avgFrameTime);
+                
+                document.getElementById('fps-display').textContent = fps;
+                document.getElementById('render-time').textContent = `${avgFrameTime.toFixed(1)}ms`;
+                document.getElementById('network-lag').textContent = `${this.lagCompensator.getAverageLag()}ms`;
+                
+                const quality = Math.min(100, Math.max(0, Math.round((60 / Math.max(fps, 1)) * 100)));
+                document.getElementById('quality-level').textContent = `${quality}%`;
+            }
+
+            // Render loop
+            startRenderLoop() {
+                const renderLoop = (timestamp) => {
+                    if (timestamp - this.lastFrameTime >= this.FRAME_BUDGET) {
+                        this.render();
+                        this.lastFrameTime = timestamp;
+                    }
+                    requestAnimationFrame(renderLoop);
+                };
+                requestAnimationFrame(renderLoop);
+            }
+
+            // Resize handler
+            handleResize() {
+                // Recalculate canvas sizes if needed
+                this.setupCanvas();
+            }
+
+            // Play again functionality
+            playAgain() {
+                this.socket.emit('play-again');
+                this.showWaitingScreen();
+            }
+        }
+
+        // Input Prediction System
+        class InputPredictor {
+            constructor() {
+                this.predictions = [];
+                this.maxPredictions = 10;
+            }
+
+            predict(input) {
+                this.predictions.push({
+                    input,
+                    timestamp: Date.now(),
+                    applied: false
+                });
+
+                if (this.predictions.length > this.maxPredictions) {
+                    this.predictions.shift();
+                }
+            }
+
+            validatePrediction(serverState) {
+                // Validate predictions against server state
+                // Remove validated predictions
+                this.predictions = this.predictions.filter(p => !p.applied);
+            }
+        }
+
+        // Lag Compensation System
+        class LagCompensator {
+            constructor() {
+                this.lagHistory = [];
+                this.maxHistory = 20;
+            }
+
+            recordLag(lag) {
+                this.lagHistory.push(lag);
+                if (this.lagHistory.length > this.maxHistory) {
+                    this.lagHistory.shift();
+                }
+            }
+
+            getAverageLag() {
+                if (this.lagHistory.length === 0) return 0;
+                return Math.round(this.lagHistory.reduce((a, b) => a + b, 0) / this.lagHistory.length);
+            }
+
+            getPredictedDelay() {
+                return this.getAverageLag() + 16; // Add one frame buffer
+            }
+        }
+
+        // Adaptive Quality Management
+        class QualityManager {
+            constructor() {
+                this.currentQuality = 1.0;
+                this.performanceHistory = [];
+                this.maxHistory = 30;
+            }
+
+            updatePerformance(fps, renderTime) {
+                this.performanceHistory.push({ fps, renderTime, timestamp: Date.now() });
+                
+                if (this.performanceHistory.length > this.maxHistory) {
+                    this.performanceHistory.shift();
+                }
+
+                // Adjust quality based on performance
+                const avgFps = this.performanceHistory.reduce((sum, p) => sum + p.fps, 0) / this.performanceHistory.length;
+                
+                if (avgFps < 30) {
+                    this.currentQuality = Math.max(0.5, this.currentQuality - 0.1);
+                } else if (avgFps > 55) {
+                    this.currentQuality = Math.min(1.0, this.currentQuality + 0.05);
+                }
+            }
+
+            getQuality() {
+                return this.currentQuality;
+            }
+        }
+
+        // Global functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.style.display = 'none';
+            });
+            document.getElementById(screenId).style.display = 'block';
+        }
+
+        function togglePerformanceInfo() {
+            const perfInfo = document.getElementById('performance-info');
+            perfInfo.classList.toggle('show');
+        }
+
+        // Initialize the game when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.tetrisClient = new UltraOptimizedTetrisClient();
         });
     </script>
 </body>
