@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script> <!-- ตามด้วย client.js -->
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
@@ -155,31 +158,50 @@
             gap: 2rem;
             max-width: 1200px;
             margin: 0 auto;
-            position: relative;
         }
 
-        .game-canvas-container {
-            position: relative;
-            background: rgba(0,0,0,0.3);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        #game-canvas {
-            border: 2px solid #333;
+        .player-board {
+            position: relative;
+            width: 280px;
+            height: 560px;
+            background: rgba(0,0,0,0.8);
+            border: 3px solid #333;
             border-radius: 10px;
-            background: #000;
+            overflow: hidden;
         }
 
-        .game-stats {
+        .player-board.current-player {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .tetris-block {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .block-i { background: #00f0f0; }
+        .block-o { background: #f0f000; }
+        .block-t { background: #a000f0; }
+        .block-s { background: #00f000; }
+        .block-z { background: #f00000; }
+        .block-j { background: #0000f0; }
+        .block-l { background: #f0a000; }
+
+        .player-stats {
+            background: rgba(255,255,255,0.1);
             border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1rem;
             min-width: 200px;
+            backdrop-filter: blur(10px);
         }
 
         .stat-row {
@@ -187,6 +209,48 @@
             justify-content: space-between;
             margin: 5px 0;
             font-weight: bold;
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .game-over-text {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        /* Game Over Screen */
+        .winner-announcement {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            font-weight: bold;
+        }
+
+        .final-scores {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 1rem 0;
+            font-size: 1.2rem;
         }
 
         /* Mobile Controls */
@@ -244,43 +308,18 @@
             background: rgba(255,255,255,0.2);
         }
 
-        /* Game Over Modal */
-        .game-over-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 2rem;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-
-        .modal-content h2 {
-            margin-bottom: 1rem;
-            font-size: 2rem;
-        }
-
-        .scores {
-            margin: 1rem 0;
-            padding: 1rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-        }
-
         /* Responsive Design */
         @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .player-board {
+                width: 200px;
+                height: 400px;
+            }
+
             .game-title {
                 font-size: 2rem;
             }
@@ -288,28 +327,17 @@
             .mobile-controls {
                 display: block;
             }
-
-            #game-canvas {
-                width: 90vw;
-                height: 60vh;
-            }
         }
 
         @media (max-width: 480px) {
             .container {
                 padding: 10px;
             }
-        }
 
-        /* Status indicator */
-        .status-display {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 0.9rem;
+            .player-board {
+                width: 150px;
+                height: 300px;
+            }
         }
     </style>
 </head>
@@ -324,8 +352,14 @@
             <div class="menu-buttons">
                 <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
                 <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
-                <button id="btn-single-player" class="btn btn-single-player">🎯 เล่นคนเดียว</button>
+                <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
             </div>
+        </div>
+
+        <!-- Connection Screen -->
+        <div id="connection-screen" class="screen">
+            <h2>⚠️ การเชื่อมต่อขาดหาย</h2>
+            <p>กำลังพยายามเชื่อมต่อใหม่...</p>
         </div>
 
         <!-- Create Room Dialog -->
@@ -336,7 +370,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-create" class="btn">✅ สร้างห้อง</button>
-                <button class="btn" onclick="showScreen('menu-screen')">❌ ยกเลิก</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -351,7 +385,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-join" class="btn">✅ เข้าร่วม</button>
-                <button class="btn" onclick="showScreen('menu-screen')">❌ ยกเลิก</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -378,20 +412,54 @@
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-container">
-                <div class="game-canvas-container">
-                    <canvas id="game-canvas" width="800" height="600"></canvas>
+                <div class="player-section">
+                    <h3>Player 1</h3>
+                    <div id="player1-board" class="player-board"></div>
+                    <div id="player1-stats" class="player-stats">
+                        <div class="stat-row">
+                            <span>คะแนน:</span>
+                            <span class="score-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>แถว:</span>
+                            <span class="lines-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>เลเวล:</span>
+                            <span class="level-value">1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="player-section">
+                    <h3>Player 2</h3>
+                    <div id="player2-board" class="player-board"></div>
+                    <div id="player2-stats" class="player-stats">
+                        <div class="stat-row">
+                            <span>คะแนน:</span>
+                            <span class="score-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>แถว:</span>
+                            <span class="lines-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>เลเวล:</span>
+                            <span class="level-value">1</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Mobile Controls -->
             <div class="mobile-controls">
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('rotate')">↶</button>
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('rotate')">↑</button>
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('hard-drop')">💧</button>
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('move-left')">←</button>
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('move-down')">↓</button>
-                    <button class="control-button" onclick="gameClient?.handleMobileInput('move-right')">→</button>
+                    <button class="control-button">↶</button>
+                    <button class="control-button">↑</button>
+                    <button class="control-button">💧</button>
+                    <button class="control-button">←</button>
+                    <button class="control-button">↓</button>
+                    <button class="control-button">→</button>
                 </div>
                 <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
                     หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
@@ -415,13 +483,10 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-play-again" class="btn">🔄 เล่นอีกครั้ง</button>
-                <button class="btn" onclick="window.location.reload()">🏠 กลับเมนู</button>
+                <button onclick="window.location.reload()" class="btn">🏠 กลับเมนู</button>
             </div>
         </div>
     </div>
-
-    <!-- Status Display -->
-    <div id="status" class="status-display">รอการเชื่อมต่อ...</div>
 
     <!-- Instructions -->
     <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
@@ -431,828 +496,16 @@
     </div>
 
     <script>
-        // Global game client instance
-        let gameClient = null;
-
-        // UI Management Functions
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.style.display = 'none';
-            });
-            document.getElementById(screenId).style.display = 'block';
-        }
-
-        function updateConnectionStatus(connected) {
-            const statusEl = document.getElementById('connection-status');
-            if (connected) {
-                statusEl.className = 'connection-status connected';
-                statusEl.innerHTML = '🟢 เชื่อมต่อแล้ว';
-            } else {
-                statusEl.className = 'connection-status disconnected';
-                statusEl.innerHTML = '🔴 ไม่ได้เชื่อมต่อ';
-            }
-        }
-
-        function updatePlayersList(players) {
-            const listEl = document.getElementById('players-list');
-            listEl.innerHTML = '';
-            
-            players.forEach((player, index) => {
-                const li = document.createElement('li');
-                li.textContent = `${player.name} ${player.ready ? '✅' : '⏳'}`;
-                if (player.id === gameClient?.socket?.id) {
-                    li.classList.add('current-player');
-                }
-                listEl.appendChild(li);
-            });
-        }
-
-        // Enhanced OptimizedTetrisClient with UI integration
-        class OptimizedTetrisClient {
-            constructor() {
-                this.socket = null;
-                this.gameState = null;
-                this.prevGameState = null;
-                this.dropInterval = null;
-                this.animationFrame = null;
-                this.playerNumber = null;
-                this.roomId = null;
-                this.TILE_SIZE = 30;
-                
-                // Canvas setup for better performance
-                this.setupCanvas();
-                
-                // Object pooling for DOM elements
-                this.blockPool = [];
-                this.activeBlocks = new Set();
-                
-                // Performance monitoring
-                this.performanceMetrics = {
-                    frameCount: 0,
-                    lastTime: performance.now(),
-                    fps: 60
-                };
-                
-                // เริ่มการเชื่อมต่อ Socket.io
-                this.initializeSocket();
-                this.setupEventListeners();
-                this.startRenderLoop();
-            }
-
-            // Socket.io initialization
-            initializeSocket() {
-                this.socket = io('http://localhost:3000', {
-                    transports: ['websocket', 'polling']
-                });
-
-                this.setupSocketHandlers();
-            }
-
-            // Socket Event Handlers
-            setupSocketHandlers() {
-                this.socket.on('connect', () => {
-                    console.log('🔌 Connected to server:', this.socket.id);
-                    updateConnectionStatus(true);
-                    this.updateStatus('เชื่อมต่อแล้ว');
-                });
-
-                this.socket.on('disconnect', (reason) => {
-                    console.log('🔌 Disconnected:', reason);
-                    updateConnectionStatus(false);
-                    this.updateStatus('ขาดการเชื่อมต่อ');
-                });
-
-                this.socket.on('room-joined', (data) => {
-                    console.log('🏠 Joined room:', data.roomId);
-                    this.roomId = data.roomId;
-                    this.playerNumber = data.playerNumber;
-                    
-                    document.getElementById('room-id-display').textContent = data.roomId;
-                    this.updateStatus(`Player ${data.playerNumber} - Room: ${data.roomId}`);
-                    
-                    showScreen('waiting-screen');
-                    document.getElementById('btn-ready').disabled = false;
-                });
-
-                this.socket.on('room-players-update', (players) => {
-                    updatePlayersList(players);
-                });
-
-                this.socket.on('game-started', (gameState) => {
-                    console.log('🎮 Game started!');
-                    this.gameState = gameState;
-                    showScreen('game-screen');
-                    this.startGameLoop();
-                });
-
-                this.socket.on('game-state-update', (gameState) => {
-                    this.gameState = gameState;
-                });
-
-                this.socket.on('game-delta', (delta) => {
-                    this.applyDelta(delta);
-                });
-
-                this.socket.on('game-over', (result) => {
-                    console.log('🏆 Game over:', result);
-                    this.handleGameOver(result);
-                });
-
-                this.socket.on('rate-limited', () => {
-                    console.warn('⚠️ Rate limited - slow down!');
-                });
-
-                this.socket.on('error', (error) => {
-                    console.error('❌ Socket error:', error);
-                    this.updateStatus('เกิดข้อผิดพลาด: ' + error);
-                });
-            }
-
-            // UI Integration Methods
-            createRoom(playerName) {
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('create-room', { 
-                        playerName: playerName || `Player_${Math.random().toString(36).substr(2, 5)}`
-                    });
-                }
-            }
-
-            joinRoom(roomId, playerName) {
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('join-room', { 
-                        roomId: roomId,
-                        playerName: playerName || `Player_${Math.random().toString(36).substr(2, 5)}`
-                    });
-                }
-            }
-
-            playerReady() {
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('player-ready');
-                }
-            }
-
-            leaveRoom() {
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('leave-room');
-                    showScreen('menu-screen');
-                }
-            }
-
-            // Game Input Handling
-            setupEventListeners() {
-                document.addEventListener('keydown', (e) => {
-                    this.handleKeyPress(e);
-                });
-
-                // Touch controls for mobile
-                this.setupTouchControls();
-            }
-
-            setupTouchControls() {
-                const canvas = document.getElementById('game-canvas');
-                if (!canvas) return;
-
-                let startX, startY;
-
-                canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    startX = touch.clientX;
-                    startY = touch.clientY;
-                });
-
-                canvas.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    if (!startX || !startY) return;
-
-                    const touch = e.changedTouches[0];
-                    const deltaX = touch.clientX - startX;
-                    const deltaY = touch.clientY - startY;
-                    const minSwipeDistance = 30;
-
-                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                        if (Math.abs(deltaX) > minSwipeDistance) {
-                            this.handleMobileInput(deltaX > 0 ? 'move-right' : 'move-left');
-                        }
-                    } else {
-                        if (Math.abs(deltaY) > minSwipeDistance) {
-                            this.handleMobileInput(deltaY > 0 ? 'move-down' : 'rotate');
-                        }
-                    }
-                });
-            }
-
-            handleMobileInput(action) {
-                if (!this.gameState?.gameStarted) return;
-                if (!this.socket?.connected) return;
-
-                this.socket.emit('game-action', { type: action });
-            }
-
-            handleKeyPress(e) {
-                if (!this.gameState?.gameStarted) return;
-                if (!this.socket?.connected) return;
-
-                const actions = {
-                    'ArrowLeft': { type: 'move-left' },
-                    'ArrowRight': { type: 'move-right' },
-                    'ArrowDown': { type: 'move-down' },
-                    'ArrowUp': { type: 'rotate' },
-                    ' ': { type: 'hard-drop' }
-                };
-
-                if (actions[e.key]) {
-                    e.preventDefault();
-                    this.socket.emit('game-action', actions[e.key]);
-                }
-            }
-
-            // Delta Updates
-            applyDelta(delta) {
-                if (!this.gameState) return;
-
-                const playerKey = `player${delta.playerNumber}`;
-                const playerState = this.gameState[playerKey];
-
-                delta.changes.forEach(change => {
-                    switch (change.type) {
-                        case 'position':
-                            playerState.currentX = change.to.x;
-                            playerState.currentY = change.to.y;
-                            break;
-
-                        case 'rotation':
-                            playerState.currentPiece.shape = change.shape;
-                            break;
-
-                        case 'hard-drop':
-                            playerState.currentY = change.newY;
-                            playerState.score += change.scoreGain;
-                            break;
-
-                        case 'piece-placed':
-                            Object.assign(playerState, change.newStats);
-                            break;
-
-                        case 'new-piece':
-                            playerState.currentPiece = change.currentPiece;
-                            playerState.nextPiece = change.nextPiece;
-                            playerState.currentX = 4;
-                            playerState.currentY = 0;
-                            break;
-
-                        case 'game-over':
-                            this.handleGameOver({
-                                winner: change.winner,
-                                finalScores: change.finalScores
-                            });
-                            break;
-                    }
-                });
-            }
-
-            // Game Over Handling
-            handleGameOver(result) {
-                this.gameState.winner = result.winner;
-                
-                const message = result.winner === 'draw' 
-                    ? 'เสมอ!' 
-                    : `ผู้เล่น ${result.winner} ชนะ!`;
-                
-                document.getElementById('winner-message').textContent = message;
-                document.getElementById('final-score-p1').textContent = result.finalScores.player1;
-                document.getElementById('final-score-p2').textContent = result.finalScores.player2;
-                
-                showScreen('game-over-screen');
-            }
-
-            // Utility Methods
-            updateStatus(message) {
-                const statusEl = document.getElementById('status');
-                if (statusEl) {
-                    statusEl.textContent = message;
-                }
-            }
-
-            startGameLoop() {
-                if (this.dropInterval) {
-                    clearInterval(this.dropInterval);
-                }
-
-                this.dropInterval = setInterval(() => {
-                    if (this.gameState?.gameStarted && this.socket?.connected) {
-                        this.socket.emit('game-action', { type: 'move-down' });
-                    }
-                }, 1000);
-            }
-
-            // Canvas and Rendering Methods
-            setupCanvas() {
-                this.canvas = document.getElementById('game-canvas');
-                if (!this.canvas) return;
-                
-                this.ctx = this.canvas.getContext('2d');
-                this.canvas.width = 800;
-                this.canvas.height = 600;
-                
-                this.ctx.imageSmoothingEnabled = false;
-                this.blockTextures = this.createBlockTextures();
-            }
-
-            createBlockTextures() {
-                const textures = {};
-                const colors = {
-                    'block-i': '#00f0f0',
-                    'block-o': '#f0f000', 
-                    'block-t': '#a000f0',
-                    'block-s': '#00f000',
-                    'block-z': '#f00000',
-                    'block-j': '#0000f0',
-                    'block-l': '#f0a000'
-                };
-
-                Object.entries(colors).forEach(([type, color]) => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = canvas.height = this.TILE_SIZE;
-                    const ctx = canvas.getContext('2d');
-                    
-                    const gradient = ctx.createLinearGradient(0, 0, this.TILE_SIZE, this.TILE_SIZE);
-                    gradient.addColorStop(0, color);
-                    gradient.addColorStop(1, this.darkenColor(color, 0.3));
-                    
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE);
-                    
-                    ctx.strokeStyle = this.lightenColor(color, 0.2);
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(1, 1, this.TILE_SIZE-2, this.TILE_SIZE-2);
-                    
-                    textures[type] = canvas;
-                });
-
-                return textures;
-            }
-
-            startRenderLoop() {
-                const render = (currentTime) => {
-                    this.performanceMetrics.frameCount++;
-                    if (currentTime - this.performanceMetrics.lastTime >= 1000) {
-                        this.performanceMetrics.fps = this.performanceMetrics.frameCount;
-                        this.performanceMetrics.frameCount = 0;
-                        this.performanceMetrics.lastTime = currentTime;
-                    }
-
-                    if (this.hasStateChanged()) {
-                        this.renderGame();
-                        this.prevGameState = this.deepCloneState(this.gameState);
-                    }
-
-                    this.animationFrame = requestAnimationFrame(render);
-                };
-
-                this.animationFrame = requestAnimationFrame(render);
-            }
-
-            hasStateChanged() {
-                if (!this.gameState || !this.prevGameState) return true;
-                
-                const current = this.gameState;
-                const prev = this.prevGameState;
-                
-                return (
-                    current.player1?.currentX !== prev.player1?.currentX ||
-                    current.player1?.currentY !== prev.player1?.currentY ||
-                    current.player1?.score !== prev.player1?.score ||
-                    current.player2?.currentX !== prev.player2?.currentX ||
-                    current.player2?.currentY !== prev.player2?.currentY ||
-                    current.player2?.score !== prev.player2?.score ||
-                    this.hasGridChanged(current.player1?.grid, prev.player1?.grid) ||
-                    this.hasGridChanged(current.player2?.grid, prev.player2?.grid)
-                );
-            }
-
-            hasGridChanged(grid1, grid2) {
-                if (!grid1 || !grid2) return true;
-                
-                for (let row = 0; row < grid1.length; row++) {
-                    for (let col = 0; col < grid1[row].length; col++) {
-                        if (grid1[row][col] !== grid2[row][col]) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-
-            renderGame() {
-                if (!this.gameState || !this.ctx) return;
-
-                // Clear canvas
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                // Draw background
-                this.drawBackground();
-
-                if (this.gameState.gameStarted) {
-                    // Draw both player grids
-                    this.drawPlayerGrid(this.gameState.player1, 50, 50);
-                    this.drawPlayerGrid(this.gameState.player2, 450, 50);
-
-                    // Draw game info
-                    this.drawGameInfo();
-                }
-            }
-
-            drawBackground() {
-                const gradient = this.ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
-                gradient.addColorStop(0, 'rgba(20, 20, 40, 0.8)');
-                gradient.addColorStop(1, 'rgba(40, 20, 60, 0.8)');
-                
-                this.ctx.fillStyle = gradient;
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            }
-
-            drawPlayerGrid(player, offsetX, offsetY) {
-                if (!player || !player.grid) return;
-
-                const gridWidth = 10;
-                const gridHeight = 20;
-
-                // Draw grid background
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                this.ctx.fillRect(offsetX, offsetY, gridWidth * this.TILE_SIZE, gridHeight * this.TILE_SIZE);
-
-                // Draw grid lines
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                this.ctx.lineWidth = 1;
-                for (let row = 0; row <= gridHeight; row++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(offsetX, offsetY + row * this.TILE_SIZE);
-                    this.ctx.lineTo(offsetX + gridWidth * this.TILE_SIZE, offsetY + row * this.TILE_SIZE);
-                    this.ctx.stroke();
-                }
-                for (let col = 0; col <= gridWidth; col++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(offsetX + col * this.TILE_SIZE, offsetY);
-                    this.ctx.lineTo(offsetX + col * this.TILE_SIZE, offsetY + gridHeight * this.TILE_SIZE);
-                    this.ctx.stroke();
-                }
-
-                // Draw placed blocks
-                for (let row = 0; row < player.grid.length; row++) {
-                    for (let col = 0; col < player.grid[row].length; col++) {
-                        if (player.grid[row][col]) {
-                            this.drawBlock(
-                                offsetX + col * this.TILE_SIZE,
-                                offsetY + row * this.TILE_SIZE,
-                                player.grid[row][col]
-                            );
-                        }
-                    }
-                }
-
-                // Draw current piece
-                if (player.currentPiece && player.currentPiece.shape) {
-                    this.drawPiece(
-                        player.currentPiece.shape,
-                        offsetX + player.currentX * this.TILE_SIZE,
-                        offsetY + player.currentY * this.TILE_SIZE,
-                        player.currentPiece.type
-                    );
-                }
-
-                // Draw player info
-                this.drawPlayerInfo(player, offsetX, offsetY - 30);
-            }
-
-            drawBlock(x, y, blockType) {
-                const texture = this.blockTextures[blockType];
-                if (texture) {
-                    this.ctx.drawImage(texture, x, y);
-                } else {
-                    // Fallback color
-                    this.ctx.fillStyle = this.getBlockColor(blockType);
-                    this.ctx.fillRect(x, y, this.TILE_SIZE, this.TILE_SIZE);
-                    
-                    this.ctx.strokeStyle = '#fff';
-                    this.ctx.lineWidth = 1;
-                    this.ctx.strokeRect(x, y, this.TILE_SIZE, this.TILE_SIZE);
-                }
-            }
-
-            drawPiece(shape, x, y, pieceType) {
-                for (let row = 0; row < shape.length; row++) {
-                    for (let col = 0; col < shape[row].length; col++) {
-                        if (shape[row][col]) {
-                            this.drawBlock(
-                                x + col * this.TILE_SIZE,
-                                y + row * this.TILE_SIZE,
-                                `block-${pieceType}`
-                            );
-                        }
-                    }
-                }
-            }
-
-            drawPlayerInfo(player, x, y) {
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = 'bold 16px Arial';
-                this.ctx.textAlign = 'left';
-                
-                const playerNum = player === this.gameState.player1 ? '1' : '2';
-                const isCurrentPlayer = parseInt(playerNum) === this.playerNumber;
-                
-                this.ctx.fillStyle = isCurrentPlayer ? '#ffd700' : '#fff';
-                this.ctx.fillText(`Player ${playerNum}`, x, y);
-                
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = '14px Arial';
-                this.ctx.fillText(`Score: ${player.score || 0}`, x, y + 20);
-                this.ctx.fillText(`Lines: ${player.lines || 0}`, x + 120, y + 20);
-                this.ctx.fillText(`Level: ${player.level || 1}`, x + 200, y + 20);
-            }
-
-            drawGameInfo() {
-                // Draw FPS counter
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                this.ctx.fillRect(10, 10, 100, 30);
-                
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = '12px Arial';
-                this.ctx.textAlign = 'left';
-                this.ctx.fillText(`FPS: ${this.performanceMetrics.fps}`, 15, 30);
-            }
-
-            getBlockColor(blockType) {
-                const colors = {
-                    'block-i': '#00f0f0',
-                    'block-o': '#f0f000',
-                    'block-t': '#a000f0',
-                    'block-s': '#00f000',
-                    'block-z': '#f00000',
-                    'block-j': '#0000f0',
-                    'block-l': '#f0a000'
-                };
-                return colors[blockType] || '#666';
-            }
-
-            darkenColor(color, factor) {
-                const hex = color.replace('#', '');
-                const r = Math.max(0, parseInt(hex.substr(0, 2), 16) * (1 - factor));
-                const g = Math.max(0, parseInt(hex.substr(2, 2), 16) * (1 - factor));
-                const b = Math.max(0, parseInt(hex.substr(4, 2), 16) * (1 - factor));
-                return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
-            }
-
-            lightenColor(color, factor) {
-                const hex = color.replace('#', '');
-                const r = Math.min(255, parseInt(hex.substr(0, 2), 16) * (1 + factor));
-                const g = Math.min(255, parseInt(hex.substr(2, 2), 16) * (1 + factor));
-                const b = Math.min(255, parseInt(hex.substr(4, 2), 16) * (1 + factor));
-                return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
-            }
-
-            deepCloneState(state) {
-                if (!state) return null;
-                return JSON.parse(JSON.stringify(state));
-            }
-
-            // Single Player Mode
-            startSinglePlayer() {
-                showScreen('game-screen');
-                this.initializeSinglePlayerGame();
-                this.startSinglePlayerLoop();
-            }
-
-            initializeSinglePlayerGame() {
-                this.singlePlayerState = {
-                    grid: Array(20).fill().map(() => Array(10).fill(null)),
-                    currentPiece: this.generateRandomPiece(),
-                    nextPiece: this.generateRandomPiece(),
-                    currentX: 4,
-                    currentY: 0,
-                    score: 0,
-                    lines: 0,
-                    level: 1,
-                    gameOver: false
-                };
-            }
-
-            generateRandomPiece() {
-                const pieces = ['i', 'o', 't', 's', 'z', 'j', 'l'];
-                const shapes = {
-                    i: [[1,1,1,1]],
-                    o: [[1,1],[1,1]],
-                    t: [[0,1,0],[1,1,1]],
-                    s: [[0,1,1],[1,1,0]],
-                    z: [[1,1,0],[0,1,1]],
-                    j: [[1,0,0],[1,1,1]],
-                    l: [[0,0,1],[1,1,1]]
-                };
-                
-                const type = pieces[Math.floor(Math.random() * pieces.length)];
-                return {
-                    type: type,
-                    shape: shapes[type]
-                };
-            }
-
-            startSinglePlayerLoop() {
-                if (this.singlePlayerInterval) {
-                    clearInterval(this.singlePlayerInterval);
-                }
-
-                const dropSpeed = Math.max(100, 1000 - (this.singlePlayerState.level - 1) * 100);
-                
-                this.singlePlayerInterval = setInterval(() => {
-                    if (!this.singlePlayerState.gameOver) {
-                        this.movePieceDown();
-                    }
-                }, dropSpeed);
-
-                // Start render loop for single player
-                this.renderSinglePlayer();
-            }
-
-            renderSinglePlayer() {
-                if (!this.singlePlayerState || this.singlePlayerState.gameOver) return;
-
-                // Clear canvas
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.drawBackground();
-
-                // Draw single player grid (centered)
-                const offsetX = (this.canvas.width - 10 * this.TILE_SIZE) / 2;
-                const offsetY = 50;
-
-                this.drawSinglePlayerGrid(offsetX, offsetY);
-                this.drawSinglePlayerInfo();
-
-                requestAnimationFrame(() => this.renderSinglePlayer());
-            }
-
-            drawSinglePlayerGrid(offsetX, offsetY) {
-                const state = this.singlePlayerState;
-                const gridWidth = 10;
-                const gridHeight = 20;
-
-                // Draw grid background
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                this.ctx.fillRect(offsetX, offsetY, gridWidth * this.TILE_SIZE, gridHeight * this.TILE_SIZE);
-
-                // Draw grid lines
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                this.ctx.lineWidth = 1;
-                for (let row = 0; row <= gridHeight; row++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(offsetX, offsetY + row * this.TILE_SIZE);
-                    this.ctx.lineTo(offsetX + gridWidth * this.TILE_SIZE, offsetY + row * this.TILE_SIZE);
-                    this.ctx.stroke();
-                }
-                for (let col = 0; col <= gridWidth; col++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(offsetX + col * this.TILE_SIZE, offsetY);
-                    this.ctx.lineTo(offsetX + col * this.TILE_SIZE, offsetY + gridHeight * this.TILE_SIZE);
-                    this.ctx.stroke();
-                }
-
-                // Draw placed blocks
-                for (let row = 0; row < state.grid.length; row++) {
-                    for (let col = 0; col < state.grid[row].length; col++) {
-                        if (state.grid[row][col]) {
-                            this.drawBlock(
-                                offsetX + col * this.TILE_SIZE,
-                                offsetY + row * this.TILE_SIZE,
-                                state.grid[row][col]
-                            );
-                        }
-                    }
-                }
-
-                // Draw current piece
-                if (state.currentPiece && state.currentPiece.shape) {
-                    this.drawPiece(
-                        state.currentPiece.shape,
-                        offsetX + state.currentX * this.TILE_SIZE,
-                        offsetY + state.currentY * this.TILE_SIZE,
-                        state.currentPiece.type
-                    );
-                }
-            }
-
-            drawSinglePlayerInfo() {
-                const state = this.singlePlayerState;
-                
-                // Draw score panel
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                this.ctx.fillRect(20, 50, 200, 150);
-                
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = 'bold 18px Arial';
-                this.ctx.textAlign = 'left';
-                this.ctx.fillText('Single Player', 30, 75);
-                
-                this.ctx.font = '14px Arial';
-                this.ctx.fillText(`Score: ${state.score}`, 30, 100);
-                this.ctx.fillText(`Lines: ${state.lines}`, 30, 120);
-                this.ctx.fillText(`Level: ${state.level}`, 30, 140);
-                
-                // Draw next piece
-                this.ctx.fillText('Next:', 30, 170);
-                if (state.nextPiece && state.nextPiece.shape) {
-                    this.drawPiece(
-                        state.nextPiece.shape,
-                        30,
-                        180,
-                        state.nextPiece.type
-                    );
-                }
-            }
-
-            // Cleanup
-            destroy() {
-                if (this.dropInterval) {
-                    clearInterval(this.dropInterval);
-                }
-                if (this.singlePlayerInterval) {
-                    clearInterval(this.singlePlayerInterval);
-                }
-                if (this.animationFrame) {
-                    cancelAnimationFrame(this.animationFrame);
-                }
-                if (this.socket) {
-                    this.socket.disconnect();
-                }
-            }
-        }
-
-        // Event Listeners for UI
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize game client
-            gameClient = new OptimizedTetrisClient();
-
-            // Menu button handlers
-            document.getElementById('btn-create-room').addEventListener('click', () => {
-                showScreen('create-room-screen');
-            });
-
-            document.getElementById('btn-join-room').addEventListener('click', () => {
-                showScreen('join-room-screen');
-            });
-
-            document.getElementById('btn-single-player').addEventListener('click', () => {
-                gameClient.startSinglePlayer();
-            });
-
-            // Create room handler
-            document.getElementById('btn-confirm-create').addEventListener('click', () => {
-                const playerName = document.getElementById('create-player-name').value.trim();
-                if (playerName) {
-                    gameClient.createRoom(playerName);
-                } else {
-                    alert('กรุณาใส่ชื่อผู้เล่น');
-                }
-            });
-
-            // Join room handler
-            document.getElementById('btn-confirm-join').addEventListener('click', () => {
-                const playerName = document.getElementById('join-player-name').value.trim();
-                const roomId = document.getElementById('join-room-id').value.trim();
-                
-                if (playerName && roomId) {
-                    gameClient.joinRoom(roomId, playerName);
-                } else {
-                    alert('กรุณาใส่ชื่อผู้เล่นและรหัสห้อง');
-                }
-            });
-
-            // Ready button handler
-            document.getElementById('btn-ready').addEventListener('click', () => {
-                gameClient.playerReady();
-                document.getElementById('btn-ready').disabled = true;
-            });
-
-            // Leave room handler
-            document.getElementById('btn-leave-room').addEventListener('click', () => {
-                gameClient.leaveRoom();
-            });
-
-            // Play again handler
-            document.getElementById('btn-play-again').addEventListener('click', () => {
-                if (gameClient.socket && gameClient.socket.connected) {
-                    gameClient.socket.emit('play-again');
-                    showScreen('waiting-screen');
-                    document.getElementById('btn-ready').disabled = false;
-                }
-            });
+        // Show create room screen
+        document.getElementById('btn-create-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('create-room-screen').style.display = 'block';
         });
 
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (gameClient) {
-                gameClient.destroy();
-            }
+        // Show join room screen  
+        document.getElementById('btn-join-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('join-room-screen').style.display = 'block';
         });
     </script>
 </body>
