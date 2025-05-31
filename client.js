@@ -1,675 +1,519 @@
-// Client-side game logic
-class TetrisClient {
+// เพิ่มส่วนที่ขาดหายในฝั่ง Client
+class OptimizedTetrisClient {
   constructor() {
     this.socket = null;
-    this.roomId = null;
-    this.playerNumber = null;
-    this.playerName = '';
     this.gameState = null;
+    this.prevGameState = null;
     this.dropInterval = null;
-    this.connected = false;
+    this.animationFrame = null;
+    this.playerNumber = null;
+    this.roomId = null;
+    this.TILE_SIZE = 30;
     
-    this.TILE_SIZE = 28;
+    // Canvas setup for better performance
+    this.setupCanvas();
+    
+    // Object pooling for DOM elements
+    this.blockPool = [];
+    this.activeBlocks = new Set();
+    
+    // Performance monitoring
+    this.performanceMetrics = {
+      frameCount: 0,
+      lastTime: performance.now(),
+      fps: 60
+    };
+    
+    // เริ่มการเชื่อมต่อ Socket.io
     this.initializeSocket();
     this.setupEventListeners();
-    this.createNotificationSystem();
-    
-    // Show connection status
-    this.updateConnectionStatus(false);
+    this.startRenderLoop();
   }
 
-  createNotificationSystem() {
-    // Create notification container if it doesn't exist
-    if (!document.getElementById('notification-container')) {
-      const container = document.createElement('div');
-      container.id = 'notification-container';
-      container.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      `;
-      document.body.appendChild(container);
+  // ✅ เพิ่มการเชื่อมต่อ Socket.io
+  initializeSocket() {
+    // เชื่อมต่อกับ server
+    this.socket = io('http://localhost:3000', {
+      transports: ['websocket', 'polling']
+    });
+
+    // ตั้งค่า event handlers
+    this.setupSocketHandlers();
+  }
+
+  // ✅ เพิ่ม Socket Event Handlers
+  setupSocketHandlers() {
+    // เมื่อเชื่อมต่อสำเร็จ
+    this.socket.on('connect', () => {
+      console.log('🔌 Connected to server:', this.socket.id);
+    });
+
+    // เมื่อเข้าห้องสำเร็จ
+    this.socket.on('room-joined', (data) => {
+      console.log('🏠 Joined room:', data.roomId);
+      this.roomId = data.roomId;
+      this.playerNumber = data.playerNumber;
+      this.updateUI(`Player ${data.playerNumber} - Room: ${data.roomId}`);
+    });
+
+    // เมื่อมีการอัพเดท game state
+    this.socket.on('game-state-update', (gameState) => {
+      this.gameState = gameState;
+    });
+
+    // ✅ รับ delta updates จาก server (ตรงกับการ emit 'game-delta' ใน server)
+    this.socket.on('game-delta', (delta) => {
+      this.applyDelta(delta);
+    });
+
+    // เมื่อเกมเริ่ม
+    this.socket.on('game-started', (gameState) => {
+      console.log('🎮 Game started!');
+      this.gameState = gameState;
+      this.startGameLoop();
+    });
+
+    // เมื่อเกมจบ
+    this.socket.on('game-over', (result) => {
+      console.log('🏆 Game over:', result);
+      this.handleGameOver(result);
+    });
+
+    // เมื่อถูก rate limit
+    this.socket.on('rate-limited', () => {
+      console.warn('⚠️ Rate limited - slow down!');
+    });
+
+    // เมื่อเกิดข้อผิดพลาด
+    this.socket.on('error', (error) => {
+      console.error('❌ Socket error:', error);
+    });
+
+    // เมื่อขาดการเชื่อมต่อ
+    this.socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected:', reason);
+    });
+  }
+
+  // ✅ เพิ่มฟังก์ชันสำหรับการเข้าห้อง
+  joinRoom(roomId) {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('join-room', { 
+        roomId: roomId || `room_${Date.now()}`,
+        playerName: `Player_${Math.random().toString(36).substr(2, 5)}`
+      });
     }
   }
 
-  showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      background: ${type === 'error' ? 'rgba(244, 67, 54, 0.9)' : 'rgba(76, 175, 80, 0.9)'};
-      color: white;
-      padding: 15px 20px;
-      border-radius: 10px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      font-weight: bold;
-      max-width: 300px;
-      word-wrap: break-word;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-    `;
-    notification.textContent = message;
-    
-    const container = document.getElementById('notification-container');
-    container.appendChild(notification);
-    
-    // Animate in
-    setTimeout(() => {
-      notification.style.transform = 'translateX(0)';
-    }, 10);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      notification.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
+  // ✅ เพิ่มฟังก์ชันสำหรับการพร้อมเล่น
+  playerReady() {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('player-ready');
+    }
   }
 
-  initializeSocket() {
-    this.socket = io();
-    
-    this.socket.on('connect', () => {
-      console.log('Connected to server');
-      this.connected = true;
-      this.updateConnectionStatus(true);
-      this.showNotification('เชื่อมต่อเซิร์ฟเวอร์สำเร็จ');
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      this.connected = false;
-      this.updateConnectionStatus(false);
-      this.showScreen('connection-screen');
-      this.showNotification('การเชื่อมต่อขาดหาย', 'error');
-    });
-
-    this.socket.on('joined-room', (data) => {
-      this.roomId = data.roomId;
-      this.playerNumber = data.playerNumber;
-      this.playerName = data.playerName;
-      this.updateRoomInfo(data.roomPlayers);
-      this.showScreen('waiting-screen');
-      this.showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
-    });
-
-    this.socket.on('player-joined', (data) => {
-      this.updateRoomInfo(data.roomPlayers);
-      this.showNotification('ผู้เล่นใหม่เข้าร่วม');
-    });
-
-    this.socket.on('player-left', () => {
-      this.showNotification('ผู้เล่นอีกคนออกจากห้อง', 'error');
-      this.showScreen('waiting-screen');
-      // Reset ready status when player leaves
-      this.resetReadyState();
-    });
-
-    this.socket.on('player-disconnected', (data) => {
-      this.showNotification(`ผู้เล่น ${data.playerNumber} หลุดการเชื่อมต่อ`, 'error');
-      // Reset ready status when player disconnects
-      this.resetReadyState();
-    });
-
-    this.socket.on('room-full', () => {
-      this.showNotification('ห้องเต็มแล้ว กรุณาลองใหม่อีกครั้ง', 'error');
-      this.showScreen('menu-screen');
-    });
-
-    this.socket.on('player-ready', (data) => {
-      this.updatePlayerReady(data.playerNumber);
-    });
-
-    this.socket.on('game-start', (gameState) => {
-      this.gameState = gameState;
-      this.startGameLoop();
-      this.showScreen('game-screen');
-      this.showNotification('เกมเริ่มแล้ว!');
-    });
-
-    this.socket.on('game-update', (gameState) => {
-      this.gameState = gameState;
-      this.updateGameDisplay();
-    });
-
-    this.socket.on('game-over', (data) => {
-      this.endGame(data);
-    });
-
-    this.socket.on('game-reset', () => {
-      // Reset game state for new round
-      this.gameState = null;
-      this.resetReadyState();
-      this.showScreen('waiting-screen');
-      this.showNotification('🔄 เตรียมตัวสำหรับรอบใหม่!');
-    });
-
-    this.socket.on('error', (message) => {
-      this.showNotification(message, 'error');
-    });
-  }
-
+  // ✅ ปรับปรุงการจัดการ input เพื่อส่งไปยัง server
   setupEventListeners() {
-    // Menu buttons
-    document.getElementById('btn-create-room').addEventListener('click', () => {
-      this.showScreen('create-room-screen');
-    });
-
-    document.getElementById('btn-join-room').addEventListener('click', () => {
-      this.showScreen('join-room-screen');
-    });
-
-    // Room creation
-    document.getElementById('btn-confirm-create').addEventListener('click', () => {
-      this.createRoom();
-    });
-
-    document.getElementById('btn-confirm-join').addEventListener('click', () => {
-      this.joinRoom();
-    });
-
-    // Game controls
-    document.getElementById('btn-ready').addEventListener('click', () => {
-      this.setReady();
-    });
-
-    document.getElementById('btn-leave-room').addEventListener('click', () => {
-      this.leaveRoom();
-    });
-
-    document.getElementById('btn-play-again').addEventListener('click', () => {
-      this.playAgain();
-    });
-
-    // Keyboard controls
     document.addEventListener('keydown', (e) => {
       this.handleKeyPress(e);
     });
 
-    // Touch controls for mobile
-    this.setupTouchControls();
-
-    // Mobile control buttons
-    this.setupMobileButtons();
+    // เพิ่ม UI controls
+    this.setupUIControls();
   }
 
-  setupMobileButtons() {
-    const buttons = document.querySelectorAll('.control-button');
-    buttons.forEach((button, index) => {
-      button.addEventListener('click', () => {
-        if (!this.gameState || !this.gameState.gameStarted) return;
-        
-        const playerState = this.gameState[`player${this.playerNumber}`];
-        if (!playerState || !playerState.alive) return;
-
-        switch (index) {
-          case 0: // Rotate
-            this.socket.emit('game-action', { type: 'rotate' });
-            break;
-          case 1: // Up/Rotate
-            this.socket.emit('game-action', { type: 'rotate' });
-            break;
-          case 2: // Hard drop
-            this.socket.emit('game-action', { type: 'hard-drop' });
-            break;
-          case 3: // Left
-            this.socket.emit('game-action', { type: 'move-left' });
-            break;
-          case 4: // Down
-            this.socket.emit('game-action', { type: 'move-down' });
-            break;
-          case 5: // Right
-            this.socket.emit('game-action', { type: 'move-right' });
-            break;
-        }
+  setupUIControls() {
+    // ปุ่มเข้าห้อง
+    const joinBtn = document.getElementById('join-room-btn');
+    if (joinBtn) {
+      joinBtn.addEventListener('click', () => {
+        const roomInput = document.getElementById('room-input');
+        const roomId = roomInput ? roomInput.value : '';
+        this.joinRoom(roomId);
       });
+    }
+
+    // ปุ่มพร้อมเล่น
+    const readyBtn = document.getElementById('ready-btn');
+    if (readyBtn) {
+      readyBtn.addEventListener('click', () => {
+        this.playerReady();
+      });
+    }
+  }
+
+  // ✅ ปรับปรุงการส่งคำสั่งเกม
+  handleKeyPress(e) {
+    if (!this.gameState?.gameStarted) return;
+    if (!this.socket?.connected) return;
+
+    const actions = {
+      'ArrowLeft': { type: 'move-left' },
+      'ArrowRight': { type: 'move-right' },
+      'ArrowDown': { type: 'move-down' },
+      'ArrowUp': { type: 'rotate' },
+      ' ': { type: 'hard-drop' }
+    };
+
+    if (actions[e.key]) {
+      e.preventDefault();
+      // ส่งคำสั่งไปยัง server (ตรงกับ 'game-action' ใน server)
+      this.socket.emit('game-action', actions[e.key]);
+    }
+  }
+
+  // ✅ เพิ่มฟังก์ชันจัดการ delta updates
+  applyDelta(delta) {
+    if (!this.gameState) return;
+
+    const playerKey = `player${delta.playerNumber}`;
+    const playerState = this.gameState[playerKey];
+
+    delta.changes.forEach(change => {
+      switch (change.type) {
+        case 'position':
+          playerState.currentX = change.to.x;
+          playerState.currentY = change.to.y;
+          break;
+
+        case 'rotation':
+          playerState.currentPiece.shape = change.shape;
+          break;
+
+        case 'hard-drop':
+          playerState.currentY = change.newY;
+          playerState.score += change.scoreGain;
+          break;
+
+        case 'piece-placed':
+          // อัพเดท grid และสถิติ
+          Object.assign(playerState, change.newStats);
+          break;
+
+        case 'new-piece':
+          playerState.currentPiece = change.currentPiece;
+          playerState.nextPiece = change.nextPiece;
+          playerState.currentX = 4;
+          playerState.currentY = 0;
+          break;
+
+        case 'game-over':
+          this.handleGameOver({
+            winner: change.winner,
+            finalScores: change.finalScores
+          });
+          break;
+      }
     });
   }
 
-  // Generate 5-digit random room code
-  generateRoomCode() {
-    return Math.floor(10000 + Math.random() * 90000).toString();
-  }
-
-  createRoom() {
-    const playerName = document.getElementById('create-player-name').value.trim();
-    if (!playerName) {
-      this.showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
-      return;
-    }
-    const roomId = this.generateRoomCode();
-    this.joinGameRoom(roomId, playerName);
-  }
-
-  joinRoom() {
-    const playerName = document.getElementById('join-player-name').value.trim();
-    const roomId = document.getElementById('join-room-id').value.trim();
+  // ✅ เพิ่มฟังก์ชันจัดการเกมจบ
+  handleGameOver(result) {
+    this.gameState.winner = result.winner;
     
-    if (!playerName || !roomId) {
-      this.showNotification('กรุณาใส่ข้อมูลให้ครบถ้วน', 'error');
-      return;
-    }
+    // แสดงผลลัพธ์
+    const message = result.winner === 'draw' 
+      ? 'เสมอ!' 
+      : `ผู้เล่น ${result.winner} ชนะ!`;
     
-    // Validate room code format (5 digits)
-    if (!/^\d{5}$/.test(roomId)) {
-      this.showNotification('รหัสห้องต้องเป็นตัวเลข 5 หลัก', 'error');
-      return;
-    }
-    
-    this.joinGameRoom(roomId, playerName);
+    this.showGameOverModal(message, result.finalScores);
   }
 
-  joinGameRoom(roomId, playerName) {
-    if (!this.connected) {
-      this.showNotification('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-      return;
-    }
-    
-    this.socket.emit('join-room', { roomId, playerName });
-  }
-
-  setReady() {
-    this.socket.emit('player-ready');
-    document.getElementById('btn-ready').disabled = true;
-    document.getElementById('btn-ready').textContent = '✅ พร้อมแล้ว';
-    this.showNotification('คุณพร้อมเล่นแล้ว');
-  }
-
-  resetReadyState() {
-    const readyBtn = document.getElementById('btn-ready');
-    if (readyBtn) {
-      readyBtn.disabled = false;
-      readyBtn.textContent = '🎮 พร้อมเล่น';
-    }
-    
-    // Reset ready indicators
-    for (let i = 1; i <= 2; i++) {
-      const indicator = document.getElementById(`ready-indicator-${i}`);
-      if (indicator) {
-        indicator.textContent = `Player ${i}: รอ...`;
-        indicator.style.color = '#666';
-        indicator.style.fontWeight = 'normal';
-      }
-    }
-  }
-
-  leaveRoom() {
-    // Create confirmation modal
+  showGameOverModal(message, scores) {
+    // สร้าง modal แสดงผล
     const modal = document.createElement('div');
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      backdrop-filter: blur(5px);
-    `;
-    
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 15px;
-      padding: 30px;
-      text-align: center;
-      color: white;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      max-width: 400px;
-      margin: 20px;
-    `;
-    
-    dialog.innerHTML = `
-      <h3 style="margin-bottom: 20px;">🚪 ออกจากห้อง</h3>
-      <p style="margin-bottom: 30px;">คุณต้องการออกจากห้องหรือไม่?</p>
-      <div style="display: flex; gap: 15px; justify-content: center;">
-        <button id="confirm-leave" style="
-          padding: 12px 25px;
-          background: #f44336;
-          color: white;
-          border: none;
-          border-radius: 10px;
-          cursor: pointer;
-          font-weight: bold;
-          transition: all 0.3s ease;
-        ">ออกจากห้อง</button>
-        <button id="cancel-leave" style="
-          padding: 12px 25px;
-          background: rgba(255,255,255,0.2);
-          color: white;
-          border: none;
-          border-radius: 10px;
-          cursor: pointer;
-          font-weight: bold;
-          transition: all 0.3s ease;
-        ">ยกเลิก</button>
+    modal.className = 'game-over-modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h2>${message}</h2>
+        <div class="scores">
+          <p>ผู้เล่น 1: ${scores.player1}</p>
+          <p>ผู้เล่น 2: ${scores.player2}</p>
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()">ปิด</button>
       </div>
     `;
-    
-    modal.appendChild(dialog);
     document.body.appendChild(modal);
-    
-    // Add hover effects
-    const buttons = dialog.querySelectorAll('button');
-    buttons.forEach(btn => {
-      btn.addEventListener('mouseenter', () => {
-        btn.style.transform = 'translateY(-2px)';
-        btn.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-      });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.transform = 'translateY(0)';
-        btn.style.boxShadow = 'none';
-      });
-    });
-    
-    dialog.querySelector('#confirm-leave').addEventListener('click', () => {
-      this.socket.emit('leave-room');
-      this.roomId = null;
-      this.playerNumber = null;
-      this.gameState = null;
-      this.showScreen('menu-screen');
-      document.body.removeChild(modal);
-      this.showNotification('ออกจากห้องแล้ว');
-    });
-    
-    dialog.querySelector('#cancel-leave').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
-    
-    // Close on backdrop click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        document.body.removeChild(modal);
-      }
-    });
   }
 
-  playAgain() {
-    // Clear current game state
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-      this.dropInterval = null;
+  // ✅ เพิ่มฟังก์ชัน utility
+  updateUI(message) {
+    const statusEl = document.getElementById('status');
+    if (statusEl) {
+      statusEl.textContent = message;
     }
-    this.gameState = null;
-    
-    // Reset ready state and go back to waiting screen
-    this.resetReadyState();
-    this.showScreen('waiting-screen');
-    
-    // Request new game from server (if needed)
-    this.socket.emit('request-new-game');
-    
-    // Show notification
-    this.showNotification('🎮 เตรียมตัวสำหรับเกมใหม่!');
   }
 
   startGameLoop() {
-    // Clear any existing interval
+    // เริ่ม game loop สำหรับการตกของชิ้นส่วน
     if (this.dropInterval) {
       clearInterval(this.dropInterval);
     }
-    
+
     this.dropInterval = setInterval(() => {
-      if (this.gameState && this.gameState.gameStarted) {
-        const playerState = this.gameState[`player${this.playerNumber}`];
-        if (playerState && playerState.alive) {
-          this.socket.emit('game-action', { type: 'move-down' });
+      if (this.gameState?.gameStarted && this.socket?.connected) {
+        this.socket.emit('game-action', { type: 'move-down' });
+      }
+    }, 1000); // ตกทุก 1 วินาที
+  }
+
+  // Canvas setup และ rendering methods (เหมือนเดิม)
+  setupCanvas() {
+    this.canvas = document.getElementById('game-canvas');
+    if (!this.canvas) return;
+    
+    this.ctx = this.canvas.getContext('2d');
+    this.canvas.width = 800;
+    this.canvas.height = 600;
+    
+    // Enable hardware acceleration
+    this.ctx.imageSmoothingEnabled = false;
+    
+    // Pre-render block textures
+    this.blockTextures = this.createBlockTextures();
+  }
+
+  createBlockTextures() {
+    const textures = {};
+    const colors = {
+      'block-i': '#00f0f0',
+      'block-o': '#f0f000', 
+      'block-t': '#a000f0',
+      'block-s': '#00f000',
+      'block-z': '#f00000',
+      'block-j': '#0000f0',
+      'block-l': '#f0a000'
+    };
+
+    Object.entries(colors).forEach(([type, color]) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = this.TILE_SIZE;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw gradient block
+      const gradient = ctx.createLinearGradient(0, 0, this.TILE_SIZE, this.TILE_SIZE);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, this.darkenColor(color, 0.3));
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE);
+      
+      // Add border
+      ctx.strokeStyle = this.lightenColor(color, 0.2);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, this.TILE_SIZE-2, this.TILE_SIZE-2);
+      
+      textures[type] = canvas;
+    });
+
+    return textures;
+  }
+
+  // ส่วนที่เหลือของ rendering methods...
+  startRenderLoop() {
+    const render = (currentTime) => {
+      this.performanceMetrics.frameCount++;
+      if (currentTime - this.performanceMetrics.lastTime >= 1000) {
+        this.performanceMetrics.fps = this.performanceMetrics.frameCount;
+        this.performanceMetrics.frameCount = 0;
+        this.performanceMetrics.lastTime = currentTime;
+      }
+
+      if (this.hasStateChanged()) {
+        this.renderGame();
+        this.prevGameState = this.deepCloneState(this.gameState);
+      }
+
+      this.animationFrame = requestAnimationFrame(render);
+    };
+
+    this.animationFrame = requestAnimationFrame(render);
+  }
+
+  // เพิ่ม methods ที่เหลือตามต้นฉบับ...
+  hasStateChanged() {
+    if (!this.gameState || !this.prevGameState) return true;
+    
+    const current = this.gameState;
+    const prev = this.prevGameState;
+    
+    return (
+      current.player1?.currentX !== prev.player1?.currentX ||
+      current.player1?.currentY !== prev.player1?.currentY ||
+      current.player1?.score !== prev.player1?.score ||
+      current.player2?.currentX !== prev.player2?.currentX ||
+      current.player2?.currentY !== prev.player2?.currentY ||
+      current.player2?.score !== prev.player2?.score ||
+      this.hasGridChanged(current.player1?.grid, prev.player1?.grid) ||
+      this.hasGridChanged(current.player2?.grid, prev.player2?.grid)
+    );
+  }
+
+  hasGridChanged(grid1, grid2) {
+    if (!grid1 || !grid2) return true;
+    
+    for (let row = 0; row < grid1.length; row++) {
+      for (let col = 0; col < grid1[row].length; col++) {
+        if (grid1[row][col] !== grid2[row][col]) {
+          return true;
         }
       }
-    }, 1000);
-  }
-
-  updateGameDisplay() {
-    if (!this.gameState) return;
-
-    // Update player 1 board (left side)
-    this.drawPlayerBoard('player1-board', this.gameState.player1, 1);
-    this.updatePlayerStats('player1-stats', this.gameState.player1);
-
-    // Update player 2 board (right side)  
-    this.drawPlayerBoard('player2-board', this.gameState.player2, 2);
-    this.updatePlayerStats('player2-stats', this.gameState.player2);
-
-    // Highlight current player
-    document.querySelectorAll('.player-board').forEach(board => {
-      board.classList.remove('current-player');
-    });
-    if (this.playerNumber) {
-      const currentBoard = document.getElementById(`player${this.playerNumber}-board`);
-      if (currentBoard) {
-        currentBoard.classList.add('current-player');
-      }
     }
+    return false;
   }
 
-  drawPlayerBoard(boardId, playerState, playerNumber) {
-    const boardElement = document.getElementById(boardId);
-    if (!boardElement) return;
+  renderGame() {
+    if (!this.ctx || !this.gameState) return;
+    
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.renderPlayerBoard(50, 50, this.gameState.player1, 1);
+    this.renderPlayerBoard(450, 50, this.gameState.player2, 2);
+    
+    this.renderUI();
+  }
 
-    boardElement.innerHTML = '';
-
+  renderPlayerBoard(offsetX, offsetY, playerState, playerNumber) {
+    if (!playerState) return;
+    
+    const tileSize = this.TILE_SIZE;
+    
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    this.ctx.fillRect(offsetX, offsetY, 10 * tileSize, 20 * tileSize);
+    
     // Draw placed blocks
     for (let row = 0; row < 20; row++) {
       for (let col = 0; col < 10; col++) {
-        if (playerState.grid[row][col]) {
-          const block = document.createElement('div');
-          block.className = `tetris-block ${playerState.grid[row][col]}`;
-          block.style.left = (col * this.TILE_SIZE) + 'px';
-          block.style.top = (row * this.TILE_SIZE) + 'px';
-          block.style.width = this.TILE_SIZE + 'px';
-          block.style.height = this.TILE_SIZE + 'px';
-          boardElement.appendChild(block);
+        const blockType = playerState.grid?.[row]?.[col];
+        if (blockType && this.blockTextures[blockType]) {
+          this.ctx.drawImage(
+            this.blockTextures[blockType],
+            offsetX + col * tileSize,
+            offsetY + row * tileSize
+          );
         }
       }
     }
 
-    // Draw current falling piece
+    // Draw current piece
     if (playerState.currentPiece && playerState.alive) {
-      for (let row = 0; row < playerState.currentPiece.shape.length; row++) {
-        for (let col = 0; col < playerState.currentPiece.shape[row].length; col++) {
-          if (playerState.currentPiece.shape[row][col]) {
-            const block = document.createElement('div');
-            block.className = `tetris-block ${playerState.currentPiece.color}`;
-            block.style.left = ((playerState.currentX + col) * this.TILE_SIZE) + 'px';
-            block.style.top = ((playerState.currentY + row) * this.TILE_SIZE) + 'px';
-            block.style.width = this.TILE_SIZE + 'px';
-            block.style.height = this.TILE_SIZE + 'px';
-            block.style.opacity = '0.9';
-            block.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
-            boardElement.appendChild(block);
+      this.ctx.save();
+      this.ctx.shadowColor = '#ffffff';
+      this.ctx.shadowBlur = 10;
+      
+      const piece = playerState.currentPiece;
+      for (let row = 0; row < piece.shape.length; row++) {
+        for (let col = 0; col < piece.shape[row].length; col++) {
+          if (piece.shape[row][col] && this.blockTextures[piece.color]) {
+            this.ctx.drawImage(
+              this.blockTextures[piece.color],
+              offsetX + (playerState.currentX + col) * tileSize,
+              offsetY + (playerState.currentY + row) * tileSize
+            );
           }
         }
       }
+      this.ctx.restore();
     }
 
-    // Show "GAME OVER" overlay if player is dead
     if (!playerState.alive) {
-      const overlay = document.createElement('div');
-      overlay.className = 'game-over-overlay';
-      overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
-      boardElement.appendChild(overlay);
+      this.ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      this.ctx.fillRect(offsetX, offsetY, 10 * tileSize, 20 * tileSize);
+      
+      this.ctx.fillStyle = 'white';
+      this.ctx.font = 'bold 24px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(
+        'GAME OVER',
+        offsetX + 5 * tileSize,
+        offsetY + 10 * tileSize
+      );
+    }
+
+    if (playerNumber === this.playerNumber) {
+      this.ctx.strokeStyle = '#00ff00';
+      this.ctx.lineWidth = 3;
+      this.ctx.strokeRect(offsetX - 2, offsetY - 2, 10 * tileSize + 4, 20 * tileSize + 4);
     }
   }
 
-  updatePlayerStats(statsId, playerState) {
-    const statsElement = document.getElementById(statsId);
-    if (!statsElement) return;
-
-    statsElement.querySelector('.score-value').textContent = playerState.score;
-    statsElement.querySelector('.lines-value').textContent = playerState.lines;
-    statsElement.querySelector('.level-value').textContent = playerState.level;
-  }
-
-  handleKeyPress(event) {
-    if (!this.gameState || !this.gameState.gameStarted) return;
+  renderUI() {
+    this.ctx.fillStyle = 'white';
+    this.ctx.font = '14px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`FPS: ${this.performanceMetrics.fps}`, 10, 20);
     
-    const playerState = this.gameState[`player${this.playerNumber}`];
-    if (!playerState || !playerState.alive) return;
-
-    switch (event.key) {
-      case 'ArrowLeft':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-left' });
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-right' });
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'move-down' });
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'rotate' });
-        break;
-      case ' ':
-        event.preventDefault();
-        this.socket.emit('game-action', { type: 'hard-drop' });
-        break;
+    if (this.gameState) {
+      this.ctx.textAlign = 'center';
+      this.ctx.font = 'bold 18px Arial';
+      
+      this.ctx.fillText(
+        `P1: ${this.gameState.player1?.score || 0}`,
+        125, 30
+      );
+      
+      this.ctx.fillText(
+        `P2: ${this.gameState.player2?.score || 0}`,
+        525, 30
+      );
     }
   }
 
-  setupTouchControls() {
-    let touchStartX = 0;
-    let touchStartY = 0;
-
-    document.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    });
-
-    document.addEventListener('touchend', (e) => {
-      if (!this.gameState || !this.gameState.gameStarted) return;
-
-      const deltaX = e.changedTouches[0].clientX - touchStartX;
-      const deltaY = e.changedTouches[0].clientY - touchStartY;
-      const threshold = 30;
-
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (deltaX > threshold) {
-          this.socket.emit('game-action', { type: 'move-right' });
-        } else if (deltaX < -threshold) {
-          this.socket.emit('game-action', { type: 'move-left' });
-        }
-      } else {
-        if (deltaY > threshold) {
-          this.socket.emit('game-action', { type: 'hard-drop' });
-        } else if (deltaY < -threshold) {
-          this.socket.emit('game-action', { type: 'rotate' });
-        }
-      }
-    });
-  }
-
-  endGame(data) {
-    // Clear game loop
+  cleanup() {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+    
     if (this.dropInterval) {
       clearInterval(this.dropInterval);
-      this.dropInterval = null;
     }
     
-    let message = '';
-    if (data.winner === 'draw') {
-      message = '🤝 เสมอกัน!';
-    } else if (data.winner === this.playerNumber) {
-      message = '🎉 คุณชนะ!';
-    } else {
-      message = '😔 คุณแพ้';
-    }
-
-    document.getElementById('winner-message').textContent = message;
-    document.getElementById('final-score-p1').textContent = data.finalScores.player1;
-    document.getElementById('final-score-p2').textContent = data.finalScores.player2;
-    
-    // Reset play again button
-    const playAgainBtn = document.getElementById('btn-play-again');
-    if (playAgainBtn) {
-      playAgainBtn.disabled = false;
-      playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
+    if (this.socket) {
+      this.socket.disconnect();
     }
     
-    this.showScreen('game-over-screen');
-    this.showNotification(message);
+    this.blockPool = [];
+    this.activeBlocks.clear();
   }
 
-  updateRoomInfo(players) {
-    const roomIdElement = document.getElementById('room-id-display');
-    const playersListElement = document.getElementById('players-list');
-    
-    if (roomIdElement) {
-      roomIdElement.textContent = this.roomId;
-    }
-    
-    if (playersListElement) {
-      playersListElement.innerHTML = '';
-      players.forEach(player => {
-        const li = document.createElement('li');
-        li.textContent = `${player.playerName} (Player ${player.playerNumber})`;
-        if (player.playerNumber === this.playerNumber) {
-          li.classList.add('current-player');
-        }
-        playersListElement.appendChild(li);
-      });
-    }
-
-    // Enable ready button if room has 2 players
-    const readyBtn = document.getElementById('btn-ready');
-    if (readyBtn && players.length === 2) {
-      readyBtn.disabled = false;
-    }
+  deepCloneState(state) {
+    if (!state) return null;
+    return {
+      player1: { 
+        ...state.player1, 
+        grid: state.player1.grid?.map(row => [...row]) 
+      },
+      player2: { 
+        ...state.player2, 
+        grid: state.player2.grid?.map(row => [...row]) 
+      },
+      gameStarted: state.gameStarted,
+      winner: state.winner
+    };
   }
 
-  updatePlayerReady(playerNumber) {
-    const indicator = document.getElementById(`ready-indicator-${playerNumber}`);
-    if (indicator) {
-      indicator.textContent = `Player ${playerNumber}: ✅ พร้อม`;
-      indicator.style.color = '#4CAF50';
-      indicator.style.fontWeight = 'bold';
-    }
+  darkenColor(color, factor) {
+    const num = parseInt(color.slice(1), 16);
+    const amt = Math.round(2.55 * factor * 100);
+    const R = (num >> 16) - amt;
+    const G = (num >> 8 & 0x00FF) - amt;
+    const B = (num & 0x0000FF) - amt;
+    return `#${(0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1)}`;
   }
 
-  updateConnectionStatus(connected) {
-    const statusElement = document.getElementById('connection-status');
-    if (statusElement) {
-      statusElement.textContent = connected ? '🟢 เชื่อมต่อแล้ว' : '🔴 ไม่ได้เชื่อมต่อ';
-      statusElement.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
-    }
-  }
-
-  showScreen(screenId) {
-    // Hide all screens
-    document.querySelectorAll('.screen').forEach(screen => {
-      screen.style.display = 'none';
-    });
-    
-    // Show target screen
-    const targetScreen = document.getElementById(screenId);
-    if (targetScreen) {
-      targetScreen.style.display = 'block';
-    }
-
-    // Reset ready button and state when going back to waiting
-    if (screenId === 'waiting-screen') {
-      this.resetReadyState();
-    }
-  }
-
-  showMessage(message) {
-    this.showNotification(message);
+  lightenColor(color, factor) {
+    const num = parseInt(color.slice(1), 16);
+    const amt = Math.round(2.55 * factor * 100);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return `#${(0x1000000 + (R > 255 ? 255 : R) * 0x10000 +
+      (G > 255 ? 255 : G) * 0x100 +
+      (B > 255 ? 255 : B)).toString(16).slice(1)}`;
   }
 }
 
-// Initialize client when page loads
-document.addEventListener('DOMContentLoaded', () => {
-  new TetrisClient();
-});
+// เริ่มต้น client
+const game = new OptimizedTetrisClient();
