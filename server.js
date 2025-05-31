@@ -29,7 +29,7 @@ app.set('trust proxy', 1);
 // CORS headers for production
 app.use((req, res, next) => {
   const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? ['https://your-app-name.onrender.com'] // Replace with your actual Render URL
+    ? ['https://new-twobob.onrender.com'] // Replace with your actual Render URL
     : ['http://localhost:3000'];
   
   const origin = req.headers.origin;
@@ -693,7 +693,7 @@ process.on('SIGINT', () => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎮 TwoBob Tactics Tetris Server running on port ${PORT}`);
-  console.log(`📁 Serving static files from 'public' directory`);
+  console.log(`📁 Serving static files from root directory`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`🔗 Local: http://localhost:${PORT}`);
