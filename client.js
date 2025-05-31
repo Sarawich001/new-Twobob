@@ -1,919 +1,458 @@
-// OptimizedTetrisClient ที่ปรับปรุงให้ทำงานร่วมกับ HTML
 class OptimizedTetrisClient {
   constructor() {
     this.socket = null;
-    this.gameState = null;
-    this.prevGameState = null;
-    this.dropInterval = null;
-    this.animationFrame = null;
-    this.playerNumber = null;
     this.roomId = null;
-    this.TILE_SIZE = 20; // ลดขนาดให้เหมาะกับ canvas ใน HTML
+    this.playerNumber = null;
+    this.gameStarted = false;
+    this.gameState = null;
     
-    // Canvas elements from HTML
+    // Canvas contexts
     this.player1Canvas = null;
     this.player2Canvas = null;
     this.player1Ctx = null;
     this.player2Ctx = null;
     
-    // Game state
-    this.isReady = false;
-    this.gameStarted = false;
-    this.connected = false;
+    // Game constants
+    this.CELL_SIZE = 20;
+    this.GRID_WIDTH = 10;
+    this.GRID_HEIGHT = 20;
     
-    // Object pooling for DOM elements
-    this.blockPool = [];
-    this.activeBlocks = new Set();
-    
-    // Performance monitoring
-    this.performanceMetrics = {
-      frameCount: 0,
-      lastTime: performance.now(),
-      fps: 60
+    // Colors
+    this.COLORS = {
+      'cyan': '#00ffff',
+      'yellow': '#ffff00', 
+      'purple': '#800080',
+      'green': '#00ff00',
+      'red': '#ff0000',
+      'blue': '#0000ff',
+      'orange': '#ffa500'
     };
     
-    // เริ่มต้นเมื่อ DOM พร้อม
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.initialize());
-    } else {
-      this.initialize();
+    this.initializeSocket();
+    this.setupCanvases();
+    this.setupKeyboardHandlers();
+  }
+
+  initializeSocket() {
+    try {
+      // Connect to server
+      this.socket = io();
+      
+      this.socket.on('connect', () => {
+        console.log('🟢 Connected to server');
+        updateConnectionStatus(true);
+        showNotification('เชื่อมต่อเซิร์ฟเวอร์สำเร็จ!', 'success');
+      });
+
+      this.socket.on('disconnect', (reason) => {
+        console.log('🔴 Disconnected from server:', reason);
+        updateConnectionStatus(false);
+        showNotification('การเชื่อมต่อขาดหาย', 'error');
+      });
+
+      this.socket.on('connect_error', (error) => {
+        console.error('❌ Connection error:', error);
+        updateConnectionStatus(false);
+        showNotification('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+      });
+
+      // Room events
+      this.socket.on('joined-room', (data) => {
+        this.roomId = data.roomId;
+        this.playerNumber = data.playerNumber;
+        document.getElementById('room-id-display').textContent = data.roomId;
+        document.getElementById('btn-ready').disabled = false;
+        showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ!`, 'success');
+      });
+
+      this.socket.on('room-full', () => {
+        showNotification('ห้องเต็มแล้ว!', 'error');
+        showScreen('menu-screen');
+      });
+
+      this.socket.on('player-joined', (data) => {
+        this.updatePlayersList(data.players);
+      });
+
+      this.socket.on('player-left', (data) => {
+        showNotification(`ผู้เล่น ${data.playerNumber} ออกจากห้อง`, 'warning');
+      });
+
+      this.socket.on('player-ready', (data) => {
+        document.getElementById(`ready-indicator-${data.playerNumber}`).textContent = 
+          `Player ${data.playerNumber}: พร้อมเล่น! ✅`;
+      });
+
+      // Game events
+      this.socket.on('game-started', (gameState) => {
+        this.gameState = gameState;
+        this.gameStarted = true;
+        showScreen('game-screen');
+        this.renderGame();
+        showNotification('เกมเริ่มแล้ว!', 'success');
+      });
+
+      this.socket.on('game-delta', (data) => {
+        this.handleGameDelta(data);
+      });
+
+      this.socket.on('auto-drop', (data) => {
+        this.handleAutoDrop(data);
+      });
+
+      this.socket.on('game-reset', () => {
+        this.gameStarted = false;
+        showScreen('waiting-screen');
+        document.getElementById('btn-ready').disabled = false;
+        showNotification('เกมถูกรีเซ็ตแล้ว', 'info');
+      });
+
+      this.socket.on('rate-limited', () => {
+        console.warn('⚠️ Rate limited');
+      });
+
+      this.socket.on('room-closed', (data) => {
+        showNotification(`ห้องถูกปิด: ${data.reason}`, 'warning');
+        showScreen('menu-screen');
+      });
+
+      // Health check
+      this.socket.on('pong', () => {
+        // Connection is alive
+      });
+
+      // Send ping every 30 seconds
+      setInterval(() => {
+        if (this.socket && this.socket.connected) {
+          this.socket.emit('ping');
+        }
+      }, 30000);
+
+    } catch (error) {
+      console.error('❌ Socket initialization failed:', error);
+      updateConnectionStatus(false);
     }
   }
 
-  initialize() {
-    console.log('🎮 Initializing Tetris Client...');
-    
-    // Setup canvas elements
-    this.setupCanvas();
-    
-    // เริ่มการเชื่อมต่อ Socket.io
-    this.initializeSocket();
-    
-    // Setup event listeners (แต่ไม่ override ของ HTML)
-    this.setupGameEventListeners();
-    
-    // Start render loop
-    this.startRenderLoop();
-  }
-
-  // ✅ Setup Canvas Elements
-  setupCanvas() {
+  setupCanvases() {
     this.player1Canvas = document.getElementById('player1-board');
     this.player2Canvas = document.getElementById('player2-board');
     
-    if (this.player1Canvas) {
-      this.player1Canvas.width = 200; // 10 blocks * 20px
-      this.player1Canvas.height = 400; // 20 blocks * 20px
+    if (this.player1Canvas && this.player2Canvas) {
       this.player1Ctx = this.player1Canvas.getContext('2d');
-      this.player1Ctx.imageSmoothingEnabled = false;
-    }
-    
-    if (this.player2Canvas) {
-      this.player2Canvas.width = 200;
-      this.player2Canvas.height = 400;
       this.player2Ctx = this.player2Canvas.getContext('2d');
+      
+      // Set canvas styles
+      this.player1Ctx.imageSmoothingEnabled = false;
       this.player2Ctx.imageSmoothingEnabled = false;
     }
+  }
+
+  setupKeyboardHandlers() {
+    document.addEventListener('keydown', (e) => {
+      this.handleKeyPress(e);
+    });
+  }
+
+  handleKeyPress(e) {
+    if (!this.gameStarted || !this.socket || !this.socket.connected) return;
     
-    // Pre-render block textures
-    this.blockTextures = this.createBlockTextures();
+    const keyActions = {
+      'ArrowLeft': 'move-left',
+      'ArrowRight': 'move-right', 
+      'ArrowDown': 'move-down',
+      'ArrowUp': 'rotate',
+      ' ': 'hard-drop' // Spacebar
+    };
     
-    console.log('🎨 Canvas setup complete');
+    const action = keyActions[e.key];
+    if (action) {
+      e.preventDefault();
+      this.socket.emit('game-action', { type: action });
+    }
   }
 
-  // ✅ เพิ่มการเชื่อมต่อ Socket.io
-  initializeSocket() {
-    // เชื่อมต่อกับ server (ปรับ URL ตามความเหมาะสม)
-    this.socket = io(window.location.origin, {
-      transports: ['websocket', 'polling']
-    });
-
-    // ตั้งค่า event handlers
-    this.setupSocketHandlers();
+  joinRoom(roomId = null) {
+    if (!this.socket || !this.socket.connected) {
+      showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
+      return;
+    }
+    
+    this.socket.emit('join-room', { roomId });
   }
 
-  // ✅ เพิ่ม Socket Event Handlers
-  setupSocketHandlers() {
-    // เมื่อเชื่อมต่อสำเร็จ
-    this.socket.on('connect', () => {
-      console.log('🔌 Connected to server:', this.socket.id);
-      this.connected = true;
-      
-      // อัพเดทสถานะการเชื่อมต่อใน HTML
-      if (window.updateConnectionStatus) {
-        window.updateConnectionStatus(true);
-      }
-    });
-
-    // เมื่อขาดการเชื่อมต่อ
-    this.socket.on('disconnect', (reason) => {
-      console.log('🔌 Disconnected:', reason);
-      this.connected = false;
-      
-      if (window.updateConnectionStatus) {
-        window.updateConnectionStatus(false);
-      }
-    });
-
-    // เมื่อเข้าห้องสำเร็จ
-    this.socket.on('room-joined', (data) => {
-      console.log('🏠 Joined room:', data.roomId);
-      this.roomId = data.roomId;
-      this.playerNumber = data.playerNumber;
-      
-      // แสดงข้อมูลห้องใน HTML
-      const roomDisplay = document.getElementById('room-id-display');
-      if (roomDisplay) {
-        roomDisplay.textContent = data.roomId;
-      }
-      
-      this.updatePlayersList(data.players || []);
-      
-      // เปิดใช้ปุ่มพร้อมเล่น
-      const readyBtn = document.getElementById('btn-ready');
-      if (readyBtn) {
-        readyBtn.disabled = false;
-      }
-    });
-
-    // เมื่อมีผู้เล่นใหม่เข้าห้อง
-    this.socket.on('players-updated', (players) => {
-      this.updatePlayersList(players);
-    });
-
-    // เมื่อมีการอัพเดท game state
-    this.socket.on('game-state-update', (gameState) => {
-      this.gameState = gameState;
-      this.updateGameUI();
-    });
-
-    // ✅ รับ delta updates จาก server
-    this.socket.on('game-delta', (delta) => {
-      this.applyDelta(delta);
-    });
-
-    // เมื่อเกมเริ่ม
-    this.socket.on('game-started', (gameState) => {
-      console.log('🎮 Game started!');
-      this.gameState = gameState;
-      this.gameStarted = true;
-      
-      // แสดงหน้าจอเกม
-      if (window.showScreen) {
-        window.showScreen('game-screen');
-      }
-      
-      this.startGameLoop();
-    });
-
-    // เมื่อเกมจบ
-    this.socket.on('game-over', (result) => {
-      console.log('🏆 Game over:', result);
-      this.gameStarted = false;
-      this.handleGameOver(result);
-    });
-
-    // เมื่อถูก rate limit
-    this.socket.on('rate-limited', () => {
-      console.warn('⚠️ Rate limited - slow down!');
-      if (window.showNotification) {
-        window.showNotification('การกดปุ่มเร็วเกินไป กรุณาช้าลง', 'warning');
-      }
-    });
-
-    // เมื่อเกิดข้อผิดพลาด
-    this.socket.on('error', (error) => {
-      console.error('❌ Socket error:', error);
-      if (window.showNotification) {
-        window.showNotification('เกิดข้อผิดพลาด: ' + error.message, 'error');
-      }
-    });
+  playerReady() {
+    if (!this.socket || !this.socket.connected) {
+      showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
+      return;
+    }
+    
+    this.socket.emit('player-ready');
   }
 
-  // ✅ อัพเดทรายชื่อผู้เล่น
   updatePlayersList(players) {
-    const list = document.getElementById('players-list');
-    if (!list) return;
-    
-    list.innerHTML = '';
+    const playersList = document.getElementById('players-list');
+    playersList.innerHTML = '';
     
     players.forEach(player => {
       const li = document.createElement('li');
-      li.textContent = `${player.name || `Player ${player.playerNumber}`}${player.ready ? ' (พร้อม)' : ''}`;
+      li.textContent = `Player ${player.playerNumber}`;
       if (player.playerNumber === this.playerNumber) {
         li.classList.add('current-player');
+        li.textContent += ' (คุณ)';
       }
-      list.appendChild(li);
-    });
-
-    // อัพเดท ready indicators
-    for (let i = 1; i <= 2; i++) {
-      const indicator = document.getElementById(`ready-indicator-${i}`);
-      if (indicator) {
-        const player = players.find(p => p.playerNumber === i);
-        if (player) {
-          indicator.textContent = `${player.name || `Player ${i}`}: ${player.ready ? 'พร้อมแล้ว ✅' : 'รอ...'}`;
-        }
+      if (player.ready) {
+        li.textContent += ' - พร้อมเล่น ✅';
       }
-    }
-  }
-
-  // ✅ เพิ่มฟังก์ชันสำหรับการเข้าห้อง (ใช้จาก HTML)
-  joinRoom(roomId) {
-    if (!this.socket || !this.socket.connected) {
-      if (window.showNotification) {
-        window.showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-      }
-      return;
-    }
-
-    const playerName = document.getElementById('create-player-name')?.value || 
-                      document.getElementById('join-player-name')?.value || 
-                      `Player_${Math.random().toString(36).substr(2, 5)}`;
-
-    this.socket.emit('join-room', { 
-      roomId: roomId || `room_${Date.now()}`,
-      playerName: playerName.trim()
-    });
-  }
-  // ✅ แก้ไข Socket Event Handlers ให้ตรงกับ Server
-setupSocketHandlers() {
-  // เมื่อเชื่อมต่อสำเร็จ
-  this.socket.on('connect', () => {
-    console.log('🔌 Connected to server:', this.socket.id);
-    this.connected = true;
-    
-    if (window.updateConnectionStatus) {
-      window.updateConnectionStatus(true);
-    }
-  });
-
-  // เมื่อขาดการเชื่อมต่อ
-  this.socket.on('disconnect', (reason) => {
-    console.log('🔌 Disconnected:', reason);
-    this.connected = false;
-    
-    if (window.updateConnectionStatus) {
-      window.updateConnectionStatus(false);
-    }
-  });
-
-  // ✅ แก้ไข event name และ structure
-  this.socket.on('joined-room', (data) => {
-    console.log('🏠 Joined room:', data.roomId);
-    this.roomId = data.roomId;
-    this.playerNumber = data.playerNumber;
-    
-    const roomDisplay = document.getElementById('room-id-display');
-    if (roomDisplay) {
-      roomDisplay.textContent = data.roomId;
-    }
-    
-    // เปิดใช้ปุ่มพร้อมเล่น
-    const readyBtn = document.getElementById('btn-ready');
-    if (readyBtn) {
-      readyBtn.disabled = false;
-    }
-  });
-
-  // ✅ เพิ่ม handler สำหรับ player-joined
-  this.socket.on('player-joined', (data) => {
-    console.log('👥 Player joined:', data);
-    this.updatePlayersList(data.players || []);
-    
-    // อัพเดท player count
-    const countEl = document.getElementById('player-count');
-    if (countEl) {
-      countEl.textContent = `${data.playerCount}/2`;
-    }
-  });
-
-  // ✅ เพิ่ม handler สำหรับ player-left
-  this.socket.on('player-left', (data) => {
-    console.log('👋 Player left:', data);
-    if (window.showNotification) {
-      window.showNotification(`Player ${data.playerNumber} ออกจากห้อง`, 'info');
-    }
-  });
-
-  // ✅ เพิ่ม handler สำหรับ player-ready
-  this.socket.on('player-ready', (data) => {
-    console.log('✅ Player ready:', data.playerNumber);
-    
-    const indicator = document.getElementById(`ready-indicator-${data.playerNumber}`);
-    if (indicator) {
-      indicator.textContent = `Player ${data.playerNumber}: พร้อมแล้ว ✅`;
-      indicator.classList.add('ready');
-    }
-  });
-
-  // ✅ เพิ่ม handler สำหรับ room-full
-  this.socket.on('room-full', () => {
-    if (window.showNotification) {
-      window.showNotification('ห้องเต็มแล้ว', 'error');
-    }
-    if (window.showScreen) {
-      window.showScreen('lobby-screen');
-    }
-  });
-
-  // ✅ เพิ่ม handler สำหรับ game-reset
-  this.socket.on('game-reset', () => {
-    console.log('🔄 Game reset');
-    this.gameStarted = false;
-    this.isReady = false;
-    
-    // รีเซ็ต UI
-    const readyBtn = document.getElementById('btn-ready');
-    if (readyBtn) {
-      readyBtn.disabled = false;
-      readyBtn.textContent = 'พร้อมเล่น';
-    }
-    
-    // กลับไปหน้าห้องรอ
-    if (window.showScreen) {
-      window.showScreen('waiting-room-screen');
-    }
-  });
-
-  // ✅ แก้ไข handler สำหรับ auto-drop
-  this.socket.on('auto-drop', (positions) => {
-    if (this.gameState) {
-      if (positions.player1 && this.gameState.player1) {
-        this.gameState.player1.currentX = positions.player1.x;
-        this.gameState.player1.currentY = positions.player1.y;
-      }
-      if (positions.player2 && this.gameState.player2) {
-        this.gameState.player2.currentX = positions.player2.x;
-        this.gameState.player2.currentY = positions.player2.y;
-      }
-    }
-  });
-
-  // เมื่อเกมเริ่ม - ✅ อัพเดทให้รับ gameState
-  this.socket.on('game-started', (gameState) => {
-    console.log('🎮 Game started!');
-    this.gameState = gameState;
-    this.gameStarted = true;
-    
-    if (window.showScreen) {
-      window.showScreen('game-screen');
-    }
-  });
-
-  // ✅ รับ delta updates จาก server
-  this.socket.on('game-delta', (delta) => {
-    this.applyDelta(delta);
-  });
-
-  // เมื่อเกมจบ
-  this.socket.on('game-over', (result) => {
-    console.log('🏆 Game over:', result);
-    this.gameStarted = false;
-    this.handleGameOver(result);
-  });
-
-  // เมื่อถูก rate limit
-  this.socket.on('rate-limited', () => {
-    console.warn('⚠️ Rate limited - slow down!');
-    if (window.showNotification) {
-      window.showNotification('การกดปุ่มเร็วเกินไป กรุณาช้าลง', 'warning');
-    }
-  });
-
-  // เมื่อเกิดข้อผิดพลาด
-  this.socket.on('error', (error) => {
-    console.error('❌ Socket error:', error);
-    if (window.showNotification) {
-      window.showNotification('เกิดข้อผิดพลาด: ' + error.message, 'error');
-    }
-  });
-}
-
-// ✅ แก้ไขฟังก์ชัน joinRoom ให้ส่งข้อมูลตรงกับ server
-joinRoom(roomId) {
-  if (!this.socket || !this.socket.connected) {
-    if (window.showNotification) {
-      window.showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-    }
-    return;
-  }
-
-  // ✅ ส่งข้อมูลตาม format ที่ server คาดหวัง
-  this.socket.emit('join-room', { 
-    roomId: roomId || this.generateRoomId()
-    // ไม่ต้องส่ง playerName เพราะ server ไม่ได้ใช้
-  });
-}
-
-// ✅ เพิ่มฟังก์ชัน generateRoomId
-generateRoomId() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-// ✅ แก้ไขฟังก์ชัน updatePlayersList
-updatePlayersList(players) {
-  const list = document.getElementById('players-list');
-  if (!list) return;
-  
-  list.innerHTML = '';
-  
-  players.forEach(player => {
-    const li = document.createElement('li');
-    li.textContent = `Player ${player.playerNumber}${player.ready ? ' (พร้อม)' : ' (รอ...)'}`;
-    if (player.playerNumber === this.playerNumber) {
-      li.classList.add('current-player');
-    }
-    list.appendChild(li);
-  });
-
-  // อัพเดท ready indicators
-  for (let i = 1; i <= 2; i++) {
-    const indicator = document.getElementById(`ready-indicator-${i}`);
-    if (indicator) {
-      const player = players.find(p => p.playerNumber === i);
-      if (player) {
-        indicator.textContent = `Player ${i}: ${player.ready ? 'พร้อมแล้ว ✅' : 'รอ...'}`;
-        indicator.classList.toggle('ready', player.ready);
-      } else {
-        indicator.textContent = `Player ${i}: รอผู้เล่น...`;
-        indicator.classList.remove('ready');
-      }
-    }
-  }
-}
-  // ✅ เพิ่มฟังก์ชันสำหรับการพร้อมเล่น
-  playerReady() {
-    if (!this.socket || !this.socket.connected) {
-      if (window.showNotification) {
-        window.showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-      }
-      return;
-    }
-
-    this.isReady = true;
-    this.socket.emit('player-ready');
-    
-    if (window.showNotification) {
-      window.showNotification('คุณพร้อมเล่นแล้ว!', 'success');
-    }
-  }
-
-  // ✅ ปรับปรุงการจัดการ input (ใช้ร่วมกับ HTML)
-  setupGameEventListeners() {
-    // เพิ่ม keyboard listener สำหรับเกม (ไม่ทับซ้อนกับ HTML)
-    document.addEventListener('keydown', (e) => {
-      if (this.gameStarted) {
-        this.handleKeyPress(e);
-      }
+      playersList.appendChild(li);
     });
   }
 
-  // ✅ ปรับปรุงการส่งคำสั่งเกม
-  handleKeyPress(e) {
-    if (!this.gameStarted || !this.gameState?.gameStarted) return;
-    if (!this.socket?.connected) return;
-
-    const actions = {
-      'ArrowLeft': { type: 'move-left' },
-      'ArrowRight': { type: 'move-right' },
-      'ArrowDown': { type: 'move-down' },
-      'ArrowUp': { type: 'rotate' },
-      ' ': { type: 'hard-drop' }
-    };
-
-    if (actions[e.key]) {
-      e.preventDefault();
-      // ส่งคำสั่งไปยัง server
-      this.socket.emit('game-action', actions[e.key]);
-    }
-  }
-
-  // ✅ เพิ่มฟังก์ชันจัดการ delta updates
-  applyDelta(delta) {
+  handleGameDelta(data) {
     if (!this.gameState) return;
-
-    const playerKey = `player${delta.playerNumber}`;
+    
+    const playerKey = `player${data.playerNumber}`;
     const playerState = this.gameState[playerKey];
-
-    if (!playerState) return;
-
-    delta.changes.forEach(change => {
+    
+    data.changes.forEach(change => {
       switch (change.type) {
         case 'position':
-          playerState.currentX = change.to.x;
-          playerState.currentY = change.to.y;
-          break;
-
-        case 'rotation':
-          if (playerState.currentPiece) {
-            playerState.currentPiece.shape = change.shape;
+          // Update piece position
+          if (data.playerNumber === 1) {
+            this.gameState.player1.currentX = change.to.x;
+            this.gameState.player1.currentY = change.to.y;
+          } else {
+            this.gameState.player2.currentX = change.to.x;
+            this.gameState.player2.currentY = change.to.y;
           }
           break;
-
+          
+        case 'rotation':
+          playerState.currentPiece.shape = change.shape;
+          break;
+          
         case 'hard-drop':
-          playerState.currentY = change.newY;
-          playerState.score += change.scoreGain;
-          this.updatePlayerStats(delta.playerNumber, playerState);
+          if (data.playerNumber === 1) {
+            this.gameState.player1.currentY = change.newY;
+            this.gameState.player1.score += change.scoreGain;
+          } else {
+            this.gameState.player2.currentY = change.newY;
+            this.gameState.player2.score += change.scoreGain;
+          }
           break;
-
+          
         case 'piece-placed':
-          // อัพเดท grid และสถิติ
-          Object.assign(playerState, change.newStats);
-          this.updatePlayerStats(delta.playerNumber, playerState);
+          // Update grid and stats
+          if (change.linesCleared && change.linesCleared.length > 0) {
+            // Handle line clearing animation
+            this.animateLineClearing(data.playerNumber, change.linesCleared);
+          }
+          
+          playerState.score = change.newStats.score;
+          playerState.lines = change.newStats.lines;
+          playerState.level = change.newStats.level;
+          
+          this.updatePlayerStats(data.playerNumber, change.newStats);
           break;
-
+          
         case 'new-piece':
           playerState.currentPiece = change.currentPiece;
           playerState.nextPiece = change.nextPiece;
-          playerState.currentX = 4;
-          playerState.currentY = 0;
-          this.updateNextPiece(delta.playerNumber, change.nextPiece);
+          if (data.playerNumber === 1) {
+            this.gameState.player1.currentX = 4;
+            this.gameState.player1.currentY = 0;
+          } else {
+            this.gameState.player2.currentX = 4;
+            this.gameState.player2.currentY = 0;
+          }
+          this.updateNextPiecePreview(data.playerNumber, change.nextPiece);
           break;
-
+          
         case 'game-over':
-          this.handleGameOver({
-            winner: change.winner,
-            finalScores: change.finalScores
-          });
-          break;
+          this.handleGameOver(change);
+          return;
       }
     });
-  }
-
-  // ✅ อัพเดท UI สถิติผู้เล่น
-  updatePlayerStats(playerNumber, stats) {
-    const statsEl = document.getElementById(`player${playerNumber}-stats`);
-    if (!statsEl) return;
-
-    const scoreEl = statsEl.querySelector('.score-value');
-    const linesEl = statsEl.querySelector('.lines-value');
-    const levelEl = statsEl.querySelector('.level-value');
-
-    if (scoreEl) scoreEl.textContent = stats.score || 0;
-    if (linesEl) linesEl.textContent = stats.linesCleared || 0;
-    if (levelEl) levelEl.textContent = stats.level || 1;
-  }
-
-  // ✅ อัพเดท next piece preview
-  updateNextPiece(playerNumber, nextPiece) {
-    const nextEl = document.getElementById(`player${playerNumber}-next`);
-    if (!nextEl || !nextPiece) return;
-
-    nextEl.innerHTML = '';
     
-    // สร้าง grid 4x4 สำหรับแสดง next piece
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 4; col++) {
+    this.renderGame();
+  }
+
+  handleAutoDrop(data) {
+    if (!this.gameState) return;
+    
+    this.gameState.player1.currentX = data.player1.x;
+    this.gameState.player1.currentY = data.player1.y;
+    this.gameState.player2.currentX = data.player2.x;
+    this.gameState.player2.currentY = data.player2.y;
+    
+    this.renderGame();
+  }
+
+  renderGame() {
+    if (!this.gameState || !this.player1Ctx || !this.player2Ctx) return;
+    
+    // Clear canvases
+    this.player1Ctx.clearRect(0, 0, this.player1Canvas.width, this.player1Canvas.height);
+    this.player2Ctx.clearRect(0, 0, this.player2Canvas.width, this.player2Canvas.height);
+    
+    // Render grids
+    this.renderGrid(this.player1Ctx, this.gameState.player1);
+    this.renderGrid(this.player2Ctx, this.gameState.player2);
+    
+    // Highlight current player
+    if (this.playerNumber === 1) {
+      this.player1Canvas.classList.add('current-player');
+      this.player2Canvas.classList.remove('current-player');
+    } else {
+      this.player2Canvas.classList.add('current-player');
+      this.player1Canvas.classList.remove('current-player');
+    }
+  }
+
+  renderGrid(ctx, playerState) {
+    const cellSize = this.CELL_SIZE;
+    
+    // Draw grid background
+    ctx.strokeStyle = '#333';
+    for (let x = 0; x <= this.GRID_WIDTH; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * cellSize, 0);
+      ctx.lineTo(x * cellSize, this.GRID_HEIGHT * cellSize);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= this.GRID_HEIGHT; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * cellSize);
+      ctx.lineTo(this.GRID_WIDTH * cellSize, y * cellSize);
+      ctx.stroke();
+    }
+    
+    // Draw placed pieces
+    for (let y = 0; y < this.GRID_HEIGHT; y++) {
+      for (let x = 0; x < this.GRID_WIDTH; x++) {
+        if (playerState.grid[y][x] !== 0) {
+          const color = this.getColorFromValue(playerState.grid[y][x]);
+          this.drawCell(ctx, x, y, color, cellSize);
+        }
+      }
+    }
+    
+    // Draw current piece
+    if (playerState.currentPiece && playerState.alive) {
+      this.drawPiece(
+        ctx, 
+        playerState.currentPiece,
+        playerState.currentX,
+        playerState.currentY,
+        cellSize
+      );
+    }
+  }
+
+  drawCell(ctx, x, y, color, cellSize) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+    
+    // Add border
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+  }
+
+  drawPiece(ctx, piece, startX, startY, cellSize) {
+    if (!piece || !piece.shape) return;
+    
+    const color = this.COLORS[piece.color] || '#fff';
+    
+    for (let y = 0; y < piece.shape.length; y++) {
+      for (let x = 0; x < piece.shape[y].length; x++) {
+        if (piece.shape[y][x]) {
+          this.drawCell(ctx, startX + x, startY + y, color, cellSize);
+        }
+      }
+    }
+  }
+
+  getColorFromValue(value) {
+    const colorMap = {
+      'cyan': '#00ffff',
+      'yellow': '#ffff00',
+      'purple': '#800080', 
+      'green': '#00ff00',
+      'red': '#ff0000',
+      'blue': '#0000ff',
+      'orange': '#ffa500'
+    };
+    
+    return colorMap[value] || '#ffffff';
+  }
+
+  updatePlayerStats(playerNumber, stats) {
+    const statsElement = document.getElementById(`player${playerNumber}-stats`);
+    if (!statsElement) return;
+    
+    statsElement.querySelector('.score-value').textContent = stats.score;
+    statsElement.querySelector('.lines-value').textContent = stats.lines;
+    statsElement.querySelector('.level-value').textContent = stats.level;
+  }
+
+  updateNextPiecePreview(playerNumber, nextPiece) {
+    const previewElement = document.getElementById(`player${playerNumber}-next`);
+    if (!previewElement || !nextPiece) return;
+    
+    previewElement.innerHTML = '';
+    
+    // Create 4x4 grid for preview
+    for (let y = 0; y < 4; y++) {
+      for (let x = 0; x < 4; x++) {
         const cell = document.createElement('div');
         cell.className = 'preview-cell';
         
-        if (nextPiece.shape[row] && nextPiece.shape[row][col]) {
-          cell.style.backgroundColor = this.getPieceColor(nextPiece.color);
+        if (nextPiece.shape[y] && nextPiece.shape[y][x]) {
+          cell.style.backgroundColor = this.COLORS[nextPiece.color] || '#fff';
         }
         
-        nextEl.appendChild(cell);
+        previewElement.appendChild(cell);
       }
     }
   }
 
-  // ✅ อัพเดท Game UI
-  updateGameUI() {
-    if (!this.gameState) return;
-
-    // อัพเดทสถิติทั้งสองผู้เล่น
-    if (this.gameState.player1) {
-      this.updatePlayerStats(1, this.gameState.player1);
-    }
-    if (this.gameState.player2) {
-      this.updatePlayerStats(2, this.gameState.player2);
-    }
-
-    // เพิ่ม highlight สำหรับผู้เล่นปัจจุบัน
-    const p1Board = document.getElementById('player1-board');
-    const p2Board = document.getElementById('player2-board');
+  animateLineClearing(playerNumber, clearedLines) {
+    // Simple line clearing animation
+    const canvas = playerNumber === 1 ? this.player1Canvas : this.player2Canvas;
+    const ctx = playerNumber === 1 ? this.player1Ctx : this.player2Ctx;
     
-    if (p1Board) {
-      p1Board.classList.toggle('current-player', this.playerNumber === 1);
-    }
-    if (p2Board) {
-      p2Board.classList.toggle('current-player', this.playerNumber === 2);
-    }
+    // Flash effect
+    canvas.style.filter = 'brightness(1.5)';
+    setTimeout(() => {
+      canvas.style.filter = 'brightness(1)';
+    }, 200);
   }
 
-  // ✅ เพิ่มฟังก์ชันจัดการเกมจบ
-  handleGameOver(result) {
+  handleGameOver(gameOverData) {
     this.gameStarted = false;
     
-    if (window.showScreen) {
-      // อัพเดทข้อมูลในหน้าจอ Game Over
-      const winnerMessage = document.getElementById('winner-message');
-      if (winnerMessage) {
-        if (result.winner === 'draw') {
-          winnerMessage.textContent = '🤝 เสมอ!';
-          winnerMessage.style.color = '#ffd700';
-        } else if (result.winner === this.playerNumber) {
-          winnerMessage.textContent = '🎉 คุณชนะ!';
-          winnerMessage.style.color = '#4CAF50';
-        } else {
-          winnerMessage.textContent = '😢 คุณแพ้';
-          winnerMessage.style.color = '#f44336';
-        }
-      }
-      
-      // อัพเดทคะแนนสุดท้าย
-      const p1Score = document.getElementById('final-score-p1');
-      const p2Score = document.getElementById('final-score-p2');
-      if (p1Score) p1Score.textContent = result.finalScores?.player1 || 0;
-      if (p2Score) p2Score.textContent = result.finalScores?.player2 || 0;
-      
-      window.showScreen('game-over-screen');
-    }
-  }
-
-  // ✅ เริ่ม Game Loop
-  startGameLoop() {
-    // เริ่ม game loop สำหรับการตกของชิ้นส่วน
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-    }
-
-    // ปรับความเร็วตาม level
-    const getDropInterval = () => {
-      const level = this.gameState?.[`player${this.playerNumber}`]?.level || 1;
-      return Math.max(100, 1000 - (level - 1) * 50); // เร็วขึ้นตาม level
-    };
-
-    const dropLoop = () => {
-      if (this.gameStarted && this.gameState?.gameStarted && this.socket?.connected) {
-        this.socket.emit('game-action', { type: 'move-down' });
-      }
-      
-      if (this.gameStarted) {
-        setTimeout(dropLoop, getDropInterval());
-      }
-    };
-
-    // เริ่ม drop loop
-    setTimeout(dropLoop, getDropInterval());
-  }
-
-  // ✅ Create Block Textures
-  createBlockTextures() {
-    const textures = {};
-    const colors = {
-      'I': '#00f0f0', // Cyan
-      'O': '#f0f000', // Yellow
-      'T': '#a000f0', // Purple
-      'S': '#00f000', // Green
-      'Z': '#f00000', // Red
-      'J': '#0000f0', // Blue
-      'L': '#f0a000'  // Orange
-    };
-
-    Object.entries(colors).forEach(([type, color]) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = this.TILE_SIZE;
-      const ctx = canvas.getContext('2d');
-      
-      // Draw gradient block
-      const gradient = ctx.createLinearGradient(0, 0, this.TILE_SIZE, this.TILE_SIZE);
-      gradient.addColorStop(0, color);
-      gradient.addColorStop(1, this.darkenColor(color, 0.3));
-      
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE);
-      
-      // Add border
-      ctx.strokeStyle = this.lightenColor(color, 0.2);
-      ctx.lineWidth = 1;
-      ctx.strokeRect(0.5, 0.5, this.TILE_SIZE-1, this.TILE_SIZE-1);
-      
-      textures[type] = canvas;
-    });
-
-    return textures;
-  }
-
-  // ✅ Get Piece Color
-  getPieceColor(pieceType) {
-    const colors = {
-      'I': '#00f0f0',
-      'O': '#f0f000',
-      'T': '#a000f0',
-      'S': '#00f000',
-      'Z': '#f00000',
-      'J': '#0000f0',
-      'L': '#f0a000'
-    };
-    return colors[pieceType] || '#ffffff';
-  }
-
-  // ✅ Start Render Loop
-  startRenderLoop() {
-    const render = (currentTime) => {
-      this.performanceMetrics.frameCount++;
-      if (currentTime - this.performanceMetrics.lastTime >= 1000) {
-        this.performanceMetrics.fps = this.performanceMetrics.frameCount;
-        this.performanceMetrics.frameCount = 0;
-        this.performanceMetrics.lastTime = currentTime;
-      }
-
-      if (this.hasStateChanged()) {
-        this.renderGame();
-        this.prevGameState = this.deepCloneState(this.gameState);
-      }
-
-      this.animationFrame = requestAnimationFrame(render);
-    };
-
-    this.animationFrame = requestAnimationFrame(render);
-  }
-
-  // ✅ Check State Changes
-  hasStateChanged() {
-    if (!this.gameState || !this.prevGameState) return true;
+    // Update final scores
+    document.getElementById('final-score-p1').textContent = gameOverData.finalScores.player1;
+    document.getElementById('final-score-p2').textContent = gameOverData.finalScores.player2;
     
-    const current = this.gameState;
-    const prev = this.prevGameState;
-    
-    return (
-      current.player1?.currentX !== prev.player1?.currentX ||
-      current.player1?.currentY !== prev.player1?.currentY ||
-      current.player1?.score !== prev.player1?.score ||
-      current.player2?.currentX !== prev.player2?.currentX ||
-      current.player2?.currentY !== prev.player2?.currentY ||
-      current.player2?.score !== prev.player2?.score ||
-      this.hasGridChanged(current.player1?.grid, prev.player1?.grid) ||
-      this.hasGridChanged(current.player2?.grid, prev.player2?.grid)
-    );
-  }
-
-  hasGridChanged(grid1, grid2) {
-    if (!grid1 || !grid2) return true;
-    
-    for (let row = 0; row < grid1.length; row++) {
-      for (let col = 0; col < grid1[row].length; col++) {
-        if (grid1[row][col] !== grid2[row][col]) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // ✅ Render Game
-  renderGame() {
-    if (!this.gameState) return;
-    
-    // Render Player 1 board
-    if (this.player1Ctx && this.gameState.player1) {
-      this.renderPlayerBoard(this.player1Ctx, this.gameState.player1, 1);
+    // Update winner message
+    const winnerMessage = document.getElementById('winner-message');
+    if (gameOverData.winner === 'draw') {
+      winnerMessage.textContent = '🤝 เสมอกัน!';
+    } else if (gameOverData.winner === this.playerNumber) {
+      winnerMessage.textContent = '🎉 คุณชนะ!';
+    } else {
+      winnerMessage.textContent = '😢 คุณแพ้!';
     }
     
-    // Render Player 2 board  
-    if (this.player2Ctx && this.gameState.player2) {
-      this.renderPlayerBoard(this.player2Ctx, this.gameState.player2, 2);
-    }
+    showScreen('game-over-screen');
+    showNotification('เกมจบแล้ว!', 'info');
   }
 
-  // ✅ Render Player Board
-  renderPlayerBoard(ctx, playerState, playerNumber) {
-    if (!ctx || !playerState) return;
-    
-    const tileSize = this.TILE_SIZE;
-    const width = 10 * tileSize;
-    const height = 20 * tileSize;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-    
-    // Background
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, width, height);
-    
-    // Draw grid lines
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 10; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * tileSize, 0);
-      ctx.lineTo(i * tileSize, height);
-      ctx.stroke();
-    }
-    for (let i = 0; i <= 20; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, i * tileSize);
-      ctx.lineTo(width, i * tileSize);
-      ctx.stroke();
-    }
-
-    // Draw placed blocks
-    if (playerState.grid) {
-      for (let row = 0; row < 20; row++) {
-        for (let col = 0; col < 10; col++) {
-          const blockType = playerState.grid[row]?.[col];
-          if (blockType && this.blockTextures[blockType]) {
-            ctx.drawImage(
-              this.blockTextures[blockType],
-              col * tileSize,
-              row * tileSize
-            );
-          }
-        }
-      }
-    }
-
-    // Draw current piece
-    if (playerState.currentPiece && playerState.alive && playerState.currentPiece.shape) {
-      ctx.save();
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 5;
-      
-      const piece = playerState.currentPiece;
-      const pieceColor = piece.color || piece.type;
-      
-      for (let row = 0; row < piece.shape.length; row++) {
-        for (let col = 0; col < piece.shape[row].length; col++) {
-          if (piece.shape[row][col] && this.blockTextures[pieceColor]) {
-            const x = (playerState.currentX + col) * tileSize;
-            const y = (playerState.currentY + row) * tileSize;
-            
-            // Only draw if within bounds
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-              ctx.drawImage(this.blockTextures[pieceColor], x, y);
-            }
-          }
-        }
-      }
-      ctx.restore();
-    }
-
-    // Draw game over overlay
-    if (!playerState.alive) {
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.fillRect(0, 0, width, height);
-      
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', width / 2, height / 2);
-    }
-  }
-
-  // ✅ Utility Functions
-  deepCloneState(state) {
-    if (!state) return null;
-    return {
-      player1: state.player1 ? { 
-        ...state.player1, 
-        grid: state.player1.grid?.map(row => [...row]) 
-      } : null,
-      player2: state.player2 ? { 
-        ...state.player2, 
-        grid: state.player2.grid?.map(row => [...row]) 
-      } : null,
-      gameStarted: state.gameStarted,
-      winner: state.winner
-    };
-  }
-
-  darkenColor(color, factor) {
-    const num = parseInt(color.slice(1), 16);
-    const amt = Math.round(2.55 * factor * 100);
-    const R = Math.max(0, (num >> 16) - amt);
-    const G = Math.max(0, (num >> 8 & 0x00FF) - amt);
-    const B = Math.max(0, (num & 0x0000FF) - amt);
-    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
-  }
-
-  lightenColor(color, factor) {
-    const num = parseInt(color.slice(1), 16);
-    const amt = Math.round(2.55 * factor * 100);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
-    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
-  }
-
-  // ✅ Cleanup
-  cleanup() {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
-    
-    if (this.dropInterval) {
-      clearInterval(this.dropInterval);
-    }
-    
+  // Cleanup
+  disconnect() {
     if (this.socket) {
       this.socket.disconnect();
     }
-    
-    this.blockPool = [];
-    this.activeBlocks.clear();
   }
 }
-
-// ⚠️ ไม่สร้าง instance ที่นี่ เพราะ HTML จะสร้างเอง
-// const game = new OptimizedTetrisClient();
