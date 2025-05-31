@@ -236,7 +236,212 @@ class OptimizedTetrisClient {
       playerName: playerName.trim()
     });
   }
+  // ✅ แก้ไข Socket Event Handlers ให้ตรงกับ Server
+setupSocketHandlers() {
+  // เมื่อเชื่อมต่อสำเร็จ
+  this.socket.on('connect', () => {
+    console.log('🔌 Connected to server:', this.socket.id);
+    this.connected = true;
+    
+    if (window.updateConnectionStatus) {
+      window.updateConnectionStatus(true);
+    }
+  });
 
+  // เมื่อขาดการเชื่อมต่อ
+  this.socket.on('disconnect', (reason) => {
+    console.log('🔌 Disconnected:', reason);
+    this.connected = false;
+    
+    if (window.updateConnectionStatus) {
+      window.updateConnectionStatus(false);
+    }
+  });
+
+  // ✅ แก้ไข event name และ structure
+  this.socket.on('joined-room', (data) => {
+    console.log('🏠 Joined room:', data.roomId);
+    this.roomId = data.roomId;
+    this.playerNumber = data.playerNumber;
+    
+    const roomDisplay = document.getElementById('room-id-display');
+    if (roomDisplay) {
+      roomDisplay.textContent = data.roomId;
+    }
+    
+    // เปิดใช้ปุ่มพร้อมเล่น
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn) {
+      readyBtn.disabled = false;
+    }
+  });
+
+  // ✅ เพิ่ม handler สำหรับ player-joined
+  this.socket.on('player-joined', (data) => {
+    console.log('👥 Player joined:', data);
+    this.updatePlayersList(data.players || []);
+    
+    // อัพเดท player count
+    const countEl = document.getElementById('player-count');
+    if (countEl) {
+      countEl.textContent = `${data.playerCount}/2`;
+    }
+  });
+
+  // ✅ เพิ่ม handler สำหรับ player-left
+  this.socket.on('player-left', (data) => {
+    console.log('👋 Player left:', data);
+    if (window.showNotification) {
+      window.showNotification(`Player ${data.playerNumber} ออกจากห้อง`, 'info');
+    }
+  });
+
+  // ✅ เพิ่ม handler สำหรับ player-ready
+  this.socket.on('player-ready', (data) => {
+    console.log('✅ Player ready:', data.playerNumber);
+    
+    const indicator = document.getElementById(`ready-indicator-${data.playerNumber}`);
+    if (indicator) {
+      indicator.textContent = `Player ${data.playerNumber}: พร้อมแล้ว ✅`;
+      indicator.classList.add('ready');
+    }
+  });
+
+  // ✅ เพิ่ม handler สำหรับ room-full
+  this.socket.on('room-full', () => {
+    if (window.showNotification) {
+      window.showNotification('ห้องเต็มแล้ว', 'error');
+    }
+    if (window.showScreen) {
+      window.showScreen('lobby-screen');
+    }
+  });
+
+  // ✅ เพิ่ม handler สำหรับ game-reset
+  this.socket.on('game-reset', () => {
+    console.log('🔄 Game reset');
+    this.gameStarted = false;
+    this.isReady = false;
+    
+    // รีเซ็ต UI
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn) {
+      readyBtn.disabled = false;
+      readyBtn.textContent = 'พร้อมเล่น';
+    }
+    
+    // กลับไปหน้าห้องรอ
+    if (window.showScreen) {
+      window.showScreen('waiting-room-screen');
+    }
+  });
+
+  // ✅ แก้ไข handler สำหรับ auto-drop
+  this.socket.on('auto-drop', (positions) => {
+    if (this.gameState) {
+      if (positions.player1 && this.gameState.player1) {
+        this.gameState.player1.currentX = positions.player1.x;
+        this.gameState.player1.currentY = positions.player1.y;
+      }
+      if (positions.player2 && this.gameState.player2) {
+        this.gameState.player2.currentX = positions.player2.x;
+        this.gameState.player2.currentY = positions.player2.y;
+      }
+    }
+  });
+
+  // เมื่อเกมเริ่ม - ✅ อัพเดทให้รับ gameState
+  this.socket.on('game-started', (gameState) => {
+    console.log('🎮 Game started!');
+    this.gameState = gameState;
+    this.gameStarted = true;
+    
+    if (window.showScreen) {
+      window.showScreen('game-screen');
+    }
+  });
+
+  // ✅ รับ delta updates จาก server
+  this.socket.on('game-delta', (delta) => {
+    this.applyDelta(delta);
+  });
+
+  // เมื่อเกมจบ
+  this.socket.on('game-over', (result) => {
+    console.log('🏆 Game over:', result);
+    this.gameStarted = false;
+    this.handleGameOver(result);
+  });
+
+  // เมื่อถูก rate limit
+  this.socket.on('rate-limited', () => {
+    console.warn('⚠️ Rate limited - slow down!');
+    if (window.showNotification) {
+      window.showNotification('การกดปุ่มเร็วเกินไป กรุณาช้าลง', 'warning');
+    }
+  });
+
+  // เมื่อเกิดข้อผิดพลาด
+  this.socket.on('error', (error) => {
+    console.error('❌ Socket error:', error);
+    if (window.showNotification) {
+      window.showNotification('เกิดข้อผิดพลาด: ' + error.message, 'error');
+    }
+  });
+}
+
+// ✅ แก้ไขฟังก์ชัน joinRoom ให้ส่งข้อมูลตรงกับ server
+joinRoom(roomId) {
+  if (!this.socket || !this.socket.connected) {
+    if (window.showNotification) {
+      window.showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
+    }
+    return;
+  }
+
+  // ✅ ส่งข้อมูลตาม format ที่ server คาดหวัง
+  this.socket.emit('join-room', { 
+    roomId: roomId || this.generateRoomId()
+    // ไม่ต้องส่ง playerName เพราะ server ไม่ได้ใช้
+  });
+}
+
+// ✅ เพิ่มฟังก์ชัน generateRoomId
+generateRoomId() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// ✅ แก้ไขฟังก์ชัน updatePlayersList
+updatePlayersList(players) {
+  const list = document.getElementById('players-list');
+  if (!list) return;
+  
+  list.innerHTML = '';
+  
+  players.forEach(player => {
+    const li = document.createElement('li');
+    li.textContent = `Player ${player.playerNumber}${player.ready ? ' (พร้อม)' : ' (รอ...)'}`;
+    if (player.playerNumber === this.playerNumber) {
+      li.classList.add('current-player');
+    }
+    list.appendChild(li);
+  });
+
+  // อัพเดท ready indicators
+  for (let i = 1; i <= 2; i++) {
+    const indicator = document.getElementById(`ready-indicator-${i}`);
+    if (indicator) {
+      const player = players.find(p => p.playerNumber === i);
+      if (player) {
+        indicator.textContent = `Player ${i}: ${player.ready ? 'พร้อมแล้ว ✅' : 'รอ...'}`;
+        indicator.classList.toggle('ready', player.ready);
+      } else {
+        indicator.textContent = `Player ${i}: รอผู้เล่น...`;
+        indicator.classList.remove('ready');
+      }
+    }
+  }
+}
   // ✅ เพิ่มฟังก์ชันสำหรับการพร้อมเล่น
   playerReady() {
     if (!this.socket || !this.socket.connected) {
