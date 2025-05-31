@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ["https://your-app-name.onrender.com"] // Replace with your actual Render URL
+      ? ["https://new-twobob.onrender.com"] // Replace with your actual Render URL
       : ["http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true
