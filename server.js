@@ -494,9 +494,6 @@ setInterval(cleanupInactiveRooms, 10 * 60 * 1000);
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // Connection timeout handling
-  socket.setTimeout(5000);
-
   socket.on('join-room', (data) => {
     try {
       const { roomId, playerName } = data;
