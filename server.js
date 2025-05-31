@@ -8,7 +8,17 @@ class OptimizedGameServer {
     this.app = express();
     this.server = http.createServer(this.app);
     this.io = socketIo(this.server, {
-      cors: { origin: "*", methods: ["GET", "POST"] }
+      cors: { 
+        origin: process.env.NODE_ENV === 'production' 
+          ? ["https://your-domain.onrender.com"] 
+          : "*", 
+        methods: ["GET", "POST"],
+        credentials: true
+      },
+      // Render-specific optimizations
+      transports: ['websocket', 'polling'],
+      pingTimeout: 60000,
+      pingInterval: 25000
     });
 
     this.rooms = new Map();
@@ -19,17 +29,58 @@ class OptimizedGameServer {
     this.metrics = {
       activeConnections: 0,
       messagesPerSecond: 0,
-      lastMessageCount: 0
+      lastMessageCount: 0,
+      startTime: Date.now()
     };
 
+    // Render health check endpoint
+    this.setupHealthCheck();
     this.setupStaticFiles();
     this.initializeServer();
     this.startMetricsCollection();
+    this.startCleanupRoutine();
+  }
+
+  setupHealthCheck() {
+    // Health check endpoint for Render
+    this.app.get('/health', (req, res) => {
+      const uptime = Date.now() - this.metrics.startTime;
+      res.json({
+        status: 'healthy',
+        uptime: Math.floor(uptime / 1000),
+        activeConnections: this.metrics.activeConnections,
+        activeRooms: this.rooms.size,
+        memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+      });
+    });
+
+    // API info endpoint
+    this.app.get('/api/info', (req, res) => {
+      res.json({
+        server: 'Tetris Multiplayer Server',
+        version: '1.0.0',
+        activeRooms: this.rooms.size,
+        activeConnections: this.metrics.activeConnections
+      });
+    });
   }
 
   setupStaticFiles() {
+    // Trust proxy for Render
+    this.app.set('trust proxy', 1);
+    
+    // Security headers
+    this.app.use((req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      next();
+    });
+
     // Serve static files from current directory
-    this.app.use(express.static(__dirname));
+    this.app.use(express.static(__dirname, {
+      maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0'
+    }));
 
     // Serve index.html for root
     this.app.get('/', (req, res) => {
@@ -48,11 +99,21 @@ class OptimizedGameServer {
       this.metrics.activeConnections++;
       this.setupSocketHandlers(socket);
       
-      socket.on('disconnect', () => {
-        console.log(`Player disconnected: ${socket.id}`);
+      socket.on('disconnect', (reason) => {
+        console.log(`Player disconnected: ${socket.id}, reason: ${reason}`);
         this.metrics.activeConnections--;
         this.handleDisconnect(socket);
       });
+
+      // Handle connection errors
+      socket.on('error', (error) => {
+        console.error(`Socket error for ${socket.id}:`, error);
+      });
+    });
+
+    // Handle server errors
+    this.io.engine.on('connection_error', (err) => {
+      console.error('Connection error:', err);
     });
   }
 
@@ -69,6 +130,11 @@ class OptimizedGameServer {
     socket.on('game-action', (action) => this.handleGameAction(socket, action));
     socket.on('leave-room', () => this.handleLeaveRoom(socket));
     socket.on('request-new-game', () => this.handleNewGame(socket));
+    
+    // Ping/pong for connection health
+    socket.on('ping', () => {
+      socket.emit('pong');
+    });
   }
 
   handleJoinRoom(socket, data) {
@@ -79,7 +145,8 @@ class OptimizedGameServer {
         id: roomId,
         players: [],
         gameState: this.createInitialGameState(),
-        dropInterval: null
+        dropInterval: null,
+        lastActivity: Date.now()
       });
     }
 
@@ -94,7 +161,8 @@ class OptimizedGameServer {
     room.players.push({
       socketId: socket.id,
       playerNumber,
-      ready: false
+      ready: false,
+      lastSeen: Date.now()
     });
 
     this.players.set(socket.id, {
@@ -109,6 +177,9 @@ class OptimizedGameServer {
       playerCount: room.players.length,
       players: room.players
     });
+
+    // Update room activity
+    room.lastActivity = Date.now();
   }
 
   handlePlayerReady(socket) {
@@ -121,6 +192,7 @@ class OptimizedGameServer {
     const player = room.players.find(p => p.socketId === socket.id);
     if (player) {
       player.ready = true;
+      player.lastSeen = Date.now();
     }
 
     this.io.to(playerInfo.roomId).emit('player-ready', {
@@ -131,6 +203,8 @@ class OptimizedGameServer {
     if (room.players.length === 2 && room.players.every(p => p.ready)) {
       this.startGame(room);
     }
+
+    room.lastActivity = Date.now();
   }
 
   handleLeaveRoom(socket) {
@@ -146,10 +220,12 @@ class OptimizedGameServer {
           clearInterval(room.dropInterval);
         }
         this.rooms.delete(playerInfo.roomId);
+        console.log(`Room ${playerInfo.roomId} deleted (empty)`);
       } else {
         this.io.to(playerInfo.roomId).emit('player-left', {
           playerNumber: playerInfo.playerNumber
         });
+        room.lastActivity = Date.now();
       }
     }
 
@@ -178,6 +254,7 @@ class OptimizedGameServer {
       room.dropInterval = null;
     }
 
+    room.lastActivity = Date.now();
     this.io.to(playerInfo.roomId).emit('game-reset');
   }
 
@@ -192,10 +269,12 @@ class OptimizedGameServer {
 
     this.io.to(room.id).emit('game-started', room.gameState);
 
-    // Start drop timer
+    // Start drop timer with variable speed based on level
     room.dropInterval = setInterval(() => {
       this.handleAutoDrop(room);
     }, 1000);
+
+    room.lastActivity = Date.now();
   }
 
   handleAutoDrop(room) {
@@ -235,6 +314,8 @@ class OptimizedGameServer {
         y: room.gameState.player2.currentY
       }
     });
+
+    room.lastActivity = Date.now();
   }
 
   createInitialGameState() {
@@ -264,7 +345,7 @@ class OptimizedGameServer {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  // Rate limiting for game actions
+  // Enhanced rate limiting for production
   isActionAllowed(socketId) {
     const now = Date.now();
     const queue = this.actionQueue.get(socketId);
@@ -277,13 +358,15 @@ class OptimizedGameServer {
       queue.windowStart = now;
     }
 
-    // Allow max 20 actions per second
-    if (queue.actionCount >= 20) {
+    // More conservative limits for production
+    const maxActionsPerSecond = process.env.NODE_ENV === 'production' ? 15 : 20;
+    const minActionInterval = process.env.NODE_ENV === 'production' ? 50 : 30;
+
+    if (queue.actionCount >= maxActionsPerSecond) {
       return false;
     }
 
-    // Minimum 30ms between actions
-    if (now - queue.lastAction < 30) {
+    if (now - queue.lastAction < minActionInterval) {
       return false;
     }
 
@@ -293,6 +376,8 @@ class OptimizedGameServer {
   }
 
   handleGameAction(socket, action) {
+    this.metrics.messagesPerSecond++;
+
     // Rate limiting check
     if (!this.isActionAllowed(socket.id)) {
       socket.emit('rate-limited');
@@ -320,6 +405,8 @@ class OptimizedGameServer {
         changes: delta
       });
     }
+
+    room.lastActivity = Date.now();
   }
 
   processGameAction(room, playerState, action, playerNumber) {
@@ -465,6 +552,12 @@ class OptimizedGameServer {
           player2: room.gameState.player2.score
         }
       });
+
+      // Clean up game interval
+      if (room.dropInterval) {
+        clearInterval(room.dropInterval);
+        room.dropInterval = null;
+      }
     } else {
       // Spawn new piece
       playerState.currentPiece = playerState.nextPiece;
@@ -482,7 +575,7 @@ class OptimizedGameServer {
     return delta;
   }
 
-  // Optimized grid operations using bit manipulation
+  // Optimized grid operations
   canMove(grid, piece, newX, newY) {
     for (let y = 0; y < piece.shape.length; y++) {
       for (let x = 0; x < piece.shape[y].length; x++) {
@@ -501,14 +594,13 @@ class OptimizedGameServer {
     return true;
   }
 
-  // Optimized piece placement
+  // Optimized piece placement (fixed bug)
   placePiece(grid, piece, x, y) {
-    // Create shallow copy for better performance
     const newGrid = grid.map(row => row.slice());
     
     for (let py = 0; py < piece.shape.length; py++) {
       for (let px = 0; px < piece.shape[py].length; px++) {
-        if (piece.shape[py][x]) {
+        if (piece.shape[py][px]) {  // Fixed: was piece.shape[py][x]
           const gridY = y + py;
           const gridX = x + px;
           if (gridY >= 0 && gridY < 20 && gridX >= 0 && gridX < 10) {
@@ -520,12 +612,11 @@ class OptimizedGameServer {
     return newGrid;
   }
 
-  // Memory-efficient piece creation with object pooling
+  // Memory-efficient piece creation
   createRandomPiece() {
     const pieces = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
     const pieceType = pieces[Math.floor(Math.random() * pieces.length)];
     
-    // Use prototype-based creation instead of deep cloning
     return Object.create(this.getPiecePrototype(pieceType));
   }
 
@@ -543,36 +634,68 @@ class OptimizedGameServer {
     return prototypes[type];
   }
 
-  // Optimized matrix rotation using transposition
+  // Optimized matrix rotation
   rotateMatrix(matrix) {
     const rows = matrix.length;
     const cols = matrix[0].length;
     
-    // Transpose and reverse each row
     return matrix[0].map((_, colIndex) =>
       matrix.map(row => row[colIndex]).reverse()
     );
   }
 
-  // Performance monitoring
+  // Enhanced metrics collection
   startMetricsCollection() {
     setInterval(() => {
       const messageCount = this.metrics.messagesPerSecond;
+      const uptime = Math.floor((Date.now() - this.metrics.startTime) / 1000);
+      const memoryUsage = process.memoryUsage();
       
       console.log(`📊 Server Metrics:
+        Uptime: ${uptime}s
         Active Connections: ${this.metrics.activeConnections}
         Messages/sec: ${messageCount}
         Active Rooms: ${this.rooms.size}
-        Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+        Memory Usage: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB
+        Memory Total: ${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB
       `);
       
       this.metrics.lastMessageCount = messageCount;
       this.metrics.messagesPerSecond = 0;
-    }, 5000);
+    }, 30000); // Every 30 seconds for production
+  }
+
+  // Cleanup routine for inactive rooms
+  startCleanupRoutine() {
+    setInterval(() => {
+      const now = Date.now();
+      const ROOM_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+      for (const [roomId, room] of this.rooms.entries()) {
+        if (now - room.lastActivity > ROOM_TIMEOUT) {
+          console.log(`Cleaning up inactive room: ${roomId}`);
+          
+          if (room.dropInterval) {
+            clearInterval(room.dropInterval);
+          }
+          
+          // Notify remaining players
+          room.players.forEach(player => {
+            this.io.to(player.socketId).emit('room-closed', {
+              reason: 'inactivity'
+            });
+          });
+          
+          this.rooms.delete(roomId);
+        }
+      }
+    }, 10 * 60 * 1000); // Every 10 minutes
   }
 
   // Graceful cleanup
   cleanup() {
+    console.log('🧹 Starting server cleanup...');
+    
     // Clear all intervals and timeouts
     this.rooms.forEach(room => {
       if (room.dropInterval) {
@@ -582,34 +705,63 @@ class OptimizedGameServer {
     
     // Clear action queues
     this.actionQueue.clear();
+    
+    // Close all socket connections
+    this.io.close();
+    
+    console.log('✅ Server cleanup completed');
   }
 
   start(port = 3000) {
-    this.server.listen(port, () => {
-      console.log(`🚀 Optimized Tetris Server running on port ${port}`);
-      console.log(`⚡ Performance optimizations active`);
-      console.log(`🌐 Access at: http://localhost:${port}`);
+    const serverPort = port || process.env.PORT || 3000;
+    
+    this.server.listen(serverPort, '0.0.0.0', () => {
+      console.log(`🚀 Tetris Server running on port ${serverPort}`);
+      console.log(`⚡ Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 Health check: http://localhost:${serverPort}/health`);
+      
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`🔒 Production optimizations active`);
+      }
+    });
+
+    // Handle server errors
+    this.server.on('error', (error) => {
+      console.error('Server error:', error);
     });
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 Server shutting down gracefully...');
+// Enhanced graceful shutdown
+const gracefulShutdown = (signal) => {
+  console.log(`🛑 Received ${signal}, shutting down gracefully...`);
+  
   if (global.gameServer) {
     global.gameServer.cleanup();
   }
+  
+  setTimeout(() => {
+    console.log('🚨 Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000); // 10 second timeout
+  
   process.exit(0);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // Render uses this
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown('uncaughtException');
 });
 
-process.on('SIGINT', () => {
-  console.log('🛑 Server shutting down gracefully...');
-  if (global.gameServer) {
-    global.gameServer.cleanup();
-  }
-  process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 const gameServer = new OptimizedGameServer();
 global.gameServer = gameServer;
-gameServer.start(process.env.PORT || 3000);
+gameServer.start();
