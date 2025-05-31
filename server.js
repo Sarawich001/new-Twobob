@@ -1,24 +1,7 @@
-// Optimized Server-Side Performance
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-
-// ✅ Serve static files from current directory
-app.use(express.static(__dirname));
-
-// ✅ Serve index.html for root "/"
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// ✅ Optional fallback (for SPA-style routing)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+const path = require('path');
 
 class OptimizedGameServer {
   constructor() {
@@ -30,7 +13,7 @@ class OptimizedGameServer {
 
     this.rooms = new Map();
     this.players = new Map();
-    this.actionQueue = new Map(); // Rate limiting
+    this.actionQueue = new Map();
     
     // Performance monitoring
     this.metrics = {
@@ -39,16 +22,34 @@ class OptimizedGameServer {
       lastMessageCount: 0
     };
 
+    this.setupStaticFiles();
     this.initializeServer();
     this.startMetricsCollection();
   }
 
+  setupStaticFiles() {
+    // Serve static files from current directory
+    this.app.use(express.static(__dirname));
+
+    // Serve index.html for root
+    this.app.get('/', (req, res) => {
+      res.sendFile(path.join(__dirname, 'index.html'));
+    });
+
+    // Fallback for SPA routing
+    this.app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'index.html'));
+    });
+  }
+
   initializeServer() {
     this.io.on('connection', (socket) => {
+      console.log(`Player connected: ${socket.id}`);
       this.metrics.activeConnections++;
       this.setupSocketHandlers(socket);
       
       socket.on('disconnect', () => {
+        console.log(`Player disconnected: ${socket.id}`);
         this.metrics.activeConnections--;
         this.handleDisconnect(socket);
       });
@@ -68,6 +69,199 @@ class OptimizedGameServer {
     socket.on('game-action', (action) => this.handleGameAction(socket, action));
     socket.on('leave-room', () => this.handleLeaveRoom(socket));
     socket.on('request-new-game', () => this.handleNewGame(socket));
+  }
+
+  handleJoinRoom(socket, data) {
+    const roomId = data.roomId || this.generateRoomId();
+    
+    if (!this.rooms.has(roomId)) {
+      this.rooms.set(roomId, {
+        id: roomId,
+        players: [],
+        gameState: this.createInitialGameState(),
+        dropInterval: null
+      });
+    }
+
+    const room = this.rooms.get(roomId);
+    
+    if (room.players.length >= 2) {
+      socket.emit('room-full');
+      return;
+    }
+
+    const playerNumber = room.players.length + 1;
+    room.players.push({
+      socketId: socket.id,
+      playerNumber,
+      ready: false
+    });
+
+    this.players.set(socket.id, {
+      roomId,
+      playerNumber
+    });
+
+    socket.join(roomId);
+    socket.emit('joined-room', { roomId, playerNumber });
+    
+    this.io.to(roomId).emit('player-joined', {
+      playerCount: room.players.length,
+      players: room.players
+    });
+  }
+
+  handlePlayerReady(socket) {
+    const playerInfo = this.players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = this.rooms.get(playerInfo.roomId);
+    if (!room) return;
+
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (player) {
+      player.ready = true;
+    }
+
+    this.io.to(playerInfo.roomId).emit('player-ready', {
+      playerNumber: playerInfo.playerNumber
+    });
+
+    // Check if all players are ready
+    if (room.players.length === 2 && room.players.every(p => p.ready)) {
+      this.startGame(room);
+    }
+  }
+
+  handleLeaveRoom(socket) {
+    const playerInfo = this.players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = this.rooms.get(playerInfo.roomId);
+    if (room) {
+      room.players = room.players.filter(p => p.socketId !== socket.id);
+      
+      if (room.players.length === 0) {
+        if (room.dropInterval) {
+          clearInterval(room.dropInterval);
+        }
+        this.rooms.delete(playerInfo.roomId);
+      } else {
+        this.io.to(playerInfo.roomId).emit('player-left', {
+          playerNumber: playerInfo.playerNumber
+        });
+      }
+    }
+
+    this.players.delete(socket.id);
+    socket.leave(playerInfo.roomId);
+  }
+
+  handleDisconnect(socket) {
+    this.handleLeaveRoom(socket);
+    this.actionQueue.delete(socket.id);
+  }
+
+  handleNewGame(socket) {
+    const playerInfo = this.players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = this.rooms.get(playerInfo.roomId);
+    if (!room) return;
+
+    // Reset game state
+    room.gameState = this.createInitialGameState();
+    room.players.forEach(p => p.ready = false);
+
+    if (room.dropInterval) {
+      clearInterval(room.dropInterval);
+      room.dropInterval = null;
+    }
+
+    this.io.to(playerInfo.roomId).emit('game-reset');
+  }
+
+  startGame(room) {
+    room.gameState.gameStarted = true;
+    
+    // Initialize both players
+    room.gameState.player1.currentPiece = this.createRandomPiece();
+    room.gameState.player1.nextPiece = this.createRandomPiece();
+    room.gameState.player2.currentPiece = this.createRandomPiece();
+    room.gameState.player2.nextPiece = this.createRandomPiece();
+
+    this.io.to(room.id).emit('game-started', room.gameState);
+
+    // Start drop timer
+    room.dropInterval = setInterval(() => {
+      this.handleAutoDrop(room);
+    }, 1000);
+  }
+
+  handleAutoDrop(room) {
+    if (!room.gameState.gameStarted) return;
+
+    const players = ['player1', 'player2'];
+    
+    players.forEach(playerKey => {
+      const playerState = room.gameState[playerKey];
+      if (!playerState.alive) return;
+
+      if (this.canMove(playerState.grid, playerState.currentPiece,
+                      playerState.currentX, playerState.currentY + 1)) {
+        playerState.currentY++;
+      } else {
+        // Handle piece placement
+        const delta = this.handlePiecePlacement(room, playerState, 
+          playerKey === 'player1' ? 1 : 2);
+        
+        if (delta) {
+          this.io.to(room.id).emit('game-delta', {
+            playerNumber: playerKey === 'player1' ? 1 : 2,
+            changes: delta.changes
+          });
+        }
+      }
+    });
+
+    // Send position updates
+    this.io.to(room.id).emit('auto-drop', {
+      player1: {
+        x: room.gameState.player1.currentX,
+        y: room.gameState.player1.currentY
+      },
+      player2: {
+        x: room.gameState.player2.currentX,
+        y: room.gameState.player2.currentY
+      }
+    });
+  }
+
+  createInitialGameState() {
+    return {
+      gameStarted: false,
+      winner: null,
+      player1: this.createPlayerState(),
+      player2: this.createPlayerState()
+    };
+  }
+
+  createPlayerState() {
+    return {
+      grid: Array(20).fill().map(() => Array(10).fill(0)),
+      currentPiece: null,
+      nextPiece: null,
+      currentX: 4,
+      currentY: 0,
+      score: 0,
+      lines: 0,
+      level: 1,
+      alive: true
+    };
+  }
+
+  generateRoomId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
   // Rate limiting for game actions
@@ -314,7 +508,7 @@ class OptimizedGameServer {
     
     for (let py = 0; py < piece.shape.length; py++) {
       for (let px = 0; px < piece.shape[py].length; px++) {
-        if (piece.shape[py][px]) {
+        if (piece.shape[py][x]) {
           const gridY = y + py;
           const gridX = x + px;
           if (gridY >= 0 && gridY < 20 && gridX >= 0 && gridX < 10) {
@@ -337,13 +531,13 @@ class OptimizedGameServer {
 
   getPiecePrototype(type) {
     const prototypes = {
-      I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'block-i' },
-      O: { shape: [[1,1],[1,1]], color: 'block-o' },
-      T: { shape: [[0,1,0],[1,1,1],[0,0,0]], color: 'block-t' },
-      S: { shape: [[0,1,1],[1,1,0],[0,0,0]], color: 'block-s' },
-      Z: { shape: [[1,1,0],[0,1,1],[0,0,0]], color: 'block-z' },
-      J: { shape: [[1,0,0],[1,1,1],[0,0,0]], color: 'block-j' },
-      L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'block-l' }
+      I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'cyan' },
+      O: { shape: [[1,1],[1,1]], color: 'yellow' },
+      T: { shape: [[0,1,0],[1,1,1],[0,0,0]], color: 'purple' },
+      S: { shape: [[0,1,1],[1,1,0],[0,0,0]], color: 'green' },
+      Z: { shape: [[1,1,0],[0,1,1],[0,0,0]], color: 'red' },
+      J: { shape: [[1,0,0],[1,1,1],[0,0,0]], color: 'blue' },
+      L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'orange' }
     };
     
     return prototypes[type];
@@ -363,7 +557,6 @@ class OptimizedGameServer {
   // Performance monitoring
   startMetricsCollection() {
     setInterval(() => {
-      const now = Date.now();
       const messageCount = this.metrics.messagesPerSecond;
       
       console.log(`📊 Server Metrics:
@@ -395,6 +588,7 @@ class OptimizedGameServer {
     this.server.listen(port, () => {
       console.log(`🚀 Optimized Tetris Server running on port ${port}`);
       console.log(`⚡ Performance optimizations active`);
+      console.log(`🌐 Access at: http://localhost:${port}`);
     });
   }
 }
@@ -402,9 +596,20 @@ class OptimizedGameServer {
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🛑 Server shutting down gracefully...');
-  server.cleanup();
+  if (global.gameServer) {
+    global.gameServer.cleanup();
+  }
   process.exit(0);
 });
 
-const server = new OptimizedGameServer();
-server.start();
+process.on('SIGINT', () => {
+  console.log('🛑 Server shutting down gracefully...');
+  if (global.gameServer) {
+    global.gameServer.cleanup();
+  }
+  process.exit(0);
+});
+
+const gameServer = new OptimizedGameServer();
+global.gameServer = gameServer;
+gameServer.start(process.env.PORT || 3000);
