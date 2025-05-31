@@ -20,8 +20,7 @@ class OptimizedGameServer {
       pingTimeout: 60000,
       pingInterval: 25000
     });
-    this.app.use(express.static(path.join(__dirname,'public' )));
-   
+
     this.rooms = new Map();
     this.players = new Map();
     this.actionQueue = new Map();
@@ -88,8 +87,9 @@ class OptimizedGameServer {
       res.sendFile(path.join(__dirname, 'index.html'));
     });
 
-    // Fallback for SPA routing
-    this.app.get('*', (req, res) => {
+    // Fixed: Use a more specific pattern instead of '*'
+    // This handles SPA routing without causing path-to-regexp issues
+    this.app.get(/^\/(?!api|health).*/, (req, res) => {
       res.sendFile(path.join(__dirname, 'index.html'));
     });
   }
