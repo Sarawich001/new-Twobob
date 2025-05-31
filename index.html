@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script> <!-- ตามด้วย client.js -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
             margin: 0;
@@ -165,6 +168,8 @@
 
         .player-board {
             position: relative;
+            width: 280px;
+            height: 560px;
             background: rgba(0,0,0,0.8);
             border: 3px solid #333;
             border-radius: 10px;
@@ -175,6 +180,20 @@
             border-color: #ffd700;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
         }
+
+        .tetris-block {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .block-i { background: #00f0f0; }
+        .block-o { background: #f0f000; }
+        .block-t { background: #a000f0; }
+        .block-s { background: #00f000; }
+        .block-z { background: #f00000; }
+        .block-j { background: #0000f0; }
+        .block-l { background: #f0a000; }
 
         .player-stats {
             background: rgba(255,255,255,0.1);
@@ -192,22 +211,24 @@
             font-weight: bold;
         }
 
-        .next-piece-preview {
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-top: 1rem;
-            width: 120px;
-            height: 120px;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(4, 1fr);
-            gap: 1px;
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
         }
 
-        .preview-cell {
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
+        .game-over-text {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
         }
 
         /* Game Over Screen */
@@ -287,29 +308,16 @@
             background: rgba(255,255,255,0.2);
         }
 
-        /* Notifications */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
         /* Responsive Design */
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
                 gap: 1rem;
+            }
+
+            .player-board {
+                width: 200px;
+                height: 400px;
             }
 
             .game-title {
@@ -325,6 +333,11 @@
             .container {
                 padding: 10px;
             }
+
+            .player-board {
+                width: 150px;
+                height: 300px;
+            }
         }
     </style>
 </head>
@@ -337,10 +350,16 @@
                 🔴 ไม่ได้เชื่อมต่อ
             </div>
             <div class="menu-buttons">
-                <button id="btn-create-room" class="btn" disabled>🏠 สร้างห้อง</button>
-                <button id="btn-join-room" class="btn" disabled>🚪 เข้าร่วมห้อง</button>
+                <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
+                <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
                 <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
             </div>
+        </div>
+
+        <!-- Connection Screen -->
+        <div id="connection-screen" class="screen">
+            <h2>⚠️ การเชื่อมต่อขาดหาย</h2>
+            <p>กำลังพยายามเชื่อมต่อใหม่...</p>
         </div>
 
         <!-- Create Room Dialog -->
@@ -351,7 +370,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-create" class="btn">✅ สร้างห้อง</button>
-                <button onclick="showScreen('menu-screen')" class="btn">❌ ยกเลิก</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -366,7 +385,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-confirm-join" class="btn">✅ เข้าร่วม</button>
-                <button onclick="showScreen('menu-screen')" class="btn">❌ ยกเลิก</button>
+                <button onclick="document.getElementById('menu-screen').style.display='block'; this.parentElement.parentElement.style.display='none';" class="btn">❌ ยกเลิก</button>
             </div>
         </div>
 
@@ -395,7 +414,7 @@
             <div class="game-container">
                 <div class="player-section">
                     <h3>Player 1</h3>
-                    <canvas id="player1-board" class="player-board" width="200" height="400"></canvas>
+                    <div id="player1-board" class="player-board"></div>
                     <div id="player1-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
@@ -410,12 +429,11 @@
                             <span class="level-value">1</span>
                         </div>
                     </div>
-                    <div class="next-piece-preview" id="player1-next"></div>
                 </div>
 
                 <div class="player-section">
                     <h3>Player 2</h3>
-                    <canvas id="player2-board" class="player-board" width="200" height="400"></canvas>
+                    <div id="player2-board" class="player-board"></div>
                     <div id="player2-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
@@ -430,19 +448,18 @@
                             <span class="level-value">1</span>
                         </div>
                     </div>
-                    <div class="next-piece-preview" id="player2-next"></div>
                 </div>
             </div>
 
             <!-- Mobile Controls -->
             <div class="mobile-controls">
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button" data-action="rotate">↶</button>
-                    <button class="control-button" data-action="hard-drop">↑</button>
-                    <button class="control-button" data-action="hard-drop">💧</button>
-                    <button class="control-button" data-action="move-left">←</button>
-                    <button class="control-button" data-action="move-down">↓</button>
-                    <button class="control-button" data-action="move-right">→</button>
+                    <button class="control-button">↶</button>
+                    <button class="control-button">↑</button>
+                    <button class="control-button">💧</button>
+                    <button class="control-button">←</button>
+                    <button class="control-button">↓</button>
+                    <button class="control-button">→</button>
                 </div>
                 <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
                     หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
@@ -478,236 +495,17 @@
         📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
     </div>
 
-    <!-- JavaScript สำหรับ Tetris Client -->
-    <script src="client.js"></script>
     <script>
-        // ตัวแปร global สำหรับเกม
-        let game = null;
-
-        // ฟังก์ชันแสดงหน้าจอต่างๆ
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.style.display = 'none';
-            });
-            const targetScreen = document.getElementById(screenId);
-            if (targetScreen) {
-                targetScreen.style.display = 'block';
-            }
-        }
-
-        // ฟังก์ชันแสดงการแจ้งเตือน
-        function showNotification(message, type = 'info') {
-            // ลบ notification เก่าก่อน
-            const oldNotification = document.querySelector('.notification');
-            if (oldNotification) {
-                oldNotification.remove();
-            }
-
-            const notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.textContent = message;
-            
-            if (type === 'error') {
-                notification.style.background = 'rgba(244, 67, 54, 0.9)';
-            } else if (type === 'success') {
-                notification.style.background = 'rgba(76, 175, 80, 0.9)';
-            } else if (type === 'warning') {
-                notification.style.background = 'rgba(255, 152, 0, 0.9)';
-            }
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 3000);
-        }
-
-        // ฟังก์ชันอัพเดทสถานะการเชื่อมต่อ
-        function updateConnectionStatus(connected) {
-            const status = document.getElementById('connection-status');
-            const createBtn = document.getElementById('btn-create-room');
-            const joinBtn = document.getElementById('btn-join-room');
-            
-            if (connected) {
-                status.textContent = '🟢 เชื่อมต่อแล้ว';
-                status.className = 'connection-status connected';
-                createBtn.disabled = false;
-                joinBtn.disabled = false;
-            } else {
-                status.textContent = '🔴 ไม่ได้เชื่อมต่อ';
-                status.className = 'connection-status disconnected';
-                createBtn.disabled = true;
-                joinBtn.disabled = true;
-            }
-        }
-
-        // ฟังก์ชันตั้งค่าปุ่มต่างๆ
-        function setupButtonHandlers() {
-            // ปุ่มสร้างห้อง
-            document.getElementById('btn-create-room').addEventListener('click', () => {
-                showScreen('create-room-screen');
-            });
-
-            // ปุ่มเข้าร่วมห้อง
-            document.getElementById('btn-join-room').addEventListener('click', () => {
-                showScreen('join-room-screen');
-            });
-
-            // ปุ่มยืนยันสร้างห้อง
-            document.getElementById('btn-confirm-create').addEventListener('click', () => {
-                const playerName = document.getElementById('create-player-name').value.trim();
-                if (!playerName) {
-                    showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
-                    return;
-                }
-                
-                if (game && game.socket && game.socket.connected) {
-                    game.joinRoom();
-                    showScreen('waiting-screen');
-                } else {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                }
-            });
-
-            // ปุ่มยืนยันเข้าร่วมห้อง
-            document.getElementById('btn-confirm-join').addEventListener('click', () => {
-                const playerName = document.getElementById('join-player-name').value.trim();
-                const roomId = document.getElementById('join-room-id').value.trim();
-                
-                if (!playerName || !roomId) {
-                    showNotification('กรุณาใส่ชื่อผู้เล่นและรหัสห้อง', 'error');
-                    return;
-                }
-                
-                if (game && game.socket && game.socket.connected) {
-                    game.joinRoom(roomId);
-                    showScreen('waiting-screen');
-                } else {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                }
-            });
-
-            // ปุ่มพร้อมเล่น
-            document.getElementById('btn-ready').addEventListener('click', () => {
-                if (game && game.socket && game.socket.connected) {
-                    game.playerReady();
-                    document.getElementById('btn-ready').disabled = true;
-                    showNotification('คุณพร้อมเล่นแล้ว!', 'success');
-                } else {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                }
-            });
-
-            // ปุ่มออกจากห้อง
-            document.getElementById('btn-leave-room').addEventListener('click', () => {
-                if (game && game.socket) {
-                    game.socket.disconnect();
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 500);
-                } else {
-                    showScreen('menu-screen');
-                }
-            });
-
-            // ปุ่มเล่นอีกครั้ง
-            document.getElementById('btn-play-again').addEventListener('click', () => {
-                window.location.reload();
-            });
-        }
-
-        // ฟังก์ชันตั้งค่าการควบคุมบนมือถือ
-        function setupMobileControls() {
-            // Touch controls
-            let touchStartX = 0;
-            let touchStartY = 0;
-            
-            document.addEventListener('touchstart', (e) => {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-            }, { passive: true });
-            
-            document.addEventListener('touchend', (e) => {
-                if (!game || !game.gameStarted) return;
-                
-                const touchEndX = e.changedTouches[0].clientX;
-                const touchEndY = e.changedTouches[0].clientY;
-                const deltaX = touchEndX - touchStartX;
-                const deltaY = touchEndY - touchStartY;
-                const minSwipeDistance = 30;
-                
-                if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                    // Horizontal swipe
-                    if (Math.abs(deltaX) > minSwipeDistance) {
-                        if (deltaX > 0) {
-                            game.handleKeyPress({key: 'ArrowRight', preventDefault: () => {}});
-                        } else {
-                            game.handleKeyPress({key: 'ArrowLeft', preventDefault: () => {}});
-                        }
-                    }
-                } else {
-                    // Vertical swipe
-                    if (Math.abs(deltaY) > minSwipeDistance) {
-                        if (deltaY < 0) {
-                            game.handleKeyPress({key: 'ArrowUp', preventDefault: () => {}});
-                        } else {
-                            game.handleKeyPress({key: 'ArrowDown', preventDefault: () => {}});
-                        }
-                    }
-                }
-            }, { passive: true });
-
-            // Button controls
-            document.querySelectorAll('.control-button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    if (!game || !game.gameStarted) return;
-                    
-                    const action = e.target.dataset.action;
-                    const keyMap = {
-                        'move-left': 'ArrowLeft',
-                        'move-right': 'ArrowRight',
-                        'move-down': 'ArrowDown',
-                        'rotate': 'ArrowUp',
-                        'hard-drop': ' '
-                    };
-                    
-                    if (keyMap[action]) {
-                        game.handleKeyPress({
-                            key: keyMap[action], 
-                            preventDefault: () => {}
-                        });
-                    }
-                });
-            });
-        }
-
-        // เริ่มต้นเมื่อหน้าเว็บโหลดเสร็จ
-        document.addEventListener('DOMContentLoaded', () => {
-            try {
-                // สร้างเกมใหม่
-                game = new OptimizedTetrisClient();
-                
-                // ตั้งค่าปุ่มและควบคุม
-                setupButtonHandlers();
-                setupMobileControls();
-                
-                // แสดงหน้าจอเมนูเริ่มต้น
-                showScreen('menu-screen');
-                
-                console.log('🎮 Tetris client initialized successfully');
-                
-            } catch (error) {
-                console.error('❌ Failed to initialize Tetris client:', error);
-                showNotification('เกิดข้อผิดพลาดในการเริ่มต้นเกม', 'error');
-            }
+        // Show create room screen
+        document.getElementById('btn-create-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('create-room-screen').style.display = 'block';
         });
 
-        // Global error handler
-        window.addEventListener('error', (e) => {
-            console.error('❌ Global error:', e.error);
-            showNotification('เกิดข้อผิดพลาดที่ไม่คาดคิด', 'error');
+        // Show join room screen  
+        document.getElementById('btn-join-room').addEventListener('click', () => {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('join-room-screen').style.display = 'block';
         });
     </script>
 </body>
