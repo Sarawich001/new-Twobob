@@ -20,7 +20,7 @@ class OptimizedGameServer {
       pingTimeout: 60000,
       pingInterval: 25000
     });
-    app.use(express.static(path.join(__dirname, )));
+    app.use(express.static(path.join(__dirname,'public' )));
     this.rooms = new Map();
     this.players = new Map();
     this.actionQueue = new Map();
