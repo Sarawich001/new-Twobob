@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
     <style>
         * {
             margin: 0;
@@ -171,41 +172,11 @@
             border: 3px solid #333;
             border-radius: 10px;
             overflow: hidden;
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            grid-template-rows: repeat(20, 1fr);
         }
 
         .player-board.current-player {
             border-color: #ffd700;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-        }
-
-        .grid-cell {
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.1s ease;
-        }
-
-        .tetris-block {
-            border-radius: 2px;
-        }
-
-        .block-cyan { background: #00f0f0; }
-        .block-yellow { background: #f0f000; }
-        .block-purple { background: #a000f0; }
-        .block-green { background: #00f000; }
-        .block-red { background: #f00000; }
-        .block-blue { background: #0000f0; }
-        .block-orange { background: #f0a000; }
-
-        .current-piece {
-            background: rgba(255, 255, 255, 0.3) !important;
-            animation: glow 1s ease-in-out infinite alternate;
-        }
-
-        @keyframes glow {
-            from { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
-            to { box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); }
         }
 
         .player-stats {
@@ -463,7 +434,7 @@
             <div class="game-container">
                 <div class="player-section">
                     <h3>Player 1</h3>
-                    <div id="player1-board" class="player-board"></div>
+                    <canvas id="player1-board" class="player-board"></canvas>
                     <div id="player1-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
@@ -483,7 +454,7 @@
 
                 <div class="player-section">
                     <h3>Player 2</h3>
-                    <div id="player2-board" class="player-board"></div>
+                    <canvas id="player2-board" class="player-board"></canvas>
                     <div id="player2-stats" class="player-stats">
                         <div class="stat-row">
                             <span>คะแนน:</span>
@@ -505,12 +476,12 @@
             <!-- Mobile Controls -->
             <div class="mobile-controls">
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button" onclick="sendGameAction('rotate')">↶</button>
-                    <button class="control-button" onclick="sendGameAction('hard-drop')">↑</button>
-                    <button class="control-button" onclick="sendGameAction('hard-drop')">💧</button>
-                    <button class="control-button" onclick="sendGameAction('move-left')">←</button>
-                    <button class="control-button" onclick="sendGameAction('move-down')">↓</button>
-                    <button class="control-button" onclick="sendGameAction('move-right')">→</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: 'ArrowUp', preventDefault: () => {}})">↶</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: ' ', preventDefault: () => {}})">↑</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: ' ', preventDefault: () => {}})">💧</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: 'ArrowLeft', preventDefault: () => {}})">←</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: 'ArrowDown', preventDefault: () => {}})">↓</button>
+                    <button class="control-button" onclick="game.handleKeyPress({key: 'ArrowRight', preventDefault: () => {}})">→</button>
                 </div>
                 <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
                     หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
@@ -547,421 +518,18 @@
     </div>
 
     <script>
-        // Global variables
-        let socket = null;
-        let gameState = null;
-        let playerNumber = null;
-        let roomId = null;
-        let isGameStarted = false;
-        let currentScreen = 'menu-screen';
+        // ตัวแปร global สำหรับเกม
+        let game = null;
 
-        // Initialize socket connection
-        function initSocket() {
-            // Try multiple connection methods for better compatibility
-            const socketConfig = {
-                transports: ['websocket', 'polling'],
-                timeout: 20000,
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 5,
-                maxReconnectionAttempts: 10
-            };
-
-            socket = io(socketConfig);
-
-            socket.on('connect', handleConnect);
-            socket.on('disconnect', handleDisconnect);
-            socket.on('connect_error', handleConnectionError);
-            
-            // Game event handlers
-            socket.on('joined-room', handleJoinedRoom);
-            socket.on('player-joined', handlePlayerJoined);
-            socket.on('player-ready', handlePlayerReady);
-            socket.on('game-started', handleGameStarted);
-            socket.on('game-delta', handleGameDelta);
-            socket.on('auto-drop', handleAutoDrop);
-            socket.on('player-left', handlePlayerLeft);
-            socket.on('game-reset', handleGameReset);
-            socket.on('room-full', handleRoomFull);
-            socket.on('room-closed', handleRoomClosed);
-            socket.on('rate-limited', handleRateLimit);
-            socket.on('pong', () => console.log('Pong received'));
-
-            // Start ping routine for connection health
-            setInterval(() => {
-                if (socket && socket.connected) {
-                    socket.emit('ping');
-                }
-            }, 25000);
-        }
-
-        // Connection handlers
-        function handleConnect() {
-            console.log('Connected to server');
-            updateConnectionStatus(true);
-            if (currentScreen === 'connection-screen') {
-                showScreen('menu-screen');
-            }
-        }
-
-        function handleDisconnect(reason) {
-            console.log('Disconnected:', reason);
-            updateConnectionStatus(false);
-            if (currentScreen === 'game-screen') {
-                showScreen('connection-screen');
-            }
-        }
-
-        function handleConnectionError(error) {
-            console.error('Connection error:', error);
-            updateConnectionStatus(false);
-            showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
-        }
-
-        function updateConnectionStatus(connected) {
-            const status = document.getElementById('connection-status');
-            if (connected) {
-                status.textContent = '🟢 เชื่อมต่อแล้ว';
-                status.className = 'connection-status connected';
-                document.getElementById('btn-create-room').disabled = false;
-                document.getElementById('btn-join-room').disabled = false;
-            } else {
-                status.textContent = '🔴 ไม่ได้เชื่อมต่อ';
-                status.className = 'connection-status disconnected';
-                document.getElementById('btn-create-room').disabled = true;
-                document.getElementById('btn-join-room').disabled = true;
-            }
-        }
-
-        // Game event handlers
-        function handleJoinedRoom(data) {
-            roomId = data.roomId;
-            playerNumber = data.playerNumber;
-            document.getElementById('room-id-display').textContent = roomId;
-            showScreen('waiting-screen');
-            showNotification(`เข้าร่วมห้อง ${roomId} ในฐานะ Player ${playerNumber}`);
-        }
-
-        function handlePlayerJoined(data) {
-            updatePlayersList(data.players);
-            if (data.playerCount === 2) {
-                document.getElementById('btn-ready').disabled = false;
-            }
-        }
-
-        function handlePlayerReady(data) {
-            document.getElementById(`ready-indicator-${data.playerNumber}`).textContent = 
-                `Player ${data.playerNumber}: พร้อมแล้ว ✅`;
-        }
-
-        function handleGameStarted(data) {
-            gameState = data;
-            isGameStarted = true;
-            showScreen('game-screen');
-            initializeGameBoards();
-            updateGameDisplay();
-            showNotification('เกมเริ่มแล้ว!', 'success');
-        }
-
-        function handleGameDelta(data) {
-            if (!gameState) return;
-            
-            const playerKey = `player${data.playerNumber}`;
-            
-            data.changes.forEach(change => {
-                switch (change.type) {
-                    case 'position':
-                        updatePiecePosition(data.playerNumber, change.to);
-                        break;
-                    case 'rotation':
-                        updatePieceRotation(data.playerNumber, change.shape);
-                        break;
-                    case 'hard-drop':
-                        updatePiecePosition(data.playerNumber, {x: gameState[playerKey].currentX, y: change.newY});
-                        updatePlayerStats(data.playerNumber, {score: gameState[playerKey].score + change.scoreGain});
-                        break;
-                    case 'piece-placed':
-                        handlePiecePlaced(data.playerNumber, change);
-                        break;
-                    case 'new-piece':
-                        updateCurrentPiece(data.playerNumber, change.currentPiece);
-                        updateNextPiece(data.playerNumber, change.nextPiece);
-                        break;
-                    case 'game-over':
-                        handleGameOver(change);
-                        break;
-                }
-            });
-        }
-
-        function handleAutoDrop(data) {
-            if (data.player1) {
-                updatePiecePosition(1, data.player1);
-            }
-            if (data.player2) {
-                updatePiecePosition(2, data.player2);
-            }
-        }
-
-        function handlePlayerLeft(data) {
-            showNotification(`Player ${data.playerNumber} ออกจากห้อง`);
-            updatePlayersList([{playerNumber: playerNumber, ready: false}]);
-            document.getElementById('btn-ready').disabled = true;
-        }
-
-        function handleGameReset() {
-            isGameStarted = false;
-            gameState = null;
-            showScreen('waiting-screen');
-            showNotification('เกมถูกรีเซ็ต');
-        }
-
-        function handleRoomFull() {
-            showNotification('ห้องเต็มแล้ว', 'error');
-            showScreen('menu-screen');
-        }
-
-        function handleRoomClosed(data) {
-            showNotification(`ห้องถูกปิด: ${data.reason}`, 'error');
-            showScreen('menu-screen');
-        }
-
-        function handleRateLimit() {
-            showNotification('คุณเล่นอย่างเร็วเกินไป กรุณาชะลอ', 'warning');
-        }
-
-        // Game display functions
-        function initializeGameBoards() {
-            for (let player = 1; player <= 2; player++) {
-                const board = document.getElementById(`player${player}-board`);
-                board.innerHTML = '';
-                
-                // Create grid cells
-                for (let row = 0; row < 20; row++) {
-                    for (let col = 0; col < 10; col++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'grid-cell';
-                        cell.dataset.row = row;
-                        cell.dataset.col = col;
-                        board.appendChild(cell);
-                    }
-                }
-                
-                // Mark current player board
-                if (player === playerNumber) {
-                    board.classList.add('current-player');
-                }
-            }
-        }
-
-        function updateGameDisplay() {
-            if (!gameState) return;
-            
-            for (let player = 1; player <= 2; player++) {
-                const playerState = gameState[`player${player}`];
-                updatePlayerGrid(player, playerState.grid);
-                updatePlayerStats(player, playerState);
-                updateCurrentPiece(player, playerState.currentPiece);
-                updateNextPiece(player, playerState.nextPiece);
-            }
-        }
-
-        function updatePlayerGrid(playerNumber, grid) {
-            const board = document.getElementById(`player${playerNumber}-board`);
-            const cells = board.querySelectorAll('.grid-cell');
-            
-            grid.forEach((row, rowIndex) => {
-                row.forEach((cell, colIndex) => {
-                    const cellElement = cells[rowIndex * 10 + colIndex];
-                    cellElement.className = 'grid-cell';
-                    
-                    if (cell !== 0) {
-                        cellElement.classList.add('tetris-block', getColorClass(cell));
-                    }
-                });
-            });
-        }
-
-        function updatePiecePosition(playerNumber, position) {
-            // Remove previous current piece highlights
-            const board = document.getElementById(`player${playerNumber}-board`);
-            board.querySelectorAll('.current-piece').forEach(cell => {
-                cell.classList.remove('current-piece');
-            });
-            
-            // Add current piece highlight at new position
-            if (gameState && gameState[`player${playerNumber}`].currentPiece) {
-                const piece = gameState[`player${playerNumber}`].currentPiece;
-                const cells = board.querySelectorAll('.grid-cell');
-                
-                piece.shape.forEach((row, rowIndex) => {
-                    row.forEach((cell, colIndex) => {
-                        if (cell) {
-                            const gridRow = position.y + rowIndex;
-                            const gridCol = position.x + colIndex;
-                            
-                            if (gridRow >= 0 && gridRow < 20 && gridCol >= 0 && gridCol < 10) {
-                                const cellIndex = gridRow * 10 + gridCol;
-                                if (cells[cellIndex]) {
-                                    cells[cellIndex].classList.add('current-piece');
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-        }
-
-        function updatePlayerStats(playerNumber, stats) {
-            const statsElement = document.getElementById(`player${playerNumber}-stats`);
-            if (stats.score !== undefined) {
-                statsElement.querySelector('.score-value').textContent = stats.score;
-            }
-            if (stats.lines !== undefined) {
-                statsElement.querySelector('.lines-value').textContent = stats.lines;
-            }
-            if (stats.level !== undefined) {
-                statsElement.querySelector('.level-value').textContent = stats.level;
-            }
-        }
-        function updateNextPiece(playerNumber, nextPiece) {
-            const preview = document.getElementById(`player${playerNumber}-next`);
-            preview.innerHTML = '';
-            
-            // Create 4x4 grid for next piece preview
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'preview-cell';
-                    preview.appendChild(cell);
-                }
-            }
-            
-            if (nextPiece && nextPiece.shape) {
-                const cells = preview.querySelectorAll('.preview-cell');
-                nextPiece.shape.forEach((row, rowIndex) => {
-                    row.forEach((cell, colIndex) => {
-                        if (cell) {
-                            const cellIndex = rowIndex * 4 + colIndex;
-                            if (cells[cellIndex]) {
-                                cells[cellIndex].classList.add('tetris-block', getColorClass(nextPiece.type));
-                            }
-                        }
-                    });
-                });
-            }
-        }
-
-        function handlePiecePlaced(playerNumber, change) {
-            // Update grid with placed piece
-            updatePlayerGrid(playerNumber, change.newGrid);
-            
-            // Update stats
-            updatePlayerStats(playerNumber, {
-                score: change.newScore,
-                lines: change.newLines,
-                level: change.newLevel
-            });
-            
-            // Show line clear animation if any
-            if (change.linesCleared && change.linesCleared.length > 0) {
-                animateLinesClear(playerNumber, change.linesCleared);
-            }
-        }
-
-        function animateLinesClear(playerNumber, clearedLines) {
-            const board = document.getElementById(`player${playerNumber}-board`);
-            const cells = board.querySelectorAll('.grid-cell');
-            
-            // Highlight cleared lines
-            clearedLines.forEach(lineIndex => {
-                for (let col = 0; col < 10; col++) {
-                    const cellIndex = lineIndex * 10 + col;
-                    if (cells[cellIndex]) {
-                        cells[cellIndex].style.background = '#ffffff';
-                        cells[cellIndex].style.animation = 'flash 0.5s ease-in-out';
-                    }
-                }
-            });
-            
-            // Remove animation after delay
-            setTimeout(() => {
-                cells.forEach(cell => {
-                    cell.style.animation = '';
-                });
-            }, 500);
-        }
-
-        function handleGameOver(change) {
-            isGameStarted = false;
-            
-            // Show game over overlay on losing player's board
-            const losingPlayer = change.playerNumber;
-            const board = document.getElementById(`player${losingPlayer}-board`);
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'game-over-overlay';
-            overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
-            board.appendChild(overlay);
-            
-            // Show final results
-            setTimeout(() => {
-                showGameOverScreen(change.winner, change.finalScores);
-            }, 2000);
-        }
-
-        function showGameOverScreen(winner, scores) {
-            const winnerMessage = document.getElementById('winner-message');
-            if (winner === playerNumber) {
-                winnerMessage.textContent = '🎉 คุณชนะ!';
-                winnerMessage.style.color = '#4CAF50';
-            } else {
-                winnerMessage.textContent = '😢 คุณแพ้';
-                winnerMessage.style.color = '#f44336';
-            }
-            
-            document.getElementById('final-score-p1').textContent = scores.player1 || 0;
-            document.getElementById('final-score-p2').textContent = scores.player2 || 0;
-            
-            showScreen('game-over-screen');
-        }
-
-        function getColorClass(pieceType) {
-            const colorMap = {
-                1: 'block-cyan',    // I piece
-                2: 'block-yellow',  // O piece
-                3: 'block-purple',  // T piece
-                4: 'block-green',   // S piece
-                5: 'block-red',     // Z piece
-                6: 'block-blue',    // J piece
-                7: 'block-orange'   // L piece
-            };
-            return colorMap[pieceType] || 'block-cyan';
-        }
-
-        // UI Functions
+        // ฟังก์ชันแสดงหน้าจอต่างๆ
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.style.display = 'none';
             });
             document.getElementById(screenId).style.display = 'block';
-            currentScreen = screenId;
         }
 
-        function updatePlayersList(players) {
-            const list = document.getElementById('players-list');
-            list.innerHTML = '';
-            
-            players.forEach(player => {
-                const li = document.createElement('li');
-                li.textContent = `Player ${player.playerNumber}${player.ready ? ' (พร้อม)' : ''}`;
-                if (player.playerNumber === playerNumber) {
-                    li.classList.add('current-player');
-                }
-                list.appendChild(li);
-            });
-        }
-
+        // ฟังก์ชันแสดงการแจ้งเตือน
         function showNotification(message, type = 'info') {
             const notification = document.createElement('div');
             notification.className = 'notification';
@@ -982,58 +550,105 @@
             }, 3000);
         }
 
-        // Game Actions
-        function sendGameAction(action, data = {}) {
-            if (!socket || !socket.connected || !isGameStarted) return;
+        // ฟังก์ชันอัพเดทสถานะการเชื่อมต่อ
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connection-status');
+            if (connected) {
+                status.textContent = '🟢 เชื่อมต่อแล้ว';
+                status.className = 'connection-status connected';
+                document.getElementById('btn-create-room').disabled = false;
+                document.getElementById('btn-join-room').disabled = false;
+            } else {
+                status.textContent = '🔴 ไม่ได้เชื่อมต่อ';
+                status.className = 'connection-status disconnected';
+                document.getElementById('btn-create-room').disabled = true;
+                document.getElementById('btn-join-room').disabled = true;
+            }
+        }
+
+        // ฟังก์ชันอัพเดทรายชื่อผู้เล่น
+        function updatePlayersList(players) {
+            const list = document.getElementById('players-list');
+            list.innerHTML = '';
             
-            socket.emit('game-action', {
-                action: action,
-                ...data
+            players.forEach(player => {
+                const li = document.createElement('li');
+                li.textContent = `Player ${player.playerNumber}${player.ready ? ' (พร้อม)' : ''}`;
+                if (player.playerNumber === game.playerNumber) {
+                    li.classList.add('current-player');
+                }
+                list.appendChild(li);
             });
         }
 
-        // Input Handlers
-        function setupInputHandlers() {
-            document.addEventListener('keydown', (e) => {
-                if (!isGameStarted || currentScreen !== 'game-screen') return;
-                
-                switch (e.key) {
-                    case 'ArrowLeft':
-                        e.preventDefault();
-                        sendGameAction('move-left');
-                        break;
-                    case 'ArrowRight':
-                        e.preventDefault();
-                        sendGameAction('move-right');
-                        break;
-                    case 'ArrowDown':
-                        e.preventDefault();
-                        sendGameAction('move-down');
-                        break;
-                    case 'ArrowUp':
-                        e.preventDefault();
-                        sendGameAction('rotate');
-                        break;
-                    case ' ':
-                        e.preventDefault();
-                        sendGameAction('hard-drop');
-                        break;
-                }
+        // ฟังก์ชันตั้งค่าปุ่มต่างๆ
+        function setupButtonHandlers() {
+            // ปุ่มสร้างห้อง
+            document.getElementById('btn-create-room').addEventListener('click', () => {
+                showScreen('create-room-screen');
             });
 
-            // Touch controls for mobile
+            // ปุ่มเข้าร่วมห้อง
+            document.getElementById('btn-join-room').addEventListener('click', () => {
+                showScreen('join-room-screen');
+            });
+
+            // ปุ่มยืนยันสร้างห้อง
+            document.getElementById('btn-confirm-create').addEventListener('click', () => {
+                const playerName = document.getElementById('create-player-name').value.trim();
+                if (!playerName) {
+                    showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
+                    return;
+                }
+                
+                game.joinRoom();
+                showScreen('waiting-screen');
+            });
+
+            // ปุ่มยืนยันเข้าร่วมห้อง
+            document.getElementById('btn-confirm-join').addEventListener('click', () => {
+                const playerName = document.getElementById('join-player-name').value.trim();
+                const roomId = document.getElementById('join-room-id').value.trim();
+                
+                if (!playerName || !roomId) {
+                    showNotification('กรุณาใส่ชื่อผู้เล่นและรหัสห้อง', 'error');
+                    return;
+                }
+                
+                game.joinRoom(roomId);
+                showScreen('waiting-screen');
+            });
+
+            // ปุ่มพร้อมเล่น
+            document.getElementById('btn-ready').addEventListener('click', () => {
+                game.playerReady();
+                document.getElementById('btn-ready').disabled = true;
+                document.getElementById(`ready-indicator-${game.playerNumber}`).textContent = 
+                    `Player ${game.playerNumber}: พร้อมแล้ว ✅`;
+            });
+
+            // ปุ่มออกจากห้อง
+            document.getElementById('btn-leave-room').addEventListener('click', () => {
+                showScreen('menu-screen');
+            });
+
+            // ปุ่มเล่นอีกครั้ง
+            document.getElementById('btn-play-again').addEventListener('click', () => {
+                window.location.reload();
+            });
+        }
+
+        // ฟังก์ชันตั้งค่าการควบคุมบนมือถือ
+        function setupMobileControls() {
             let touchStartX = 0;
             let touchStartY = 0;
             
             document.addEventListener('touchstart', (e) => {
-                if (!isGameStarted || currentScreen !== 'game-screen') return;
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             });
             
             document.addEventListener('touchend', (e) => {
-                if (!isGameStarted || currentScreen !== 'game-screen') return;
-                
                 const touchEndX = e.changedTouches[0].clientX;
                 const touchEndY = e.changedTouches[0].clientY;
                 const deltaX = touchEndX - touchStartX;
@@ -1044,109 +659,77 @@
                     // Horizontal swipe
                     if (Math.abs(deltaX) > minSwipeDistance) {
                         if (deltaX > 0) {
-                            sendGameAction('move-right');
+                            game.handleKeyPress({key: 'ArrowRight', preventDefault: () => {}});
                         } else {
-                            sendGameAction('move-left');
+                            game.handleKeyPress({key: 'ArrowLeft', preventDefault: () => {}});
                         }
                     }
                 } else {
                     // Vertical swipe
                     if (Math.abs(deltaY) > minSwipeDistance) {
                         if (deltaY < 0) {
-                            sendGameAction('rotate');
+                            game.handleKeyPress({key: 'ArrowUp', preventDefault: () => {}});
                         } else {
-                            sendGameAction('hard-drop');
+                            game.handleKeyPress({key: 'ArrowDown', preventDefault: () => {}});
                         }
                     }
                 }
             });
         }
 
-        // Button Event Listeners
-        function setupButtonHandlers() {
-            document.getElementById('btn-create-room').addEventListener('click', () => {
-                showScreen('create-room-screen');
-            });
-
-            document.getElementById('btn-join-room').addEventListener('click', () => {
-                showScreen('join-room-screen');
-            });
-
-            document.getElementById('btn-confirm-create').addEventListener('click', () => {
-                const playerName = document.getElementById('create-player-name').value.trim();
-                if (!playerName) {
-                    showNotification('กรุณาใส่ชื่อผู้เล่น', 'error');
-                    return;
-                }
-                
-                if (!socket || !socket.connected) {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                    return;
-                }
-                
-                socket.emit('create-room', { playerName });
-            });
-
-            document.getElementById('btn-confirm-join').addEventListener('click', () => {
-                const playerName = document.getElementById('join-player-name').value.trim();
-                const roomId = document.getElementById('join-room-id').value.trim();
-                
-                if (!playerName || !roomId) {
-                    showNotification('กรุณาใส่ชื่อผู้เล่นและรหัสห้อง', 'error');
-                    return;
-                }
-                
-                if (!socket || !socket.connected) {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                    return;
-                }
-                
-                socket.emit('join-room', { playerName, roomId });
-            });
-
-            document.getElementById('btn-ready').addEventListener('click', () => {
-                if (!socket || !socket.connected) {
-                    showNotification('ไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-                    return;
-                }
-                
-                socket.emit('player-ready');
-                document.getElementById('btn-ready').disabled = true;
-                document.getElementById(`ready-indicator-${playerNumber}`).textContent = 
-                    `Player ${playerNumber}: พร้อมแล้ว ✅`;
-            });
-
-            document.getElementById('btn-leave-room').addEventListener('click', () => {
-                if (socket && socket.connected) {
-                    socket.emit('leave-room');
-                }
-                showScreen('menu-screen');
-            });
-
-            document.getElementById('btn-play-again').addEventListener('click', () => {
-                if (socket && socket.connected) {
-                    socket.emit('play-again');
-                }
-                showScreen('waiting-screen');
-            });
-        }
-
-        // Initialize everything when DOM is loaded
+        // เริ่มต้นเมื่อหน้าเว็บโหลดเสร็จ
         document.addEventListener('DOMContentLoaded', () => {
-            initSocket();
-            setupInputHandlers();
-            setupButtonHandlers();
+            // สร้างเกมใหม่
+            game = new OptimizedTetrisClient();
             
-            // Show initial screen
+            // ตั้งค่าสถานะการเชื่อมต่อ
+            game.socket.on('connect', () => {
+                updateConnectionStatus(true);
+            });
+            
+            game.socket.on('disconnect', () => {
+                updateConnectionStatus(false);
+            });
+            
+            // เมื่อเข้าร่วมห้อง
+            game.socket.on('room-joined', (data) => {
+                document.getElementById('room-id-display').textContent = data.roomId;
+                showScreen('waiting-screen');
+                showNotification(`เข้าร่วมห้อง ${data.roomId} ในฐานะ Player ${data.playerNumber}`);
+            });
+            
+            // เมื่อเกมเริ่ม
+            game.socket.on('game-started', () => {
+                showScreen('game-screen');
+                showNotification('เกมเริ่มแล้ว!', 'success');
+            });
+            
+            // เมื่อเกมจบ
+            game.socket.on('game-over', (result) => {
+                const winnerMessage = document.getElementById('winner-message');
+                if (result.winner === 'draw') {
+                    winnerMessage.textContent = 'เสมอ!';
+                    winnerMessage.style.color = '#ffd700';
+                } else if (result.winner === game.playerNumber) {
+                    winnerMessage.textContent = '🎉 คุณชนะ!';
+                    winnerMessage.style.color = '#4CAF50';
+                } else {
+                    winnerMessage.textContent = '😢 คุณแพ้';
+                    winnerMessage.style.color = '#f44336';
+                }
+                
+                document.getElementById('final-score-p1').textContent = result.finalScores.player1 || 0;
+                document.getElementById('final-score-p2').textContent = result.finalScores.player2 || 0;
+                
+                showScreen('game-over-screen');
+            });
+            
+            // ตั้งค่าปุ่มและควบคุม
+            setupButtonHandlers();
+            setupMobileControls();
+            
+            // แสดงหน้าจอเมนูเริ่มต้น
             showScreen('menu-screen');
-        });
-
-        // Handle page unload
-        window.addEventListener('beforeunload', () => {
-            if (socket && socket.connected) {
-                socket.emit('leave-room');
-                socket.disconnect();
-            }
         });
     </script>
 </body>
