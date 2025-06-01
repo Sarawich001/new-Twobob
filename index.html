@@ -150,7 +150,7 @@
             border: 2px solid #ffd700;
         }
 
-        /* Game Screen */
+        /* Game Screen - New Layout */
         .game-container {
             display: flex;
             justify-content: center;
@@ -158,27 +158,43 @@
             gap: 2rem;
             max-width: 1200px;
             margin: 0 auto;
+            position: relative;
         }
 
-        .player-section {
+        .my-game-area {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        .player-board {
-            position: relative;
-            width: 280px;
-            height: 560px;
+        .opponent-game-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .tetris-board {
             background: rgba(0,0,0,0.8);
             border: 3px solid #333;
             border-radius: 10px;
             overflow: hidden;
+            position: relative;
         }
 
-        .player-board.current-player {
+        .main-board {
+            width: 280px;
+            height: 560px;
             border-color: #ffd700;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .small-board {
+            width: 140px;
+            height: 280px;
+            border-color: #666;
         }
 
         .tetris-block {
@@ -195,19 +211,39 @@
         .block-j { background: #0000f0; }
         .block-l { background: #f0a000; }
 
-        .player-stats {
+        .stats {
             background: rgba(255,255,255,0.1);
             border-radius: 10px;
             padding: 1rem;
             margin-top: 1rem;
             min-width: 200px;
             backdrop-filter: blur(10px);
+            font-size: 1.1rem;
+            line-height: 1.5;
         }
 
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
+        .stats-small {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin-top: 0.5rem;
+            min-width: 120px;
+            backdrop-filter: blur(10px);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        #my-player-name {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        #opponent-player-name {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #ccc;
             font-weight: bold;
         }
 
@@ -312,12 +348,24 @@
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
-                gap: 1rem;
+                align-items: center;
             }
 
-            .player-board {
+            .opponent-game-area {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-top: 1rem;
+            }
+
+            .main-board {
                 width: 200px;
                 height: 400px;
+            }
+
+            .small-board {
+                width: 120px;
+                height: 240px;
             }
 
             .game-title {
@@ -334,9 +382,14 @@
                 padding: 10px;
             }
 
-            .player-board {
+            .main-board {
                 width: 150px;
                 height: 300px;
+            }
+
+            .small-board {
+                width: 100px;
+                height: 200px;
             }
         }
     </style>
@@ -412,41 +465,25 @@
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-container">
-                <div class="player-section">
-                    <h3>Player 1</h3>
-                    <div id="player1-board" class="player-board"></div>
-                    <div id="player1-stats" class="player-stats">
-                        <div class="stat-row">
-                            <span>คะแนน:</span>
-                            <span class="score-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>แถว:</span>
-                            <span class="lines-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>เลเวล:</span>
-                            <span class="level-value">1</span>
-                        </div>
+                <!-- My Board (Main) -->
+                <div class="my-game-area">
+                    <h3 id="my-player-name">ผู้เล่น</h3>
+                    <div id="my-board" class="tetris-board main-board"></div>
+                    <div class="stats">
+                        คะแนน: <span id="my-score">0</span><br>
+                        แถว: <span id="my-lines">0</span><br>
+                        เลเวล: <span id="my-level">1</span>
                     </div>
                 </div>
-
-                <div class="player-section">
-                    <h3>Player 2</h3>
-                    <div id="player2-board" class="player-board"></div>
-                    <div id="player2-stats" class="player-stats">
-                        <div class="stat-row">
-                            <span>คะแนน:</span>
-                            <span class="score-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>แถว:</span>
-                            <span class="lines-value">0</span>
-                        </div>
-                        <div class="stat-row">
-                            <span>เลเวล:</span>
-                            <span class="level-value">1</span>
-                        </div>
+                
+                <!-- Opponent Board (Small) -->
+                <div class="opponent-game-area">
+                    <h4 id="opponent-player-name">ฝ่ายตรงข้าม</h4>
+                    <div id="opponent-board" class="tetris-board small-board"></div>
+                    <div class="stats-small">
+                        คะแนน: <span id="opponent-score">0</span><br>
+                        แถว: <span id="opponent-lines">0</span><br>
+                        เลเวล: <span id="opponent-level">1</span>
                     </div>
                 </div>
             </div>
