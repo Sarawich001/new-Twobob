@@ -150,10 +150,10 @@
             border: 2px solid #ffd700;
         }
 
-        /* Game Screen - Improved Layout */
+        /* Game Screen - New Improved Layout */
         .game-container {
             display: grid;
-            grid-template-columns: 1fr auto 1fr;
+            grid-template-columns: 1fr auto auto;
             gap: 2rem;
             max-width: 1400px;
             margin: 0 auto;
@@ -168,11 +168,17 @@
             width: 100%;
         }
 
-        .game-info {
+        .main-player-area {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1rem;
+        }
+
+        .right-side-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
         }
 
         .next-piece-container {
@@ -217,8 +223,8 @@
         }
 
         .opponent-board {
-            width: 200px;
-            height: 400px;
+            width: 160px;
+            height: 320px;
             border-color: #ff6b6b;
             box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
         }
@@ -252,9 +258,15 @@
             border-radius: 10px;
             padding: 1rem;
             backdrop-filter: blur(10px);
-            font-size: 1rem;
+            font-size: 0.9rem;
             line-height: 1.6;
-            min-width: 150px;
+            min-width: 120px;
+        }
+
+        .opponent-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .player-name {
@@ -269,7 +281,7 @@
 
         .opponent-player-name {
             color: #ff6b6b;
-            font-size: 1.3rem;
+            font-size: 1.1rem;
         }
 
         .game-over-overlay {
@@ -314,14 +326,14 @@
             font-size: 1.2rem;
         }
 
-        /* Mobile Controls */
+        /* Mobile Controls - Improved */
         .mobile-controls {
             display: none;
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             border-radius: 15px;
             padding: 15px;
             backdrop-filter: blur(10px);
@@ -330,8 +342,8 @@
 
         .control-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 8px;
             margin-bottom: 10px;
         }
 
@@ -339,14 +351,14 @@
             background: rgba(255,255,255,0.2);
             border: 2px solid rgba(255,255,255,0.3);
             border-radius: 12px;
-            padding: 15px;
+            padding: 12px;
             color: white;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 1.2rem;
-            min-width: 50px;
-            min-height: 50px;
+            font-size: 1rem;
+            min-width: 45px;
+            min-height: 45px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -403,8 +415,13 @@
             }
             
             .opponent-board {
-                width: 180px;
-                height: 360px;
+                width: 140px;
+                height: 280px;
+            }
+
+            .right-side-info {
+                flex-direction: row;
+                gap: 2rem;
             }
         }
 
@@ -419,13 +436,13 @@
             }
 
             .main-board {
-                width: 300px;
-                height: 600px;
+                width: 280px;
+                height: 560px;
             }
 
             .opponent-board {
-                width: 200px;
-                height: 400px;
+                width: 140px;
+                height: 280px;
             }
 
             .game-title {
@@ -440,24 +457,30 @@
                 font-size: 1rem;
                 padding: 1rem;
             }
+
+            .right-side-info {
+                flex-direction: row;
+                gap: 1rem;
+                justify-content: center;
+            }
         }
 
         @media (max-width: 480px) {
             .main-board {
-                width: 250px;
-                height: 500px;
+                width: 240px;
+                height: 480px;
             }
 
             .opponent-board {
-                width: 160px;
-                height: 320px;
+                width: 120px;
+                height: 240px;
             }
 
             .control-button {
-                padding: 12px;
-                font-size: 1rem;
-                min-width: 45px;
-                min-height: 45px;
+                padding: 10px;
+                font-size: 0.9rem;
+                min-width: 40px;
+                min-height: 40px;
             }
         }
 
@@ -556,11 +579,11 @@
             </div>
         </div>
 
-        <!-- Game Screen -->
+        <!-- Game Screen - New Layout -->
         <div id="game-screen" class="screen">
             <div class="game-container">
-                <!-- My Board Area -->
-                <div class="player-area">
+                <!-- Main Player Area -->
+                <div class="main-player-area">
                     <h3 id="my-player-name" class="player-name my-player-name">ผู้เล่น</h3>
                     <div id="my-board" class="tetris-board main-board"></div>
                     <div class="stats">
@@ -570,16 +593,16 @@
                     </div>
                 </div>
                 
-                <!-- Game Info (Next Piece, etc.) -->
-                <div class="game-info">
+                <!-- Right Side Info -->
+                <div class="right-side-info">
                     <div class="next-piece-container">
                         <div class="next-piece-title">บล็อคถัดไป</div>
                         <div id="next-piece-preview" class="next-piece-preview"></div>
                     </div>
                 </div>
                 
-                <!-- Opponent Board Area -->
-                <div class="player-area">
+                <!-- Opponent Area -->
+                <div class="opponent-area">
                     <h4 id="opponent-player-name" class="player-name opponent-player-name">ฝ่ายตรงข้าม</h4>
                     <div id="opponent-board" class="tetris-board opponent-board"></div>
                     <div class="stats-opponent">
@@ -590,18 +613,16 @@
                 </div>
             </div>
 
-            <!-- Mobile Controls -->
+            <!-- Mobile Controls - Updated -->
             <div class="mobile-controls">
                 <div class="control-grid">
-                    <button class="control-button" id="btn-rotate">↻</button>
-                    <button class="control-button" id="btn-up">↑</button>
-                    <button class="control-button" id="btn-drop">💧</button>
                     <button class="control-button" id="btn-left">←</button>
-                    <button class="control-button" id="btn-down">↓</button>
                     <button class="control-button" id="btn-right">→</button>
+                    <button class="control-button" id="btn-rotate">↻</button>
+                    <button class="control-button" id="btn-drop">💧</button>
                 </div>
                 <div class="control-instructions">
-                    หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
+                    Swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
                 </div>
             </div>
         </div>
@@ -647,34 +668,20 @@
             document.getElementById('join-room-screen').style.display = 'block';
         });
 
-        // Mobile control buttons
+        // Mobile control buttons - Updated
         document.getElementById('btn-left').addEventListener('click', () => {
-            // Simulate left arrow key
             document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
         });
 
         document.getElementById('btn-right').addEventListener('click', () => {
-            // Simulate right arrow key
             document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
         });
 
-        document.getElementById('btn-up').addEventListener('click', () => {
-            // Simulate up arrow key (rotate)
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
-        });
-
-        document.getElementById('btn-down').addEventListener('click', () => {
-            // Simulate down arrow key (soft drop)
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));
-        });
-
         document.getElementById('btn-rotate').addEventListener('click', () => {
-            // Simulate rotate key
             document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
         });
 
         document.getElementById('btn-drop').addEventListener('click', () => {
-            // Simulate space key (hard drop)
             document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
         });
 
@@ -716,8 +723,8 @@
                         // Swipe up (rotate)
                         document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
                     } else {
-                        // Swipe down (soft drop)
-                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));
+                        // Swipe down (hard drop)
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
                     }
                 }
             }
