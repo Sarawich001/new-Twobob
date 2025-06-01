@@ -330,6 +330,16 @@ io.on('connection', (socket) => {
             console.error('Error updating game:', error);
         }
     });
+    socket.on('request-rematch', () => {
+    // หาห้องที่ผู้เล่นอยู่
+    const room = findPlayerRoom(socket.id);
+    if (room && room.players.length === 2) {
+        // ส่งข้อความไปยังคู่ต่อสู้
+        socket.to(room.id).emit('rematch-requested', {
+            requester: socket.playerName
+        });
+    }
+});
 
     socket.on('gameOver', (data) => {
         try {
