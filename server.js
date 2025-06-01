@@ -1,769 +1,659 @@
+// Optimized Server-Side Performance
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
+class OptimizedGameServer {
+  constructor() {
+    this.app = express();
+    this.server = http.createServer(this.app);
+    this.io = socketIo(this.server, {
+      cors: { origin: "*", methods: ["GET", "POST"] }
+    });
 
-// Socket.IO configuration for production
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ["https://new-twobob.onrender.com"] // Replace with your actual Render URL
-      : ["http://localhost:3000"],
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  transports: ['websocket', 'polling'],
-  allowEIO3: true
-});
-
-// Security and performance middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Trust proxy for Render
-app.set('trust proxy', 1);
-
-// CORS headers for production
-app.use((req, res, next) => {
-  const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? ['https://new-twobob.onrender.com'] // Replace with your actual Render URL
-    : ['http://localhost:3000'];
-  
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  next();
-});
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public'), {
-  maxAge: process.env.NODE_ENV === 'production' ? '24h' : '0'
-}));
-
-// Game rooms storage with cleanup
-const gameRooms = {};
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes
-const MAX_ROOMS = 1000; // Limit concurrent rooms
-
-// Tetris piece definitions
-const PIECES = {
-  I: {
-    shape: [
-      [1, 1, 1, 1]
-    ],
-    color: 'block-i'
-  },
-  O: {
-    shape: [
-      [1, 1],
-      [1, 1]
-    ],
-    color: 'block-o'
-  },
-  T: {
-    shape: [
-      [0, 1, 0],
-      [1, 1, 1]
-    ],
-    color: 'block-t'
-  },
-  S: {
-    shape: [
-      [0, 1, 1],
-      [1, 1, 0]
-    ],
-    color: 'block-s'
-  },
-  Z: {
-    shape: [
-      [1, 1, 0],
-      [0, 1, 1]
-    ],
-    color: 'block-z'
-  },
-  J: {
-    shape: [
-      [1, 0, 0],
-      [1, 1, 1]
-    ],
-    color: 'block-j'
-  },
-  L: {
-    shape: [
-      [0, 0, 1],
-      [1, 1, 1]
-    ],
-    color: 'block-l'
-  }
-};
-
-const PIECE_TYPES = Object.keys(PIECES);
-
-class TetrisGame {
-  constructor(roomId) {
-    this.roomId = roomId;
-    this.players = {};
-    this.gameStarted = false;
-    this.lastActivity = Date.now();
-    this.gameState = {
-      gameStarted: false,
-      player1: null,
-      player2: null
-    };
-  }
-
-  updateActivity() {
-    this.lastActivity = Date.now();
-  }
-
-  addPlayer(socket, playerName) {
-    this.updateActivity();
-    const playerNumber = Object.keys(this.players).length + 1;
+    this.rooms = new Map();
+    this.players = new Map();
+    this.actionQueue = new Map(); // Rate limiting
     
-    if (playerNumber > 2) {
-      return false; // Room is full
-    }
-
-    this.players[socket.id] = {
-      socket: socket,
-      playerNumber: playerNumber,
-      playerName: playerName,
-      ready: false
+    // Performance monitoring
+    this.metrics = {
+      activeConnections: 0,
+      messagesPerSecond: 0,
+      lastMessageCount: 0
     };
 
-    // Initialize player game state
-    this.gameState[`player${playerNumber}`] = this.createPlayerState();
-
-    return playerNumber;
+    this.initializeServer();
+    this.startMetricsCollection();
   }
 
-  removePlayer(socketId) {
-    this.updateActivity();
-    delete this.players[socketId];
-    
-    // Reset game if it was started
-    if (this.gameStarted) {
-      this.gameStarted = false;
-      this.gameState.gameStarted = false;
-      // Notify remaining players
-      this.broadcastToRoom('game-reset');
-    }
-  }
-
-  createPlayerState() {
-    return {
-      grid: Array(20).fill().map(() => Array(10).fill(0)),
-      currentPiece: null,
-      currentX: 0,
-      currentY: 0,
-      score: 0,
-      lines: 0,
-      level: 1,
-      alive: true,
-      nextPiece: this.generateRandomPiece()
-    };
-  }
-
-  generateRandomPiece() {
-    const pieceType = PIECE_TYPES[Math.floor(Math.random() * PIECE_TYPES.length)];
-    return {
-      type: pieceType,
-      shape: PIECES[pieceType].shape,
-      color: PIECES[pieceType].color
-    };
-  }
-
-  setPlayerReady(socketId) {
-    this.updateActivity();
-    if (this.players[socketId]) {
-      this.players[socketId].ready = true;
+  initializeServer() {
+    this.io.on('connection', (socket) => {
+      this.metrics.activeConnections++;
+      this.setupSocketHandlers(socket);
       
-      const playerNumber = this.players[socketId].playerNumber;
-      this.broadcastToRoom('player-ready', { playerNumber });
-
-      // Check if both players are ready
-      const allReady = Object.values(this.players).every(player => player.ready);
-      if (allReady && Object.keys(this.players).length === 2) {
-        this.startGame();
-      }
-    }
-  }
-
-  startGame() {
-    this.updateActivity();
-    this.gameStarted = true;
-    this.gameState.gameStarted = true;
-
-    // Initialize both players
-    for (let i = 1; i <= 2; i++) {
-      const playerState = this.gameState[`player${i}`];
-      playerState.currentPiece = playerState.nextPiece;
-      playerState.nextPiece = this.generateRandomPiece();
-      playerState.currentX = 3;
-      playerState.currentY = 0;
-      playerState.alive = true;
-    }
-
-    this.broadcastToRoom('game-start', this.gameState);
-  }
-
-  handlePlayerAction(socketId, action) {
-    this.updateActivity();
-    const player = this.players[socketId];
-    if (!player || !this.gameStarted) return;
-
-    const playerNumber = player.playerNumber;
-    const playerState = this.gameState[`player${playerNumber}`];
-    
-    if (!playerState || !playerState.alive) return;
-
-    switch (action.type) {
-      case 'move-left':
-        this.movePiece(playerState, -1, 0);
-        break;
-      case 'move-right':
-        this.movePiece(playerState, 1, 0);
-        break;
-      case 'move-down':
-        if (!this.movePiece(playerState, 0, 1)) {
-          this.placePiece(playerState);
-        }
-        break;
-      case 'rotate':
-        this.rotatePiece(playerState);
-        break;
-      case 'hard-drop':
-        this.hardDrop(playerState);
-        break;
-    }
-
-    // Check for game over
-    this.checkGameOver();
-    
-    // Send updated game state
-    this.broadcastToRoom('game-update', this.gameState);
-  }
-
-  movePiece(playerState, deltaX, deltaY) {
-    const newX = playerState.currentX + deltaX;
-    const newY = playerState.currentY + deltaY;
-
-    if (this.isValidPosition(playerState, newX, newY, playerState.currentPiece.shape)) {
-      playerState.currentX = newX;
-      playerState.currentY = newY;
-      return true;
-    }
-    return false;
-  }
-
-  rotatePiece(playerState) {
-    if (!playerState.currentPiece) return;
-
-    const rotatedShape = this.rotateMatrix(playerState.currentPiece.shape);
-    
-    if (this.isValidPosition(playerState, playerState.currentX, playerState.currentY, rotatedShape)) {
-      playerState.currentPiece.shape = rotatedShape;
-    }
-  }
-// แก้ไขในส่วน TetrisGame class
-
-  setPlayerReady(socketId) {
-    this.updateActivity();
-    if (this.players[socketId]) {
-      this.players[socketId].ready = true;
-      
-      const playerNumber = this.players[socketId].playerNumber;
-      
-      // ส่งข้อมูลผู้เล่นที่พร้อมไปยังทุกคนในห้อง
-      this.broadcastToRoom('player-ready', { 
-        playerNumber,
-        roomPlayers: this.getRoomPlayers() // เพิ่มข้อมูลผู้เล่นทั้งหมด
+      socket.on('disconnect', () => {
+        this.metrics.activeConnections--;
+        this.handleDisconnect(socket);
       });
-
-      console.log(`Player ${playerNumber} in room ${this.roomId} is ready`);
-
-      // ตรวจสอบว่าผู้เล่นทั้งคู่พร้อมหรือไม่
-      const playerCount = Object.keys(this.players).length;
-      const readyCount = Object.values(this.players).filter(player => player.ready).length;
-      
-      console.log(`Room ${this.roomId}: ${readyCount}/${playerCount} players ready`);
-
-      if (playerCount === 2 && readyCount === 2) {
-        console.log(`Starting game in room ${this.roomId}`);
-        this.startGame();
-      }
-    }
-  }
-
-  startGame() {
-    this.updateActivity();
-    this.gameStarted = true;
-    this.gameState.gameStarted = true;
-
-    console.log(`Game started in room ${this.roomId}`);
-
-    // เริ่มต้นผู้เล่นทั้งสองคน
-    for (let i = 1; i <= 2; i++) {
-      const playerState = this.gameState[`player${i}`];
-      if (playerState) {
-        playerState.currentPiece = playerState.nextPiece;
-        playerState.nextPiece = this.generateRandomPiece();
-        playerState.currentX = 3;
-        playerState.currentY = 0;
-        playerState.alive = true;
-        playerState.score = 0;
-        playerState.lines = 0;
-        playerState.level = 1;
-      }
-    }
-
-    // ส่งสถานะเกมให้ผู้เล่นทั้งหมด
-    this.broadcastToRoom('game-start', {
-      gameState: this.gameState,
-      roomPlayers: this.getRoomPlayers()
     });
   }
 
-  // เพิ่มฟังก์ชันสำหรับดีบัก
-  getDebugInfo() {
-    return {
-      roomId: this.roomId,
-      playerCount: Object.keys(this.players).length,
-      players: Object.values(this.players).map(p => ({
-        playerNumber: p.playerNumber,
-        playerName: p.playerName,
-        ready: p.ready
-      })),
-      gameStarted: this.gameStarted
+  setupSocketHandlers(socket) {
+    // Rate limiting setup
+    this.actionQueue.set(socket.id, {
+      lastAction: 0,
+      actionCount: 0,
+      windowStart: Date.now()
+    });
+
+  const wrapHandler = (handler) => {
+    return (...args) => {
+      this.metrics.messagesPerSecond++;
+      return handler(...args);
     };
-  }
-  rotateMatrix(matrix) {
-    const rows = matrix.length;
-    const cols = matrix[0].length;
-    const rotated = Array(cols).fill().map(() => Array(rows).fill(0));
+  };
+
+  socket.on('join-room', wrapHandler((data) => this.handleJoinRoom(socket, data)));
+  socket.on('player-ready', wrapHandler(() => this.handlePlayerReady(socket)));
+  socket.on('game-action', wrapHandler((action) => this.handleGameAction(socket, action)));
+  socket.on('leave-room', wrapHandler(() => this.handleLeaveRoom(socket)));
+  socket.on('request-new-game', wrapHandler(() => this.handleNewGame(socket)));
+}
+
+  // Rate limiting for game actions
+  isActionAllowed(socketId) {
+    const now = Date.now();
+    const queue = this.actionQueue.get(socketId);
     
-    for (let i = 0; i < rows; i++) {
-      for (let j = 0; j < cols; j++) {
-        rotated[j][rows - 1 - i] = matrix[i][j];
+    if (!queue) return false;
+
+    // Reset window every second
+    if (now - queue.windowStart > 1000) {
+      queue.actionCount = 0;
+      queue.windowStart = now;
+    }
+
+    // Allow max 20 actions per second
+    if (queue.actionCount >= 20) {
+      return false;
+    }
+
+    // Minimum 30ms between actions
+    if (now - queue.lastAction < 30) {
+      return false;
+    }
+
+    queue.actionCount++;
+    queue.lastAction = now;
+    return true;
+  }
+
+  handleGameAction(socket, action) {
+    // Rate limiting check
+    if (!this.isActionAllowed(socket.id)) {
+      socket.emit('rate-limited');
+      return;
+    }
+
+    const playerInfo = this.players.get(socket.id);
+    if (!playerInfo) return;
+
+    const room = this.rooms.get(playerInfo.roomId);
+    if (!room || !room.gameState.gameStarted) return;
+
+    const playerKey = `player${playerInfo.playerNumber}`;
+    const playerState = room.gameState[playerKey];
+    
+    if (!playerState.alive) return;
+
+    // Process action and get delta changes
+    const delta = this.processGameAction(room, playerState, action, playerInfo.playerNumber);
+    
+    if (delta) {
+      // Send only delta updates instead of full state
+      this.io.to(playerInfo.roomId).emit('game-delta', {
+        playerNumber: playerInfo.playerNumber,
+        changes: delta
+      });
+    }
+  }
+
+  processGameAction(room, playerState, action, playerNumber) {
+    const delta = { changes: [] };
+    
+    switch (action.type) {
+      case 'move-left':
+        if (this.canMove(playerState.grid, playerState.currentPiece, 
+                       playerState.currentX - 1, playerState.currentY)) {
+          const oldX = playerState.currentX;
+          playerState.currentX--;
+          delta.changes.push({
+            type: 'position',
+            from: { x: oldX, y: playerState.currentY },
+            to: { x: playerState.currentX, y: playerState.currentY }
+          });
+        }
+        break;
+
+      case 'move-right':
+        if (this.canMove(playerState.grid, playerState.currentPiece,
+                       playerState.currentX + 1, playerState.currentY)) {
+          const oldX = playerState.currentX;
+          playerState.currentX++;
+          delta.changes.push({
+            type: 'position',
+            from: { x: oldX, y: playerState.currentY },
+            to: { x: playerState.currentX, y: playerState.currentY }
+          });
+        }
+        break;
+
+      case 'move-down':
+        if (this.canMove(playerState.grid, playerState.currentPiece,
+                       playerState.currentX, playerState.currentY + 1)) {
+          const oldY = playerState.currentY;
+          playerState.currentY++;
+          delta.changes.push({
+            type: 'position',
+            from: { x: playerState.currentX, y: oldY },
+            to: { x: playerState.currentX, y: playerState.currentY }
+          });
+        } else {
+          // Handle piece placement
+          return this.handlePiecePlacement(room, playerState, playerNumber);
+        }
+        break;
+
+      case 'rotate':
+        const rotated = this.rotateMatrix(playerState.currentPiece.shape);
+        if (this.canMove(playerState.grid, { shape: rotated, color: playerState.currentPiece.color },
+                       playerState.currentX, playerState.currentY)) {
+          playerState.currentPiece.shape = rotated;
+          delta.changes.push({
+            type: 'rotation',
+            shape: rotated
+          });
+        }
+        break;
+
+      case 'hard-drop':
+        let dropDistance = 0;
+        while (this.canMove(playerState.grid, playerState.currentPiece,
+                          playerState.currentX, playerState.currentY + 1)) {
+          playerState.currentY++;
+          dropDistance++;
+          playerState.score += 2;
+        }
+        if (dropDistance > 0) {
+          delta.changes.push({
+            type: 'hard-drop',
+            distance: dropDistance,
+            newY: playerState.currentY,
+            scoreGain: dropDistance * 2
+          });
+        }
+        break;
+    }
+
+    return delta.changes.length > 0 ? delta : null;
+  }
+
+  handlePiecePlacement(room, playerState, playerNumber) {
+    const delta = { changes: [] };
+    
+    // Place piece on grid
+    const newGrid = this.placePiece(
+      playerState.grid,
+      playerState.currentPiece,
+      playerState.currentX,
+      playerState.currentY
+    );
+    
+    // Clear lines efficiently
+    const clearedLines = [];
+    let linesCleared = 0;
+    
+    for (let row = 19; row >= 0; row--) {
+      if (newGrid[row].every(cell => cell !== 0)) {
+        clearedLines.push(row);
+        newGrid.splice(row, 1);
+        newGrid.unshift(Array(10).fill(0));
+        linesCleared++;
+        row++; // Check same row again since we shifted
       }
     }
     
-    return rotated;
-  }
-
-  hardDrop(playerState) {
-    while (this.movePiece(playerState, 0, 1)) {
-      playerState.score += 2; // Bonus points for hard drop
+    playerState.grid = newGrid;
+    playerState.lines += linesCleared;
+    
+    // Calculate score efficiently
+    const lineScores = [0, 100, 300, 500, 800];
+    const scoreGain = lineScores[linesCleared] * playerState.level;
+    playerState.score += scoreGain;
+    playerState.level = Math.floor(playerState.lines / 10) + 1;
+    
+    // Add placement delta
+    delta.changes.push({
+      type: 'piece-placed',
+      piece: playerState.currentPiece,
+      position: { x: playerState.currentX, y: playerState.currentY },
+      linesCleared: clearedLines,
+      scoreGain,
+      newStats: {
+        score: playerState.score,
+        lines: playerState.lines,
+        level: playerState.level
+      }
+    });
+    
+    // Check game over
+    if (newGrid[0].some(cell => cell !== 0)) {
+      playerState.alive = false;
+      const otherPlayerKey = playerNumber === 1 ? 'player2' : 'player1';
+      room.gameState.winner = room.gameState[otherPlayerKey].alive ? 
+        (playerNumber === 1 ? 2 : 1) : 'draw';
+      
+      delta.changes.push({
+        type: 'game-over',
+        winner: room.gameState.winner,
+        finalScores: {
+          player1: room.gameState.player1.score,
+          player2: room.gameState.player2.score
+        }
+      });
+    } else {
+      // Spawn new piece
+      playerState.currentPiece = playerState.nextPiece;
+      playerState.nextPiece = this.createRandomPiece();
+      playerState.currentX = 4;
+      playerState.currentY = 0;
+      
+      delta.changes.push({
+        type: 'new-piece',
+        currentPiece: playerState.currentPiece,
+        nextPiece: playerState.nextPiece
+      });
     }
-    this.placePiece(playerState);
+    
+    return delta;
   }
 
-  isValidPosition(playerState, x, y, shape) {
-    for (let row = 0; row < shape.length; row++) {
-      for (let col = 0; col < shape[row].length; col++) {
-        if (shape[row][col]) {
-          const newX = x + col;
-          const newY = y + row;
+  // Optimized grid operations using bit manipulation
+  canMove(grid, piece, newX, newY) {
+    for (let y = 0; y < piece.shape.length; y++) {
+      for (let x = 0; x < piece.shape[y].length; x++) {
+        if (piece.shape[y][x]) {
+          const gridX = newX + x;
+          const gridY = newY + y;
           
-          // Check boundaries
-          if (newX < 0 || newX >= 10 || newY >= 20) {
-            return false;
-          }
+          // Boundary checks
+          if (gridX < 0 || gridX >= 10 || gridY >= 20) return false;
           
-          // Check collision with existing blocks
-          if (newY >= 0 && playerState.grid[newY][newX]) {
-            return false;
-          }
+          // Collision check
+          if (gridY >= 0 && grid[gridY][gridX] !== 0) return false;
         }
       }
     }
     return true;
   }
 
-  placePiece(playerState) {
-    if (!playerState.currentPiece) return;
-
-    // Place the piece on the grid
-    for (let row = 0; row < playerState.currentPiece.shape.length; row++) {
-      for (let col = 0; col < playerState.currentPiece.shape[row].length; col++) {
-        if (playerState.currentPiece.shape[row][col]) {
-          const gridX = playerState.currentX + col;
-          const gridY = playerState.currentY + row;
-          
-          if (gridY >= 0) {
-            playerState.grid[gridY][gridX] = playerState.currentPiece.color;
+  // Optimized piece placement
+  placePiece(grid, piece, x, y) {
+    // Create shallow copy for better performance
+    const newGrid = grid.map(row => row.slice());
+    
+    for (let py = 0; py < piece.shape.length; py++) {
+      for (let px = 0; px < piece.shape[py].length; px++) {
+        if (piece.shape[py][px]) {
+          const gridY = y + py;
+          const gridX = x + px;
+          if (gridY >= 0 && gridY < 20 && gridX >= 0 && gridX < 10) {
+            newGrid[gridY][gridX] = piece.color;
           }
         }
       }
     }
-
-    // Clear completed lines
-    const linesCleared = this.clearLines(playerState);
-    if (linesCleared > 0) {
-      playerState.lines += linesCleared;
-      playerState.score += this.calculateScore(linesCleared, playerState.level);
-      playerState.level = Math.floor(playerState.lines / 10) + 1;
-    }
-
-    // Spawn new piece
-    playerState.currentPiece = playerState.nextPiece;
-    playerState.nextPiece = this.generateRandomPiece();
-    playerState.currentX = 3;
-    playerState.currentY = 0;
-
-    // Check if new piece can be placed (game over condition)
-    if (!this.isValidPosition(playerState, playerState.currentX, playerState.currentY, playerState.currentPiece.shape)) {
-      playerState.alive = false;
-    }
+    return newGrid;
   }
 
-  clearLines(playerState) {
-    let linesCleared = 0;
+  // Memory-efficient piece creation with object pooling
+  createRandomPiece() {
+    const pieces = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+    const pieceType = pieces[Math.floor(Math.random() * pieces.length)];
     
-    for (let row = 19; row >= 0; row--) {
-      if (playerState.grid[row].every(cell => cell !== 0)) {
-        // Remove the completed line
-        playerState.grid.splice(row, 1);
-        // Add new empty line at top
-        playerState.grid.unshift(Array(10).fill(0));
-        linesCleared++;
-        row++; // Check the same row again
-      }
-    }
-    
-    return linesCleared;
+    // Use prototype-based creation instead of deep cloning
+    return Object.create(this.getPiecePrototype(pieceType));
   }
 
-  calculateScore(linesCleared, level) {
-    const baseScores = [0, 40, 100, 300, 1200];
-    return baseScores[linesCleared] * level;
-  }
-
-  checkGameOver() {
-    const player1Alive = this.gameState.player1.alive;
-    const player2Alive = this.gameState.player2.alive;
-
-    if (!player1Alive || !player2Alive) {
-      this.endGame();
-    }
-  }
-
-  endGame() {
-    this.updateActivity();
-    this.gameStarted = false;
-    this.gameState.gameStarted = false;
-
-    const player1Score = this.gameState.player1.score;
-    const player2Score = this.gameState.player2.score;
-    
-    let winner;
-    if (player1Score > player2Score) {
-      winner = 1;
-    } else if (player2Score > player1Score) {
-      winner = 2;
-    } else {
-      winner = 'draw';
-    }
-
-    const gameOverData = {
-      winner: winner,
-      finalScores: {
-        player1: player1Score,
-        player2: player2Score
-      }
+  getPiecePrototype(type) {
+    const prototypes = {
+      I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'block-i' },
+      O: { shape: [[1,1],[1,1]], color: 'block-o' },
+      T: { shape: [[0,1,0],[1,1,1],[0,0,0]], color: 'block-t' },
+      S: { shape: [[0,1,1],[1,1,0],[0,0,0]], color: 'block-s' },
+      Z: { shape: [[1,1,0],[0,1,1],[0,0,0]], color: 'block-z' },
+      J: { shape: [[1,0,0],[1,1,1],[0,0,0]], color: 'block-j' },
+      L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'block-l' }
     };
-
-    this.broadcastToRoom('game-over', gameOverData);
     
-    // Reset ready states
-    Object.values(this.players).forEach(player => {
-      player.ready = false;
-    });
+    return prototypes[type];
   }
 
-  resetForNewGame() {
-    this.updateActivity();
-    this.gameStarted = false;
-    this.gameState.gameStarted = false;
+  // Optimized matrix rotation using transposition
+  rotateMatrix(matrix) {
+    const rows = matrix.length;
+    const cols = matrix[0].length;
     
-    // Reset player states
-    for (let i = 1; i <= 2; i++) {
-      this.gameState[`player${i}`] = this.createPlayerState();
-    }
-    
-    // Reset ready states
-    Object.values(this.players).forEach(player => {
-      player.ready = false;
-    });
+    // Transpose and reverse each row
+    return matrix[0].map((_, colIndex) =>
+      matrix.map(row => row[colIndex]).reverse()
+    );
   }
 
-  getRoomPlayers() {
-    return Object.values(this.players).map(player => ({
-      playerNumber: player.playerNumber,
-      playerName: player.playerName,
-      ready: player.ready
-    }));
+  // Performance monitoring
+  startMetricsCollection() {
+    setInterval(() => {
+      const now = Date.now();
+      const messageCount = this.metrics.messagesPerSecond;
+      
+      console.log(`📊 Server Metrics:
+        Active Connections: ${this.metrics.activeConnections}
+        Messages/sec: ${messageCount}
+        Active Rooms: ${this.rooms.size}
+        Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+      `);
+      
+      this.metrics.lastMessageCount = messageCount;
+      this.metrics.messagesPerSecond = 0;
+    }, 5000);
   }
 
-  broadcastToRoom(event, data) {
-    Object.values(this.players).forEach(player => {
-      try {
-        player.socket.emit(event, data);
-      } catch (error) {
-        console.error(`Error broadcasting to socket ${player.socket.id}:`, error);
+  // Graceful cleanup
+  cleanup() {
+    // Clear all intervals and timeouts
+    this.rooms.forEach(room => {
+      if (room.dropInterval) {
+        clearInterval(room.dropInterval);
       }
     });
+    
+    // Clear action queues
+    this.actionQueue.clear();
   }
 
-  broadcastToOthers(socketId, event, data) {
-    Object.values(this.players).forEach(player => {
-      if (player.socket.id !== socketId) {
-        try {
-          player.socket.emit(event, data);
-        } catch (error) {
-          console.error(`Error broadcasting to socket ${player.socket.id}:`, error);
-        }
-      }
+  start(port = 3000) {
+    this.server.listen(port, () => {
+      console.log(`🚀 Optimized Tetris Server running on port ${port}`);
+      console.log(`⚡ Performance optimizations active`);
     });
   }
 }
+// ⚠️ เพิ่มส่วนที่ขาดหายใน Server Class
+// วางโค้ดนี้ใน OptimizedGameServer class
 
-// Room cleanup function
-function cleanupInactiveRooms() {
-  const now = Date.now();
-  const roomsToDelete = [];
+handleJoinRoom(socket, data) {
+  const roomId = data.roomId || `room_${Date.now()}`;
+  const playerName = data.playerName || `Player_${socket.id.slice(0, 5)}`;
   
-  for (const [roomId, room] of Object.entries(gameRooms)) {
-    // Remove rooms that have been inactive for more than 30 minutes
-    if (now - room.lastActivity > ROOM_CLEANUP_INTERVAL) {
-      roomsToDelete.push(roomId);
-    }
+  // หาห้องที่มีอยู่หรือสร้างใหม่
+  let room = this.rooms.get(roomId);
+  
+  if (!room) {
+    room = this.createNewRoom(roomId);
+    this.rooms.set(roomId, room);
   }
   
-  roomsToDelete.forEach(roomId => {
-    console.log(`Cleaning up inactive room: ${roomId}`);
-    delete gameRooms[roomId];
-  });
-  
-  if (roomsToDelete.length > 0) {
-    console.log(`Cleaned up ${roomsToDelete.length} inactive rooms`);
+  // ตรวจสอบว่าห้องเต็มหรือไม่
+  if (room.players.length >= 2) {
+    socket.emit('room-full', { message: 'ห้องเต็มแล้ว' });
+    return;
   }
-}
-
-// Run cleanup every 10 minutes
-setInterval(cleanupInactiveRooms, 10 * 60 * 1000);
-
-// Socket.IO connection handling with error handling
-io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
-
-  socket.on('join-room', (data) => {
-    try {
-      const { roomId, playerName } = data;
-      
-      // Validate input
-      if (!roomId || !playerName || typeof roomId !== 'string' || typeof playerName !== 'string') {
-        socket.emit('error', { message: 'Invalid room ID or player name' });
-        return;
-      }
-
-      // Check room limit
-      if (Object.keys(gameRooms).length >= MAX_ROOMS) {
-        socket.emit('error', { message: 'Server is at capacity. Please try again later.' });
-        return;
-      }
-      
-      // Create room if it doesn't exist
-      if (!gameRooms[roomId]) {
-        gameRooms[roomId] = new TetrisGame(roomId);
-      }
-
-      const room = gameRooms[roomId];
-      
-      // Check if room is full
-      if (Object.keys(room.players).length >= 2) {
-        socket.emit('room-full');
-        return;
-      }
-
-      // Add player to room
-      const playerNumber = room.addPlayer(socket, playerName);
-      if (playerNumber) {
-        socket.join(roomId);
-        socket.roomId = roomId;
-        
-        socket.emit('joined-room', {
-          roomId: roomId,
-          playerNumber: playerNumber,
-          playerName: playerName,
-          roomPlayers: room.getRoomPlayers()
-        });
-
-        // Notify other players
-        room.broadcastToOthers(socket.id, 'player-joined', {
-          roomPlayers: room.getRoomPlayers()
-        });
-
-        console.log(`Player ${playerName} joined room ${roomId} as Player ${playerNumber}`);
-      }
-    } catch (error) {
-      console.error('Error in join-room:', error);
-      socket.emit('error', { message: 'Failed to join room' });
-    }
-  });
-
-  socket.on('leave-room', () => {
-    try {
-      if (socket.roomId && gameRooms[socket.roomId]) {
-        const room = gameRooms[socket.roomId];
-        room.removePlayer(socket.id);
-        
-        // Notify remaining players
-        room.broadcastToOthers(socket.id, 'player-left');
-        
-        socket.leave(socket.roomId);
-        
-        // Clean up empty rooms
-        if (Object.keys(room.players).length === 0) {
-          delete gameRooms[socket.roomId];
-        }
-        
-        socket.roomId = null;
-      }
-    } catch (error) {
-      console.error('Error in leave-room:', error);
-    }
-  });
-
-  socket.on('player-ready', () => {
-    try {
-      if (socket.roomId && gameRooms[socket.roomId]) {
-        const room = gameRooms[socket.roomId];
-        room.setPlayerReady(socket.id);
-      }
-    } catch (error) {
-      console.error('Error in player-ready:', error);
-    }
-  });
-
-  socket.on('game-action', (action) => {
-    try {
-      if (socket.roomId && gameRooms[socket.roomId] && action && action.type) {
-        const room = gameRooms[socket.roomId];
-        room.handlePlayerAction(socket.id, action);
-      }
-    } catch (error) {
-      console.error('Error in game-action:', error);
-    }
-  });
-
-  socket.on('request-new-game', () => {
-    try {
-      if (socket.roomId && gameRooms[socket.roomId]) {
-        const room = gameRooms[socket.roomId];
-        room.resetForNewGame();
-        room.broadcastToRoom('game-reset');
-      }
-    } catch (error) {
-      console.error('Error in request-new-game:', error);
-    }
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('Client disconnected:', socket.id, 'Reason:', reason);
-    
-    try {
-      if (socket.roomId && gameRooms[socket.roomId]) {
-        const room = gameRooms[socket.roomId];
-        const player = room.players[socket.id];
-        
-        if (player) {
-          // Notify other players about disconnection
-          room.broadcastToOthers(socket.id, 'player-disconnected', {
-            playerNumber: player.playerNumber
-          });
-        }
-        
-        room.removePlayer(socket.id);
-        
-        // Clean up empty rooms
-        if (Object.keys(room.players).length === 0) {
-          delete gameRooms[socket.roomId];
-          console.log(`Room ${socket.roomId} deleted (empty)`);
-        }
-      }
-    } catch (error) {
-      console.error('Error in disconnect handler:', error);
-    }
-  });
-
-  socket.on('error', (error) => {
-    console.error('Socket error:', error);
-  });
-});
-
-// Routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Health check endpoint for Render
-app.get('/health', (req, res) => {
-  const healthStatus = {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-    rooms: Object.keys(gameRooms).length,
-    totalPlayers: Object.values(gameRooms).reduce((total, room) => total + Object.keys(room.players).length, 0),
-    memory: process.memoryUsage(),
-    version: process.version
+  
+  // กำหนด player number
+  const playerNumber = room.players.length === 0 ? 1 : 2;
+  
+  // เพิ่มผู้เล่นเข้าห้อง
+  const playerInfo = {
+    socketId: socket.id,
+    playerNumber,
+    playerName,
+    roomId,
+    ready: false
   };
   
-  res.json(healthStatus);
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Express error:', err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
+  room.players.push(playerInfo);
+  this.players.set(socket.id, playerInfo);
+  
+  // ให้ผู้เล่นเข้าห้อง socket
+  socket.join(roomId);
+  
+  // แจ้งผู้เล่นว่าเข้าห้องสำเร็จ
+  socket.emit('room-joined', {
+    roomId,
+    playerNumber,
+    playerName,
+    playersInRoom: room.players.length
   });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
+  
+  // แจ้งผู้เล่นอื่นในห้อง
+  socket.to(roomId).emit('player-joined', {
+    playerName,
+    playerNumber,
+    playersInRoom: room.players.length
   });
-});
+  
+  console.log(`✅ ${playerName} joined room ${roomId} as Player ${playerNumber}`);
+}
 
-// Start server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🎮 TwoBob Tactics Tetris Server running on port ${PORT}`);
-  console.log(`📁 Serving static files from root directory`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`🔗 Local: http://localhost:${PORT}`);
+handlePlayerReady(socket) {
+  const playerInfo = this.players.get(socket.id);
+  if (!playerInfo) return;
+  
+  const room = this.rooms.get(playerInfo.roomId);
+  if (!room) return;
+  
+  // ตั้งสถานะพร้อม
+  playerInfo.ready = true;
+  
+  // แจ้งผู้เล่นอื่นในห้อง
+  socket.to(playerInfo.roomId).emit('player-ready', {
+    playerNumber: playerInfo.playerNumber,
+    playerName: playerInfo.playerName
+  });
+  
+  // ตรวจสอบว่าผู้เล่นทั้งหมดพร้อมหรือไม่
+  const allReady = room.players.length === 2 && room.players.every(p => p.ready);
+  
+  if (allReady && !room.gameState.gameStarted) {
+    this.startGame(room);
   }
+  
+  console.log(`🎯 Player ${playerInfo.playerNumber} is ready in room ${playerInfo.roomId}`);
+}
+
+handleLeaveRoom(socket) {
+  const playerInfo = this.players.get(socket.id);
+  if (!playerInfo) return;
+  
+  const room = this.rooms.get(playerInfo.roomId);
+  if (!room) return;
+  
+  // ลบผู้เล่นออกจากห้อง
+  room.players = room.players.filter(p => p.socketId !== socket.id);
+  
+  // แจ้งผู้เล่นอื่นในห้อง
+  socket.to(playerInfo.roomId).emit('player-left', {
+    playerName: playerInfo.playerName,
+    playerNumber: playerInfo.playerNumber
+  });
+  
+  // ถ้าห้องว่าง ให้ลบห้อง
+  if (room.players.length === 0) {
+    if (room.dropInterval) {
+      clearInterval(room.dropInterval);
+    }
+    this.rooms.delete(playerInfo.roomId);
+    console.log(`🗑️ Room ${playerInfo.roomId} deleted (empty)`);
+  } else {
+    // หยุดเกมถ้ามีการเล่นอยู่
+    if (room.gameState.gameStarted) {
+      room.gameState.gameStarted = false;
+      if (room.dropInterval) {
+        clearInterval(room.dropInterval);
+      }
+      
+      socket.to(playerInfo.roomId).emit('game-stopped', {
+        reason: 'Player left the game'
+      });
+    }
+  }
+  
+  // ลบข้อมูลผู้เล่น
+  this.players.delete(socket.id);
+  socket.leave(playerInfo.roomId);
+  
+  console.log(`❌ ${playerInfo.playerName} left room ${playerInfo.roomId}`);
+}
+
+handleDisconnect(socket) {
+  // ใช้ handleLeaveRoom เพื่อทำความสะอาด
+  this.handleLeaveRoom(socket);
+  
+  // ลบ action queue
+  this.actionQueue.delete(socket.id);
+}
+
+handleNewGame(socket) {
+  const playerInfo = this.players.get(socket.id);
+  if (!playerInfo) return;
+  
+  const room = this.rooms.get(playerInfo.roomId);
+  if (!room) return;
+  
+  // รีเซ็ต game state
+  room.gameState = this.createInitialGameState();
+  
+  // รีเซ็ตสถานะผู้เล่น
+  room.players.forEach(p => p.ready = false);
+  
+  // แจ้งผู้เล่นในห้อง
+  this.io.to(playerInfo.roomId).emit('game-reset', {
+    message: 'Game has been reset. Please ready up to start again.'
+  });
+  
+  console.log(`🔄 Game reset in room ${playerInfo.roomId}`);
+}
+
+createNewRoom(roomId) {
+  return {
+    roomId,
+    players: [],
+    gameState: this.createInitialGameState(),
+    dropInterval: null,
+    createdAt: Date.now()
+  };
+}
+
+createInitialGameState() {
+  return {
+    gameStarted: false,
+    winner: null,
+    player1: this.createPlayerState(),
+    player2: this.createPlayerState()
+  };
+}
+
+createPlayerState() {
+  return {
+    grid: Array(20).fill().map(() => Array(10).fill(0)),
+    currentPiece: this.createRandomPiece(),
+    nextPiece: this.createRandomPiece(),
+    currentX: 4,
+    currentY: 0,
+    score: 0,
+    lines: 0,
+    level: 1,
+    alive: true
+  };
+}
+
+startGame(room) {
+  // เริ่มเกม
+  room.gameState.gameStarted = true;
+  room.gameState.winner = null;
+  
+  // รีเซ็ตสถานะผู้เล่น
+  room.gameState.player1 = this.createPlayerState();
+  room.gameState.player2 = this.createPlayerState();
+  
+  // แจ้งผู้เล่นในห้อง
+  this.io.to(room.roomId).emit('game-started', room.gameState);
+  
+  // เริ่ม auto-drop loop
+  this.startAutoDropLoop(room);
+  
+  console.log(`🎮 Game started in room ${room.roomId}`);
+}
+
+startAutoDropLoop(room) {
+  if (room.dropInterval) {
+    clearInterval(room.dropInterval);
+  }
+  
+  room.dropInterval = setInterval(() => {
+    if (!room.gameState.gameStarted) {
+      clearInterval(room.dropInterval);
+      return;
+    }
+    
+    // Auto drop สำหรับผู้เล่นที่ยังมีชีวิต
+    ['player1', 'player2'].forEach((playerKey, index) => {
+      const playerState = room.gameState[playerKey];
+      if (playerState.alive) {
+        // จำลองการส่ง move-down action
+        const delta = this.processGameAction(room, playerState, 
+          { type: 'move-down' }, index + 1);
+        
+        if (delta) {
+          this.io.to(room.roomId).emit('game-delta', {
+            playerNumber: index + 1,
+            changes: delta.changes
+          });
+        }
+      }
+    });
+    
+    // ตรวจสอบว่าเกมจบหรือไม่
+    const alivePlayers = [room.gameState.player1, room.gameState.player2]
+      .filter(p => p.alive);
+    
+    if (alivePlayers.length <= 1) {
+      room.gameState.gameStarted = false;
+      clearInterval(room.dropInterval);
+      
+      // กำหนดผู้ชนะ
+      if (alivePlayers.length === 1) {
+        room.gameState.winner = room.gameState.player1.alive ? 1 : 2;
+      } else {
+        room.gameState.winner = 'draw';
+      }
+      
+      this.io.to(room.roomId).emit('game-over', {
+        winner: room.gameState.winner,
+        finalScores: {
+          player1: room.gameState.player1.score,
+          player2: room.gameState.player2.score
+        }
+      });
+    }
+  }, 1000); // Auto drop ทุก 1 วินาที
+}
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Server shutting down gracefully...');
+  server.cleanup();
+  process.exit(0);
 });
+
+const server = new OptimizedGameServer();
+server.start();
