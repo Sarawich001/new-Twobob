@@ -1,4 +1,4 @@
-// TwoBob Tactics - Tetris Multiplayer Client
+// TwoBob Tactics - Tetris Multiplayer Client (Fixed)
 class TetrisMultiplayer {
     constructor() {
         this.socket = null;
@@ -11,9 +11,17 @@ class TetrisMultiplayer {
             level: 1,
             gameOver: false
         };
+        this.opponentState = {
+            board: [],
+            score: 0,
+            lines: 0,
+            level: 1,
+            gameOver: false
+        };
         this.playerId = null;
         this.roomId = null;
         this.playerName = '';
+        this.opponentName = '';
         this.isReady = false;
         this.gameStarted = false;
         
@@ -21,6 +29,7 @@ class TetrisMultiplayer {
         this.BOARD_WIDTH = 10;
         this.BOARD_HEIGHT = 20;
         this.BLOCK_SIZE = 28;
+        this.SMALL_BLOCK_SIZE = 14; // For opponent board
         
         // Piece templates
         this.pieces = {
@@ -69,12 +78,14 @@ class TetrisMultiplayer {
         this.socket.on('roomCreated', (data) => {
             this.roomId = data.roomId;
             this.playerId = data.playerId;
+            console.log('Room created, I am player:', this.playerId);
             this.showWaitingScreen();
         });
 
         this.socket.on('roomJoined', (data) => {
             this.roomId = data.roomId;
             this.playerId = data.playerId;
+            console.log('Room joined, I am player:', this.playerId);
             this.showWaitingScreen();
         });
 
@@ -86,6 +97,12 @@ class TetrisMultiplayer {
         this.socket.on('roomUpdate', (data) => {
             this.updatePlayersDisplay(data.players);
             this.updateReadyStatus(data.players);
+            
+            // Store opponent name
+            const opponent = data.players.find(p => p.id !== this.playerId);
+            if (opponent) {
+                this.opponentName = opponent.name;
+            }
         });
 
         this.socket.on('gameStart', (data) => {
@@ -93,7 +110,9 @@ class TetrisMultiplayer {
         });
 
         this.socket.on('gameUpdate', (data) => {
-            this.updateOpponentBoard(data);
+            if (data.playerId !== this.playerId) {
+                this.updateOpponentBoard(data);
+            }
         });
 
         this.socket.on('gameOver', (data) => {
@@ -251,6 +270,7 @@ class TetrisMultiplayer {
 
     initializeBoard() {
         this.gameState.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
+        this.opponentState.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
     }
 
     generatePiece() {
@@ -266,7 +286,6 @@ class TetrisMultiplayer {
 
     startGame(data) {
         this.gameStarted = true;
-        this.playerId = data.playerId;
         this.initializeBoard();
         this.gameState.currentPiece = this.generatePiece();
         this.gameState.nextPiece = this.generatePiece();
@@ -276,13 +295,16 @@ class TetrisMultiplayer {
         this.gameState.gameOver = false;
         
         this.showScreen('game-screen');
+        this.setupGameLayout();
         this.updateBoard();
         this.updateStats();
         this.gameLoop();
-        
-        // Highlight current player's board
-        const myBoard = document.getElementById(`player${this.playerId}-board`);
-        myBoard.classList.add('current-player');
+    }
+
+    setupGameLayout() {
+        // Update player names in the UI
+        document.getElementById('my-player-name').textContent = this.playerName + ' (คุณ)';
+        document.getElementById('opponent-player-name').textContent = this.opponentName || 'ฝ่ายตรงข้าม';
     }
 
     gameLoop() {
@@ -426,8 +448,11 @@ class TetrisMultiplayer {
         });
     }
 
+    // Update MY board (main board)
     updateBoard() {
-        const boardEl = document.getElementById(`player${this.playerId}-board`);
+        const boardEl = document.getElementById('my-board');
+        if (!boardEl) return;
+        
         boardEl.innerHTML = '';
         
         // Draw placed blocks
@@ -441,6 +466,7 @@ class TetrisMultiplayer {
                     block.style.width = this.BLOCK_SIZE + 'px';
                     block.style.height = this.BLOCK_SIZE + 'px';
                     block.style.background = this.gameState.board[i][j];
+                    block.style.border = '1px solid rgba(255,255,255,0.3)';
                     boardEl.appendChild(block);
                 }
             }
@@ -453,12 +479,14 @@ class TetrisMultiplayer {
                 for (let j = 0; j < shape[i].length; j++) {
                     if (shape[i][j]) {
                         const block = document.createElement('div');
-                        block.className = 'tetris-block';
+                        block.className = 'tetris-block current-piece';
                         block.style.left = (x + j) * this.BLOCK_SIZE + 'px';
                         block.style.top = (y + i) * this.BLOCK_SIZE + 'px';
                         block.style.width = this.BLOCK_SIZE + 'px';
                         block.style.height = this.BLOCK_SIZE + 'px';
                         block.style.background = color;
+                        block.style.border = '2px solid rgba(255,255,255,0.8)';
+                        block.style.boxShadow = '0 0 5px rgba(255,255,255,0.5)';
                         boardEl.appendChild(block);
                     }
                 }
@@ -474,46 +502,71 @@ class TetrisMultiplayer {
         }
     }
 
+    // Update opponent board (smaller board)
     updateOpponentBoard(data) {
-        const opponentId = data.playerId === 1 ? 2 : 1;
-        const boardEl = document.getElementById(`player${opponentId}-board`);
+        console.log('Updating opponent board with data:', data);
+        
+        // Store opponent state
+        this.opponentState.board = data.board || [];
+        this.opponentState.score = data.score || 0;
+        this.opponentState.lines = data.lines || 0;
+        this.opponentState.level = data.level || 1;
+        
+        const boardEl = document.getElementById('opponent-board');
+        if (!boardEl) return;
+        
         boardEl.innerHTML = '';
         
-        // Draw opponent's board
+        // Draw opponent's board with smaller blocks
         for (let i = 0; i < this.BOARD_HEIGHT; i++) {
             for (let j = 0; j < this.BOARD_WIDTH; j++) {
                 if (data.board[i] && data.board[i][j]) {
                     const block = document.createElement('div');
-                    block.className = 'tetris-block';
-                    block.style.left = j * this.BLOCK_SIZE + 'px';
-                    block.style.top = i * this.BLOCK_SIZE + 'px';
-                    block.style.width = this.BLOCK_SIZE + 'px';
-                    block.style.height = this.BLOCK_SIZE + 'px';
+                    block.className = 'tetris-block-small';
+                    block.style.left = j * this.SMALL_BLOCK_SIZE + 'px';
+                    block.style.top = i * this.SMALL_BLOCK_SIZE + 'px';
+                    block.style.width = this.SMALL_BLOCK_SIZE + 'px';
+                    block.style.height = this.SMALL_BLOCK_SIZE + 'px';
                     block.style.background = data.board[i][j];
+                    block.style.border = '1px solid rgba(255,255,255,0.2)';
+                    block.style.position = 'absolute';
                     boardEl.appendChild(block);
                 }
             }
         }
         
         // Update opponent stats
-        const statsEl = document.getElementById(`player${opponentId}-stats`);
-        statsEl.querySelector('.score-value').textContent = data.score || 0;
-        statsEl.querySelector('.lines-value').textContent = data.lines || 0;
-        statsEl.querySelector('.level-value').textContent = data.level || 1;
+        this.updateOpponentStats();
     }
 
     updateStats() {
-        const statsEl = document.getElementById(`player${this.playerId}-stats`);
-        statsEl.querySelector('.score-value').textContent = this.gameState.score;
-        statsEl.querySelector('.lines-value').textContent = this.gameState.lines;
-        statsEl.querySelector('.level-value').textContent = this.gameState.level;
+        const scoreEl = document.getElementById('my-score');
+        const linesEl = document.getElementById('my-lines');
+        const levelEl = document.getElementById('my-level');
+        
+        if (scoreEl) scoreEl.textContent = this.gameState.score;
+        if (linesEl) linesEl.textContent = this.gameState.lines;
+        if (levelEl) levelEl.textContent = this.gameState.level;
+    }
+
+    updateOpponentStats() {
+        const scoreEl = document.getElementById('opponent-score');
+        const linesEl = document.getElementById('opponent-lines');
+        const levelEl = document.getElementById('opponent-level');
+        
+        if (scoreEl) scoreEl.textContent = this.opponentState.score;
+        if (linesEl) linesEl.textContent = this.opponentState.lines;
+        if (levelEl) levelEl.textContent = this.opponentState.level;
     }
 
     showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(screen => {
             screen.style.display = 'none';
         });
-        document.getElementById(screenId).style.display = 'block';
+        const targetScreen = document.getElementById(screenId);
+        if (targetScreen) {
+            targetScreen.style.display = 'block';
+        }
     }
 
     showWaitingScreen() {
@@ -524,6 +577,8 @@ class TetrisMultiplayer {
 
     updatePlayersDisplay(players) {
         const playersList = document.getElementById('players-list');
+        if (!playersList) return;
+        
         playersList.innerHTML = '';
         
         players.forEach((player, index) => {
@@ -550,11 +605,15 @@ class TetrisMultiplayer {
         this.gameStarted = false;
         this.gameState.gameOver = true;
         
-        document.getElementById('winner-message').textContent = 
-            data.winner === this.playerId ? '🎉 คุณชนะ!' : '😢 คุณแพ้';
+        const winnerMsg = document.getElementById('winner-message');
+        if (winnerMsg) {
+            winnerMsg.textContent = data.winner === this.playerId ? '🎉 คุณชนะ!' : '😢 คุณแพ้';
+        }
         
-        document.getElementById('final-score-p1').textContent = data.scores.player1 || 0;
-        document.getElementById('final-score-p2').textContent = data.scores.player2 || 0;
+        const finalScoreP1 = document.getElementById('final-score-p1');
+        const finalScoreP2 = document.getElementById('final-score-p2');
+        if (finalScoreP1) finalScoreP1.textContent = data.scores.player1 || 0;
+        if (finalScoreP2) finalScoreP2.textContent = data.scores.player2 || 0;
         
         this.showScreen('game-over-screen');
     }
