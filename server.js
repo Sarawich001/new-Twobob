@@ -273,7 +273,78 @@ class TetrisGame {
       playerState.currentPiece.shape = rotatedShape;
     }
   }
+// แก้ไขในส่วน TetrisGame class
 
+  setPlayerReady(socketId) {
+    this.updateActivity();
+    if (this.players[socketId]) {
+      this.players[socketId].ready = true;
+      
+      const playerNumber = this.players[socketId].playerNumber;
+      
+      // ส่งข้อมูลผู้เล่นที่พร้อมไปยังทุกคนในห้อง
+      this.broadcastToRoom('player-ready', { 
+        playerNumber,
+        roomPlayers: this.getRoomPlayers() // เพิ่มข้อมูลผู้เล่นทั้งหมด
+      });
+
+      console.log(`Player ${playerNumber} in room ${this.roomId} is ready`);
+
+      // ตรวจสอบว่าผู้เล่นทั้งคู่พร้อมหรือไม่
+      const playerCount = Object.keys(this.players).length;
+      const readyCount = Object.values(this.players).filter(player => player.ready).length;
+      
+      console.log(`Room ${this.roomId}: ${readyCount}/${playerCount} players ready`);
+
+      if (playerCount === 2 && readyCount === 2) {
+        console.log(`Starting game in room ${this.roomId}`);
+        this.startGame();
+      }
+    }
+  }
+
+  startGame() {
+    this.updateActivity();
+    this.gameStarted = true;
+    this.gameState.gameStarted = true;
+
+    console.log(`Game started in room ${this.roomId}`);
+
+    // เริ่มต้นผู้เล่นทั้งสองคน
+    for (let i = 1; i <= 2; i++) {
+      const playerState = this.gameState[`player${i}`];
+      if (playerState) {
+        playerState.currentPiece = playerState.nextPiece;
+        playerState.nextPiece = this.generateRandomPiece();
+        playerState.currentX = 3;
+        playerState.currentY = 0;
+        playerState.alive = true;
+        playerState.score = 0;
+        playerState.lines = 0;
+        playerState.level = 1;
+      }
+    }
+
+    // ส่งสถานะเกมให้ผู้เล่นทั้งหมด
+    this.broadcastToRoom('game-start', {
+      gameState: this.gameState,
+      roomPlayers: this.getRoomPlayers()
+    });
+  }
+
+  // เพิ่มฟังก์ชันสำหรับดีบัก
+  getDebugInfo() {
+    return {
+      roomId: this.roomId,
+      playerCount: Object.keys(this.players).length,
+      players: Object.values(this.players).map(p => ({
+        playerNumber: p.playerNumber,
+        playerName: p.playerName,
+        ready: p.ready
+      })),
+      gameStarted: this.gameStarted
+    };
+  }
   rotateMatrix(matrix) {
     const rows = matrix.length;
     const cols = matrix[0].length;
