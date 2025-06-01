@@ -241,7 +241,151 @@ class TetrisClient {
       }, 1000);
     }
   }
+// แก้ไข function updatePlayersList โดยเพิ่มการตรวจสอบ
+function updatePlayersList(players) {
+  console.log('Updating players list:', players);
+  
+  // ตรวจสอบว่า players เป็น array และมีข้อมูลหรือไม่
+  if (!players || !Array.isArray(players)) {
+    console.warn('Players data is invalid:', players);
+    return;
+  }
 
+  const playersListElement = document.getElementById('players-list');
+  if (!playersListElement) {
+    console.warn('Players list element not found');
+    return;
+  }
+
+  // ล้างรายการเดิม
+  playersListElement.innerHTML = '';
+  
+  // เพิ่มผู้เล่นใหม่
+  players.forEach(player => {
+    if (!player) return; // ข้าม player ที่เป็น null หรือ undefined
+    
+    const li = document.createElement('li');
+    li.style.cssText = `
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      list-style: none;
+    `;
+    
+    const statusIcon = player.ready ? '✅' : '⏳';
+    const statusText = player.ready ? 'พร้อม' : 'รอ...';
+    
+    li.innerHTML = `
+      <strong>${player.playerName || 'ผู้เล่น'}</strong> (Player ${player.playerNumber || '?'})
+      <br><small>${statusIcon} ${statusText}</small>
+    `;
+    
+    // ไฮไลต์ผู้เล่นปัจจุบัน
+    if (player.playerNumber === this.playerNumber) {
+      li.style.border = '2px solid #FFD700';
+      li.style.background = 'rgba(255, 215, 0, 0.2)';
+    }
+    
+    playersListElement.appendChild(li);
+  });
+}
+
+// แก้ไข function updateRoomInfo ให้รองรับทั้งสองกรณี
+function updateRoomInfo(players) {
+  console.log('Updating room info:', players);
+  
+  // ตรวจสอบข้อมูล players
+  if (!players) {
+    console.warn('No players data provided');
+    return;
+  }
+
+  const roomIdElement = document.getElementById('room-id-display');
+  
+  if (roomIdElement) {
+    roomIdElement.textContent = this.roomId || 'N/A';
+  }
+  
+  // เรียกใช้ updatePlayersList ที่แก้ไขแล้ว
+  updatePlayersList.call(this, players);
+
+  // เปิดใช้งานปุ่ม Ready เมื่อมีผู้เล่น 2 คน
+  const readyBtn = document.getElementById('btn-ready');
+  if (readyBtn && Array.isArray(players) && players.length === 2 && !readyBtn.disabled) {
+    readyBtn.disabled = false;
+    readyBtn.style.background = '#2196F3';
+  }
+  
+  // แสดงสถานะห้อง
+  if (Array.isArray(players)) {
+    const statusMsg = players.length === 1 ? 
+      'รอผู้เล่นคนที่ 2...' : 
+      'ห้องเต็มแล้ว! คลิกพร้อมเล่นเพื่อเริ่มเกม';
+    
+    const statusElement = document.getElementById('room-status');
+    if (statusElement) {
+      statusElement.textContent = statusMsg;
+      statusElement.style.color = players.length === 2 ? '#4CAF50' : '#FFA726';
+    }
+  }
+}
+
+// แก้ไข Socket event handlers ให้มีการตรวจสอบข้อมูลที่ดีขึ้น
+function setupSocketEvents() {
+  this.socket.on('player-joined', (data) => {
+    console.log('Player joined event:', data);
+    
+    // ตรวจสอบว่ามีข้อมูล roomPlayers หรือไม่
+    if (data && data.roomPlayers) {
+      this.updateRoomInfo(data.roomPlayers);
+      this.showNotification('ผู้เล่นใหม่เข้าร่วม');
+    } else {
+      console.warn('Invalid player-joined data:', data);
+      this.showNotification('มีผู้เล่นเข้าร่วม แต่ไม่สามารถอัพเดทข้อมูลได้', 'error');
+    }
+  });
+
+  this.socket.on('joined-room', (data) => {
+    console.log('Joined room event:', data);
+    
+    if (!data) {
+      console.error('No data received from joined-room event');
+      return;
+    }
+
+    this.roomId = data.roomId;
+    this.playerNumber = data.playerNumber;
+    this.playerName = data.playerName;
+    
+    // ตรวจสอบว่ามีข้อมูล roomPlayers หรือไม่
+    if (data.roomPlayers) {
+      this.updateRoomInfo(data.roomPlayers);
+    }
+    
+    this.showScreen('waiting-screen');
+    this.showNotification(`เข้าร่วมห้อง ${data.roomId} สำเร็จ`);
+  });
+
+  this.socket.on('player-ready', (data) => {
+    console.log('Player ready event:', data);
+    
+    if (!data) {
+      console.warn('No data received from player-ready event');
+      return;
+    }
+    
+    this.updatePlayerReady(data.playerNumber);
+    
+    // อัพเดทข้อมูลผู้เล่นถ้ามี
+    if (data.roomPlayers) {
+      this.updateRoomInfo(data.roomPlayers);
+    }
+    
+    // ตรวจสอบว่าผู้เล่นทั้งคู่พร้อมหรือไม่
+    this.checkAllPlayersReady(data.roomPlayers);
+  });
+}
   setReady() {
     console.log('Setting player ready...');
     if (!this.socket || !this.roomId) {
