@@ -721,68 +721,6 @@
     </div>
 
     <script>
-        // เพิ่มใน script section ของ HTML
-document.getElementById('btn-play-again').addEventListener('click', () => {
-    // 1. ซ่อน game-over screen
-    document.getElementById('game-over-screen').style.display = 'none';
-    
-    // 2. แสดง waiting screen เพื่อให้ผู้เล่นรอคู่ต่อสู้
-    document.getElementById('waiting-screen').style.display = 'block';
-    
-    // 3. Reset ค่าต่างๆ กลับเป็น default
-    resetGameStats();
-    
-    // 4. ส่งสัญญาณไปยัง server ว่าต้องการเล่นใหม่
-    if (socket && socket.connected) {
-        socket.emit('request-rematch');
-    }
-});
-
-// ฟังก์ชัน reset stats
-function resetGameStats() {
-    // Reset player stats
-    document.getElementById('my-score').textContent = '0';
-    document.getElementById('my-lines').textContent = '0';
-    document.getElementById('my-level').textContent = '1';
-    
-    // Reset opponent stats
-    document.getElementById('opponent-score').textContent = '0';
-    document.getElementById('opponent-lines').textContent = '0';
-    document.getElementById('opponent-level').textContent = '1';
-    
-    // Clear game boards
-    const myBoard = document.getElementById('my-board');
-    const opponentBoard = document.getElementById('opponent-board');
-    
-    if (myBoard) myBoard.innerHTML = '';
-    if (opponentBoard) opponentBoard.innerHTML = '';
-    
-    // Reset ready status
-    document.getElementById('btn-ready').disabled = false;
-    document.getElementById('btn-ready').textContent = '🎮 พร้อมเล่น';
-}
-
-// จัดการการตอบสนองจาก server เมื่อมีการขอเล่นใหม่
-if (socket) {
-    socket.on('rematch-requested', (data) => {
-        // แสดงสถานะว่ามีการขอเล่นใหม่
-        document.getElementById('winner-message').textContent = 
-            `${data.requester} ต้องการเล่นใหม่...`;
-    });
-    
-    socket.on('rematch-accepted', () => {
-        // เมื่อทั้งสองฝ่ายยอมรับ ให้เริ่มเกมใหม่
-        document.getElementById('game-over-screen').style.display = 'none';
-        document.getElementById('waiting-screen').style.display = 'block';
-        resetGameStats();
-    });
-    
-    socket.on('rematch-declined', () => {
-        // หากฝ่ายตรงข้ามปฏิเสธ
-        document.getElementById('winner-message').textContent = 
-            '😞 คู่ต่อสู้ไม่ต้องการเล่นใหม่';
-    });
-}
         // Show create room screen
         document.getElementById('btn-create-room').addEventListener('click', () => {
             document.getElementById('menu-screen').style.display = 'none';
