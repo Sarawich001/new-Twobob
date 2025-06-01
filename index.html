@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
@@ -310,6 +308,12 @@
             border-radius: 2px;
         }
 
+        .tetris-block-small {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1px;
+        }
+
         .block-i { background: #00f0f0; }
         .block-o { background: #f0f000; }
         .block-t { background: #a000f0; }
@@ -376,7 +380,8 @@
 
         .control-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
             gap: 8px;
             margin-bottom: 10px;
         }
@@ -681,10 +686,12 @@
             <!-- Mobile Controls -->
             <div class="mobile-controls">
                 <div class="control-grid">
-                    <button class="control-button" id="btn-left">←</button>
-                    <button class="control-button" id="btn-right">→</button>
-                    <button class="control-button" id="btn-rotate">↻</button>
-                    <button class="control-button" id="btn-drop">💧</button>
+                    <button class="control-button">↶</button>
+                    <button class="control-button">↑</button>
+                    <button class="control-button">💧</button>
+                    <button class="control-button">←</button>
+                    <button class="control-button">↓</button>
+                    <button class="control-button">→</button>
                 </div>
                 <div class="control-instructions">
                     Swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
@@ -708,7 +715,7 @@
             </div>
             <div class="menu-buttons">
                 <button id="btn-play-again" class="btn">🔄 เล่นอีกครั้ง</button>
-                <button onclick="window.location.reload()" class="btn">🏠 กลับเมนู</button>
+                <button id="btn-back-menu" class="btn">🏠 กลับเมนู</button>
             </div>
         </div>
     </div>
@@ -731,23 +738,6 @@
         document.getElementById('btn-join-room').addEventListener('click', () => {
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('join-room-screen').style.display = 'block';
-        });
-
-        // Mobile control buttons
-        document.getElementById('btn-left').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
-        });
-
-        document.getElementById('btn-right').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
-        });
-
-        document.getElementById('btn-rotate').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
-        });
-
-        document.getElementById('btn-drop').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
         });
 
         // Touch/Swipe controls for mobile
@@ -798,5 +788,7 @@
             touchStartX = 0;
         });
     </script>
+
+    <script>
 </body>
 </html>
