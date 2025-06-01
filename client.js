@@ -198,7 +198,135 @@ class TetrisClient {
     // Mobile control buttons
     this.setupMobileButtons();
   }
+// แก้ไขส่วน Socket event handlers
 
+    this.socket.on('player-ready', (data) => {
+      console.log('Player ready event:', data);
+      this.updatePlayerReady(data.playerNumber);
+      
+      // อัพเดทข้อมูลผู้เล่นถ้ามี
+      if (data.roomPlayers) {
+        this.updateRoomInfo(data.roomPlayers);
+      }
+      
+      // ตรวจสอบว่าผู้เล่นทั้งคู่พร้อมหรือไม่
+      this.checkAllPlayersReady(data.roomPlayers);
+    });
+
+    this.socket.on('game-start', (data) => {
+      console.log('Game start event:', data);
+      this.gameState = data.gameState || data; // รองรับทั้งสองรูปแบบ
+      this.startGameLoop();
+      this.showScreen('game-screen');
+      this.showNotification('เกมเริ่มแล้ว! 🎮');
+    });
+
+  // เพิ่มฟังก์ชันตรวจสอบผู้เล่นพร้อม
+  checkAllPlayersReady(players) {
+    if (!players || players.length !== 2) return;
+    
+    const allReady = players.every(player => player.ready);
+    if (allReady) {
+      this.showNotification('ผู้เล่นทั้งคู่พร้อมแล้ว! กำลังเริ่มเกม...', 'info');
+      
+      // แสดง countdown (ถ้าต้องการ)
+      let countdown = 3;
+      const countdownInterval = setInterval(() => {
+        if (countdown > 0) {
+          this.showNotification(`เริ่มเกมใน ${countdown} วินาที...`, 'info');
+          countdown--;
+        } else {
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+    }
+  }
+
+  setReady() {
+    console.log('Setting player ready...');
+    if (!this.socket || !this.roomId) {
+      this.showNotification('ไม่สามารถเชื่อมต่อได้', 'error');
+      return;
+    }
+    
+    this.socket.emit('player-ready');
+    
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn) {
+      readyBtn.disabled = true;
+      readyBtn.textContent = '✅ พร้อมแล้ว';
+      readyBtn.style.background = '#4CAF50';
+    }
+    
+    this.showNotification('คุณพร้อมเล่นแล้ว! รอผู้เล่นอีกคน...');
+  }
+
+  updateRoomInfo(players) {
+    console.log('Updating room info:', players);
+    
+    const roomIdElement = document.getElementById('room-id-display');
+    const playersListElement = document.getElementById('players-list');
+    
+    if (roomIdElement) {
+      roomIdElement.textContent = this.roomId;
+    }
+    
+    if (playersListElement) {
+      playersListElement.innerHTML = '';
+      players.forEach(player => {
+        const li = document.createElement('li');
+        li.style.cssText = `
+          padding: 10px;
+          margin: 5px 0;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.1);
+          list-style: none;
+        `;
+        
+        const statusIcon = player.ready ? '✅' : '⏳';
+        const statusText = player.ready ? 'พร้อม' : 'รอ...';
+        
+        li.innerHTML = `
+          <strong>${player.playerName}</strong> (Player ${player.playerNumber})
+          <br><small>${statusIcon} ${statusText}</small>
+        `;
+        
+        if (player.playerNumber === this.playerNumber) {
+          li.style.border = '2px solid #FFD700';
+          li.style.background = 'rgba(255, 215, 0, 0.2)';
+        }
+        
+        playersListElement.appendChild(li);
+      });
+    }
+
+    // เปิดใช้งานปุ่ม Ready เมื่อมีผู้เล่น 2 คน
+    const readyBtn = document.getElementById('btn-ready');
+    if (readyBtn && players.length === 2 && !readyBtn.disabled) {
+      readyBtn.disabled = false;
+      readyBtn.style.background = '#2196F3';
+    }
+    
+    // แสดงสถานะห้อง
+    const statusMsg = players.length === 1 ? 
+      'รอผู้เล่นคนที่ 2...' : 
+      'ห้องเต็มแล้ว! คลิกพร้อมเล่นเพื่อเริ่มเกม';
+    
+    const statusElement = document.getElementById('room-status');
+    if (statusElement) {
+      statusElement.textContent = statusMsg;
+      statusElement.style.color = players.length === 2 ? '#4CAF50' : '#FFA726';
+    }
+  }
+
+  // เพิ่มการแสดงสถานะการเชื่อมต่อ
+  showConnectionStatus() {
+    const status = this.socket?.connected ? 'เชื่อมต่อแล้ว' : 'ไม่ได้เชื่อมต่อ';
+    const color = this.socket?.connected ? '#4CAF50' : '#f44336';
+    
+    console.log(`Connection status: ${status}`);
+    this.updateConnectionStatus(this.socket?.connected || false);
+  }
   setupMobileButtons() {
     const buttons = document.querySelectorAll('.control-button');
     buttons.forEach((button, index) => {
