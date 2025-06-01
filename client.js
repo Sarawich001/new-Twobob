@@ -1,4 +1,4 @@
-// TwoBob Tactics - Tetris Multiplayer Client (Fixed Play Again)
+// TwoBob Tactics - Tetris Multiplayer Client (Fixed)
 class TetrisMultiplayer {
     constructor() {
         this.socket = null;
@@ -121,22 +121,7 @@ class TetrisMultiplayer {
 
         this.socket.on('playerLeft', () => {
             alert('ผู้เล่นคนอื่นออกจากห้อง');
-            this.resetToWaitingScreen();
-        });
-
-        // เพิ่ม event สำหรับ play again
-        this.socket.on('playAgainResponse', (data) => {
-            if (data.success) {
-                this.resetForNewGame();
-                this.showWaitingScreen();
-            } else {
-                alert(data.message || 'ไม่สามารถเล่นใหม่ได้');
-            }
-        });
-
-        this.socket.on('bothPlayersReady', () => {
-            // ผู้เล่นทั้งคู่พร้อมแล้ว เกมจะเริ่มใหม่
-            console.log('Both players ready for new game');
+            this.showScreen('menu-screen');
         });
     }
 
@@ -190,16 +175,9 @@ class TetrisMultiplayer {
             this.showScreen('menu-screen');
         });
 
-        // Play again - ปรับปรุงใหม่
+        // Play again
         document.getElementById('btn-play-again').addEventListener('click', () => {
-            this.handlePlayAgain();
-        });
-
-        // Back to menu from game over screen
-        document.getElementById('btn-back-menu').addEventListener('click', () => {
-            this.socket.emit('leaveRoom', { roomId: this.roomId });
-            this.resetGame();
-            this.showScreen('menu-screen');
+            this.socket.emit('playAgain', { roomId: this.roomId });
         });
 
         // Keyboard controls
@@ -316,17 +294,10 @@ class TetrisMultiplayer {
         this.gameState.level = 1;
         this.gameState.gameOver = false;
         
-        // รีเซ็ต opponent state
-        this.opponentState.score = 0;
-        this.opponentState.lines = 0;
-        this.opponentState.level = 1;
-        this.opponentState.gameOver = false;
-        
         this.showScreen('game-screen');
         this.setupGameLayout();
         this.updateBoard();
         this.updateStats();
-        this.updateOpponentStats();
         this.gameLoop();
     }
 
@@ -602,10 +573,6 @@ class TetrisMultiplayer {
         document.getElementById('room-id-display').textContent = this.roomId;
         this.showScreen('waiting-screen');
         document.getElementById('btn-ready').disabled = false;
-        this.isReady = false;
-        
-        // Clear ready status display
-        this.clearReadyStatus();
     }
 
     updatePlayersDisplay(players) {
@@ -634,89 +601,6 @@ class TetrisMultiplayer {
         });
     }
 
-    clearReadyStatus() {
-        // Clear ready indicators
-        for (let i = 1; i <= 2; i++) {
-            const indicator = document.getElementById(`ready-indicator-${i}`);
-            if (indicator) {
-                indicator.textContent = '';
-            }
-        }
-    }
-
-    // ฟังก์ชันจัดการ Play Again ที่ปรับปรุงแล้ว
-    handlePlayAgain() {
-        // Disable button to prevent multiple clicks
-        const playAgainBtn = document.getElementById('btn-play-again');
-        if (playAgainBtn) {
-            playAgainBtn.disabled = true;
-            playAgainBtn.textContent = 'กำลังเตรียมเกมใหม่...';
-        }
-        
-        // Send play again request to server
-        this.socket.emit('playAgain', { 
-            roomId: this.roomId,
-            playerId: this.playerId
-        });
-    }
-
-    // รีเซ็ตเกมสำหรับเกมใหม่
-    resetForNewGame() {
-        this.gameStarted = false;
-        this.isReady = false;
-        
-        // Reset game states
-        this.gameState = {
-            board: [],
-            currentPiece: null,
-            nextPiece: null,
-            score: 0,
-            lines: 0,
-            level: 1,
-            gameOver: false
-        };
-        
-        this.opponentState = {
-            board: [],
-            score: 0,
-            lines: 0,
-            level: 1,
-            gameOver: false
-        };
-        
-        // Reset timing
-        this.lastMoveTime = 0;
-        this.moveInterval = 500;
-        
-        // Initialize boards
-        this.initializeBoard();
-        
-        // Reset play again button
-        const playAgainBtn = document.getElementById('btn-play-again');
-        if (playAgainBtn) {
-            playAgainBtn.disabled = false;
-            playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
-        }
-    }
-
-    // รีเซ็ตกลับไปหน้ารอ
-    resetToWaitingScreen() {
-        this.resetForNewGame();
-        this.showWaitingScreen();
-    }
-
-    // รีเซ็ตเกมทั้งหมด
-    resetGame() {
-        this.gameStarted = false;
-        this.isReady = false;
-        this.roomId = null;
-        this.playerId = null;
-        this.playerName = '';
-        this.opponentName = '';
-        
-        this.resetForNewGame();
-    }
-
     endGame(data) {
         this.gameStarted = false;
         this.gameState.gameOver = true;
@@ -730,13 +614,6 @@ class TetrisMultiplayer {
         const finalScoreP2 = document.getElementById('final-score-p2');
         if (finalScoreP1) finalScoreP1.textContent = data.scores.player1 || 0;
         if (finalScoreP2) finalScoreP2.textContent = data.scores.player2 || 0;
-        
-        // Reset play again button state
-        const playAgainBtn = document.getElementById('btn-play-again');
-        if (playAgainBtn) {
-            playAgainBtn.disabled = false;
-            playAgainBtn.textContent = '🔄 เล่นอีกครั้ง';
-        }
         
         this.showScreen('game-over-screen');
     }
