@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TwoBob Tactics - Tetris Multiplayer</title>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script> <!-- ตามด้วย client.js -->
-
+    <script src="client.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
@@ -19,8 +18,8 @@
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            overflow: hidden;
-            height: 100vh;
+            overflow-x: hidden;
+            min-height: 100vh;
         }
 
         .container {
@@ -35,6 +34,7 @@
             display: none;
             text-align: center;
             animation: fadeIn 0.5s ease-in;
+            width: 100%;
         }
 
         @keyframes fadeIn {
@@ -150,30 +150,54 @@
             border: 2px solid #ffd700;
         }
 
-        /* Game Screen - New Layout */
+        /* Game Screen - Improved Layout */
         .game-container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
             gap: 2rem;
-            max-width: 1200px;
+            max-width: 1400px;
+            margin: 0 auto;
+            align-items: start;
+            justify-items: center;
+        }
+
+        .player-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .game-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .next-piece-container {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .next-piece-title {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .next-piece-preview {
+            width: 80px;
+            height: 80px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #666;
+            border-radius: 8px;
             margin: 0 auto;
             position: relative;
-        }
-
-        .my-game-area {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .opponent-game-area {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
 
         .tetris-board {
@@ -182,19 +206,21 @@
             border-radius: 10px;
             overflow: hidden;
             position: relative;
+            margin-bottom: 1rem;
         }
 
         .main-board {
-            width: 280px;
-            height: 560px;
+            width: 320px;
+            height: 640px;
             border-color: #ffd700;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
         }
 
-        .small-board {
-            width: 140px;
-            height: 280px;
-            border-color: #666;
+        .opponent-board {
+            width: 200px;
+            height: 400px;
+            border-color: #ff6b6b;
+            box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
         }
 
         .tetris-block {
@@ -214,37 +240,36 @@
         .stats {
             background: rgba(255,255,255,0.1);
             border-radius: 10px;
-            padding: 1rem;
-            margin-top: 1rem;
-            min-width: 200px;
+            padding: 1.5rem;
             backdrop-filter: blur(10px);
             font-size: 1.1rem;
-            line-height: 1.5;
+            line-height: 1.8;
+            min-width: 200px;
         }
 
-        .stats-small {
+        .stats-opponent {
             background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 0.8rem;
-            margin-top: 0.5rem;
-            min-width: 120px;
+            border-radius: 10px;
+            padding: 1rem;
             backdrop-filter: blur(10px);
-            font-size: 0.9rem;
-            line-height: 1.4;
+            font-size: 1rem;
+            line-height: 1.6;
+            min-width: 150px;
         }
 
-        #my-player-name {
+        .player-name {
             font-size: 1.5rem;
             margin-bottom: 1rem;
-            color: #ffd700;
             font-weight: bold;
         }
 
-        #opponent-player-name {
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-            color: #ccc;
-            font-weight: bold;
+        .my-player-name {
+            color: #ffd700;
+        }
+
+        .opponent-player-name {
+            color: #ff6b6b;
+            font-size: 1.3rem;
         }
 
         .game-over-overlay {
@@ -296,27 +321,48 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             border-radius: 15px;
             padding: 15px;
             backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
         }
 
         .control-button {
             background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
             padding: 15px;
-            margin: 5px;
             color: white;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            font-size: 1.2rem;
+            min-width: 50px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .control-button:active {
             background: rgba(255,255,255,0.4);
             transform: scale(0.95);
+            border-color: rgba(255,255,255,0.6);
+        }
+
+        .control-instructions {
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.8);
+            margin-top: 5px;
         }
 
         /* Form Styles */
@@ -345,27 +391,41 @@
         }
 
         /* Responsive Design */
-        @media (max-width: 768px) {
+        @media (max-width: 1200px) {
             .game-container {
-                flex-direction: column;
-                align-items: center;
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
             }
+            
+            .main-board {
+                width: 280px;
+                height: 560px;
+            }
+            
+            .opponent-board {
+                width: 180px;
+                height: 360px;
+            }
+        }
 
-            .opponent-game-area {
-                position: relative;
-                top: auto;
-                right: auto;
-                margin-top: 1rem;
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .game-container {
+                grid-template-columns: 1fr;
+                gap: 1rem;
             }
 
             .main-board {
-                width: 200px;
-                height: 400px;
+                width: 300px;
+                height: 600px;
             }
 
-            .small-board {
-                width: 120px;
-                height: 240px;
+            .opponent-board {
+                width: 200px;
+                height: 400px;
             }
 
             .game-title {
@@ -375,21 +435,55 @@
             .mobile-controls {
                 display: block;
             }
+
+            .stats, .stats-opponent {
+                font-size: 1rem;
+                padding: 1rem;
+            }
         }
 
         @media (max-width: 480px) {
-            .container {
-                padding: 10px;
-            }
-
             .main-board {
-                width: 150px;
-                height: 300px;
+                width: 250px;
+                height: 500px;
             }
 
-            .small-board {
-                width: 100px;
-                height: 200px;
+            .opponent-board {
+                width: 160px;
+                height: 320px;
+            }
+
+            .control-button {
+                padding: 12px;
+                font-size: 1rem;
+                min-width: 45px;
+                min-height: 45px;
+            }
+        }
+
+        /* Instructions */
+        .instructions {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            max-width: 320px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .instructions strong {
+            color: #ffd700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .instructions {
+                display: none;
             }
         }
     </style>
@@ -465,9 +559,9 @@
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-container">
-                <!-- My Board (Main) -->
-                <div class="my-game-area">
-                    <h3 id="my-player-name">ผู้เล่น</h3>
+                <!-- My Board Area -->
+                <div class="player-area">
+                    <h3 id="my-player-name" class="player-name my-player-name">ผู้เล่น</h3>
                     <div id="my-board" class="tetris-board main-board"></div>
                     <div class="stats">
                         คะแนน: <span id="my-score">0</span><br>
@@ -476,11 +570,19 @@
                     </div>
                 </div>
                 
-                <!-- Opponent Board (Small) -->
-                <div class="opponent-game-area">
-                    <h4 id="opponent-player-name">ฝ่ายตรงข้าม</h4>
-                    <div id="opponent-board" class="tetris-board small-board"></div>
-                    <div class="stats-small">
+                <!-- Game Info (Next Piece, etc.) -->
+                <div class="game-info">
+                    <div class="next-piece-container">
+                        <div class="next-piece-title">บล็อคถัดไป</div>
+                        <div id="next-piece-preview" class="next-piece-preview"></div>
+                    </div>
+                </div>
+                
+                <!-- Opponent Board Area -->
+                <div class="player-area">
+                    <h4 id="opponent-player-name" class="player-name opponent-player-name">ฝ่ายตรงข้าม</h4>
+                    <div id="opponent-board" class="tetris-board opponent-board"></div>
+                    <div class="stats-opponent">
                         คะแนน: <span id="opponent-score">0</span><br>
                         แถว: <span id="opponent-lines">0</span><br>
                         เลเวล: <span id="opponent-level">1</span>
@@ -490,15 +592,15 @@
 
             <!-- Mobile Controls -->
             <div class="mobile-controls">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <button class="control-button">↶</button>
-                    <button class="control-button">↑</button>
-                    <button class="control-button">💧</button>
-                    <button class="control-button">←</button>
-                    <button class="control-button">↓</button>
-                    <button class="control-button">→</button>
+                <div class="control-grid">
+                    <button class="control-button" id="btn-rotate">↻</button>
+                    <button class="control-button" id="btn-up">↑</button>
+                    <button class="control-button" id="btn-drop">💧</button>
+                    <button class="control-button" id="btn-left">←</button>
+                    <button class="control-button" id="btn-down">↓</button>
+                    <button class="control-button" id="btn-right">→</button>
                 </div>
-                <div style="text-align: center; margin-top: 10px; font-size: 0.8rem;">
+                <div class="control-instructions">
                     หรือใช้ swipe: ←→ เลื่อน, ↑ หมุน, ↓ ดรอป
                 </div>
             </div>
@@ -526,8 +628,8 @@
     </div>
 
     <!-- Instructions -->
-    <div style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; font-size: 0.8rem; max-width: 300px;">
-        <strong>การควบคุม:</strong><br>
+    <div class="instructions">
+        <strong>การควบคุม:</strong>
         ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
         📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
     </div>
@@ -543,6 +645,85 @@
         document.getElementById('btn-join-room').addEventListener('click', () => {
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('join-room-screen').style.display = 'block';
+        });
+
+        // Mobile control buttons
+        document.getElementById('btn-left').addEventListener('click', () => {
+            // Simulate left arrow key
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
+        });
+
+        document.getElementById('btn-right').addEventListener('click', () => {
+            // Simulate right arrow key
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+        });
+
+        document.getElementById('btn-up').addEventListener('click', () => {
+            // Simulate up arrow key (rotate)
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
+        });
+
+        document.getElementById('btn-down').addEventListener('click', () => {
+            // Simulate down arrow key (soft drop)
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));
+        });
+
+        document.getElementById('btn-rotate').addEventListener('click', () => {
+            // Simulate rotate key
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
+        });
+
+        document.getElementById('btn-drop').addEventListener('click', () => {
+            // Simulate space key (hard drop)
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
+        });
+
+        // Touch/Swipe controls for mobile
+        let touchStartY = 0;
+        let touchStartX = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (!touchStartY || !touchStartX) return;
+
+            let touchEndY = e.changedTouches[0].clientY;
+            let touchEndX = e.changedTouches[0].clientX;
+
+            let deltaY = touchStartY - touchEndY;
+            let deltaX = touchStartX - touchEndX;
+
+            const minSwipeDistance = 30;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (Math.abs(deltaX) > minSwipeDistance) {
+                    if (deltaX > 0) {
+                        // Swipe left
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
+                    } else {
+                        // Swipe right
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(deltaY) > minSwipeDistance) {
+                    if (deltaY > 0) {
+                        // Swipe up (rotate)
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
+                    } else {
+                        // Swipe down (soft drop)
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));
+                    }
+                }
+            }
+
+            touchStartY = 0;
+            touchStartX = 0;
         });
     </script>
 </body>
