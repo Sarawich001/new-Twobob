@@ -13,15 +13,27 @@ const io = socketIo(server, {
     }
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// แก้ไข: Serve static files จาก root directory แทน public folder
+app.use(express.static(__dirname, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        }
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Content-Type', 'text/html');
+        }
+    }
+}));
 
 // Serve main HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Game state management
+// Game state management (ไม่เปลี่ยนแปลง)
 class GameRoom {
     constructor(id) {
         this.id = id;
@@ -134,7 +146,6 @@ class GameRoom {
             } else if (player2.gameOver && !player1.gameOver) {
                 return { winner: 1, scores: { player1: player1.score, player2: player2.score } };
             } else if (player1.gameOver && player2.gameOver) {
-                // Both game over, winner by score
                 const winner = player1.score >= player2.score ? 1 : 2;
                 return { winner: winner, scores: { player1: player1.score, player2: player2.score } };
             }
@@ -165,7 +176,7 @@ class GameRoom {
 
 // Room management
 const rooms = new Map();
-const playerRooms = new Map(); // socketId -> roomId
+const playerRooms = new Map();
 
 // Utility functions
 function generateRoomId() {
@@ -174,7 +185,7 @@ function generateRoomId() {
 
 function cleanupEmptyRooms() {
     const now = Date.now();
-    const ROOM_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    const ROOM_TIMEOUT = 30 * 60 * 1000;
     
     for (const [roomId, room] of rooms.entries()) {
         if (room.isEmpty() && (now - room.createdAt) > ROOM_TIMEOUT) {
@@ -184,14 +195,12 @@ function cleanupEmptyRooms() {
     }
 }
 
-// Clean up empty rooms every 5 minutes
 setInterval(cleanupEmptyRooms, 5 * 60 * 1000);
 
-// Socket.IO connection handling
+// Socket.IO connection handling (ไม่เปลี่ยนแปลง)
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
-    // Create room
     socket.on('createRoom', (data) => {
         try {
             const roomId = generateRoomId();
@@ -208,7 +217,6 @@ io.on('connection', (socket) => {
                     playerId: result.playerId
                 });
 
-                // Send room update
                 io.to(roomId).emit('roomUpdate', {
                     players: room.players,
                     gameStarted: room.gameStarted
@@ -224,7 +232,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Join room
     socket.on('joinRoom', (data) => {
         try {
             const room = rooms.get(data.roomId);
@@ -253,7 +260,6 @@ io.on('connection', (socket) => {
                     playerId: result.playerId
                 });
 
-                // Send room update to all players
                 io.to(data.roomId).emit('roomUpdate', {
                     players: room.players,
                     gameStarted: room.gameStarted
@@ -269,24 +275,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Player ready
     socket.on('playerReady', (data) => {
         try {
             const room = rooms.get(data.roomId);
             if (!room) return;
 
             if (room.setPlayerReady(socket.id)) {
-                // Send updated room status
                 io.to(data.roomId).emit('roomUpdate', {
                     players: room.players,
                     gameStarted: room.gameStarted
                 });
 
-                // Start game if both players are ready
                 if (room.canStartGame()) {
                     room.startGame();
                     
-                    // Send game start event to all players
                     room.players.forEach(player => {
                         io.to(player.socketId).emit('gameStart', {
                             playerId: player.id,
@@ -302,13 +304,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Game update
     socket.on('gameUpdate', (data) => {
         try {
             const room = rooms.get(data.roomId);
             if (!room || !room.gameStarted) return;
 
-            // Update room game state
             room.updatePlayerBoard(data.playerId, {
                 board: data.board,
                 score: data.score,
@@ -316,7 +316,6 @@ io.on('connection', (socket) => {
                 level: data.level
             });
 
-            // Send update to opponent
             const opponent = room.players.find(p => p.id !== data.playerId);
             if (opponent) {
                 io.to(opponent.socketId).emit('gameUpdate', {
@@ -332,7 +331,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Game over
     socket.on('gameOver', (data) => {
         try {
             const room = rooms.get(data.roomId);
@@ -340,10 +338,8 @@ io.on('connection', (socket) => {
 
             room.setPlayerGameOver(data.playerId, data.score);
             
-            // Check if game should end
             const gameResult = room.getWinner();
             if (gameResult) {
-                // Send game over to all players
                 io.to(data.roomId).emit('gameOver', gameResult);
                 console.log(`Game ended in room: ${data.roomId}, Winner: Player ${gameResult.winner}`);
             }
@@ -352,7 +348,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Play again
     socket.on('playAgain', (data) => {
         try {
             const room = rooms.get(data.roomId);
@@ -360,7 +355,6 @@ io.on('connection', (socket) => {
 
             room.resetForNewGame();
             
-            // Send room update
             io.to(data.roomId).emit('roomUpdate', {
                 players: room.players,
                 gameStarted: room.gameStarted
@@ -372,7 +366,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Leave room
     socket.on('leaveRoom', (data) => {
         try {
             handlePlayerDisconnect(socket.id);
@@ -381,7 +374,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle disconnect
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
         handlePlayerDisconnect(socket.id);
@@ -395,14 +387,11 @@ io.on('connection', (socket) => {
                 room.removePlayer(socketId);
                 
                 if (room.isEmpty()) {
-                    // Delete empty room immediately
                     rooms.delete(roomId);
                     console.log(`Deleted empty room: ${roomId}`);
                 } else {
-                    // Notify remaining players
                     io.to(roomId).emit('playerLeft');
                     
-                    // Update room status
                     io.to(roomId).emit('roomUpdate', {
                         players: room.players,
                         gameStarted: room.gameStarted
@@ -414,7 +403,7 @@ io.on('connection', (socket) => {
     }
 });
 
-// Health check endpoint for Render
+// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
