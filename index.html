@@ -222,6 +222,13 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    // In your main HTML file:
+<script src="game-class.js"></script>
+<script>
+    // Initialize game when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        window.tetrisGame = new TetrisMultiplayer();
+    });
+</script>
 </body>
 </html>
