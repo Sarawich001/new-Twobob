@@ -121,6 +121,95 @@
             background: linear-gradient(45deg, #ffb84d, #ff8533);
         }
 
+        /* Controls Accordion */
+        .controls-accordion {
+            max-width: 300px;
+            margin: 1rem auto;
+        }
+
+        .controls-toggle {
+            background: linear-gradient(45deg, #8a2be2, #4b0082);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .controls-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #9932cc, #6a0dad);
+        }
+
+        .controls-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            background: rgba(138, 43, 226, 0.1);
+            border-radius: 15px;
+            margin-top: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls-content.expanded {
+            max-height: 300px;
+            padding: 20px;
+            border: 2px solid rgba(138, 43, 226, 0.3);
+        }
+
+        .controls-section {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+
+        .controls-title {
+            color: #8a2be2;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .controls-list {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .control-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+
+        .control-key {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.rotated {
+            transform: rotate(180deg);
+        }
+
         /* Waiting Screen */
         .room-info {
             background: rgba(255,255,255,0.1);
@@ -511,36 +600,6 @@
                 gap: 0.5rem;
             }
         }
-
-        /* Instructions */
-        .instructions {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.8);
-            padding: 15px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            max-width: 320px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .instructions strong {
-            color: #ffd700;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        @media (max-width: 900px) {
-            .instructions {
-                display: none;
-            }
-            
-            body {
-                overflow-y: auto;
-            }
-        }
     </style>
 </head>
 <body>
@@ -555,6 +614,50 @@
                 <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
                 <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
                 <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
+            </div>
+            
+            <!-- Controls Accordion -->
+            <div class="controls-accordion">
+                <button id="controls-toggle" class="controls-toggle">
+                    🎮 วิธีเล่น
+                    <span id="toggle-icon" class="toggle-icon">▼</span>
+                </button>
+                <div id="controls-content" class="controls-content">
+                    <div class="controls-section">
+                        <div class="controls-title">
+                            💻 คอมพิวเตอร์
+                        </div>
+                        <div class="controls-list">
+                            <div class="control-item">
+                                <span>เลื่อนซ้าย-ขวา</span>
+                                <span class="control-key">← →</span>
+                            </div>
+                            <div class="control-item">
+                                <span>หมุนชิ้นส่วน</span>
+                                <span class="control-key">↑</span>
+                            </div>
+                            <div class="control-item">
+                                <span>เร่งความเร็ว</span>
+                                <span class="control-key">↓</span>
+                            </div>
+                            <div class="control-item">
+                                <span>ดรอปทันที</span>
+                                <span class="control-key">Space</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="controls-section">
+                        <div class="controls-title">
+                            📱 มือถือ
+                        </div>
+                        <div class="controls-list">
+                            <div style="margin-bottom: 8px;">• ใช้ปุ่มควบคุมด้านล่าง</div>
+                            <div style="margin-bottom: 8px;">• Swipe ซ้าย-ขวา: เลื่อน</div>
+                            <div style="margin-bottom: 8px;">• Swipe ขึ้น: หมุน</div>
+                            <div>• Swipe ลง: ดรอป</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -713,89 +816,402 @@
         </div>
     </div>
 
-    <!-- Instructions -->
-    <div class="instructions">
-        <strong>การควบคุม:</strong>
-        ←→ เลื่อน | ↑ หมุน | ↓ เร่ง | Space ดรอป<br>
-        📱 มือถือ: ใช้ swipe หรือปุ่มด้านล่าง
-    </div>
-
     <script>
-        // Show create room screen
-        document.getElementById('btn-create-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('create-room-screen').style.display = 'block';
-        });
-
-        // Show join room screen  
-        document.getElementById('btn-join-room').addEventListener('click', () => {
-            document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('join-room-screen').style.display = 'block';
-        });
-
-        // Mobile control buttons
-        document.getElementById('btn-left').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
-        });
-
-        document.getElementById('btn-right').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
-        });
-
-        document.getElementById('btn-rotate').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
-        });
-
-        document.getElementById('btn-drop').addEventListener('click', () => {
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
-        });
-
-        // Touch/Swipe controls for mobile
-        let touchStartY = 0;
-        let touchStartX = 0;
-
-        document.addEventListener('touchstart', (e) => {
-            touchStartY = e.touches[0].clientY;
-            touchStartX = e.touches[0].clientX;
-        });
-
-        document.addEventListener('touchend', (e) => {
-            if (!touchStartY || !touchStartX) return;
-
-            let touchEndY = e.changedTouches[0].clientY;
-            let touchEndX = e.changedTouches[0].clientX;
-
-            let deltaY = touchStartY - touchEndY;
-            let deltaX = touchStartX - touchEndX;
-
-            const minSwipeDistance = 30;
-
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                // Horizontal swipe
-                if (Math.abs(deltaX) > minSwipeDistance) {
-                    if (deltaX > 0) {
-                        // Swipe left
-                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
-                    } else {
-                        // Swipe right
-                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
-                    }
-                }
+        // Controls Accordion Toggle
+        document.getElementById('controls-toggle').addEventListener('click', () => {
+            const content = document.getElementById('controls-content');
+            const icon =document.getElementById('toggle-icon');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.classList.remove('rotated');
             } else {
-                // Vertical swipe
-                if (Math.abs(deltaY) > minSwipeDistance) {
-                    if (deltaY > 0) {
-                        // Swipe up (rotate)
-                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
-                    } else {
-                        // Swipe down (hard drop)
-                        document.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
-                    }
+                content.classList.add('expanded');
+                icon.classList.add('rotated');
+            }
+        });
+
+        // Global variables
+        let socket;
+        let gameState = {
+            currentPlayer: null,
+            room: null,
+            isReady: false,
+            inGame: false
+        };
+
+        // Initialize socket connection
+        function initSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                document.getElementById('connection-status').className = 'connection-status connected';
+                document.getElementById('connection-status').innerHTML = '🟢 เชื่อมต่อแล้ว';
+                enableButtons();
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+                document.getElementById('connection-status').className = 'connection-status disconnected';
+                document.getElementById('connection-status').innerHTML = '🔴 ไม่ได้เชื่อมต่อ';
+                disableButtons();
+                showScreen('connection-screen');
+            });
+
+            // Room events
+            socket.on('room-created', (data) => {
+                gameState.room = data.roomId;
+                gameState.currentPlayer = data.player;
+                showScreen('waiting-screen');
+                updateRoomDisplay();
+            });
+
+            socket.on('room-joined', (data) => {
+                gameState.room = data.roomId;
+                gameState.currentPlayer = data.player;
+                showScreen('waiting-screen');
+                updateRoomDisplay();
+            });
+
+            socket.on('room-full', () => {
+                alert('ห้องเต็มแล้ว!');
+                showScreen('menu-screen');
+            });
+
+            socket.on('room-not-found', () => {
+                alert('ไม่พบห้องดังกล่าว!');
+                showScreen('menu-screen');
+            });
+
+            socket.on('players-updated', (players) => {
+                updatePlayersList(players);
+            });
+
+            socket.on('player-ready', (data) => {
+                updateReadyStatus(data);
+            });
+
+            socket.on('game-start', (data) => {
+                gameState.inGame = true;
+                showScreen('game-screen');
+                initGame(data);
+            });
+
+            socket.on('game-state', (data) => {
+                updateGameDisplay(data);
+            });
+
+            socket.on('game-over', (data) => {
+                gameState.inGame = false;
+                showGameOver(data);
+            });
+
+            socket.on('error', (message) => {
+                alert('Error: ' + message);
+            });
+        }
+
+        // Screen management
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.style.display = 'none';
+            });
+            document.getElementById(screenId).style.display = 'block';
+        }
+
+        // Button states
+        function enableButtons() {
+            document.getElementById('btn-create-room').disabled = false;
+            document.getElementById('btn-join-room').disabled = false;
+        }
+
+        function disableButtons() {
+            document.getElementById('btn-create-room').disabled = true;
+            document.getElementById('btn-join-room').disabled = true;
+        }
+
+        // Room management
+        function updateRoomDisplay() {
+            document.getElementById('room-id-display').textContent = gameState.room;
+        }
+
+        function updatePlayersList(players) {
+            const playersList = document.getElementById('players-list');
+            playersList.innerHTML = '';
+            
+            players.forEach((player, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${player.name} ${player.ready ? '✅' : '⏳'}`;
+                if (player.id === gameState.currentPlayer.id) {
+                    li.classList.add('current-player');
+                }
+                playersList.appendChild(li);
+            });
+
+            // Enable ready button if we have a name
+            const readyBtn = document.getElementById('btn-ready');
+            readyBtn.disabled = false;
+        }
+
+        function updateReadyStatus(data) {
+            const indicator1 = document.getElementById('ready-indicator-1');
+            const indicator2 = document.getElementById('ready-indicator-2');
+            
+            if (data.player1) {
+                indicator1.textContent = `${data.player1.name}: ${data.player1.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
+            }
+            if (data.player2) {
+                indicator2.textContent = `${data.player2.name}: ${data.player2.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
+            }
+        }
+
+        // Game functions
+        function initGame(gameData) {
+            // Initialize game boards
+            initGameBoard('my-board', 20, 10);
+            initGameBoard('opponent-board', 20, 10);
+            
+            // Set player names
+            document.getElementById('my-player-name').textContent = gameState.currentPlayer.name;
+            document.getElementById('opponent-player-name').textContent = 'กำลังรอ...';
+            
+            // Reset scores
+            document.getElementById('my-score').textContent = '0';
+            document.getElementById('my-lines').textContent = '0';
+            document.getElementById('my-level').textContent = '1';
+            document.getElementById('opponent-score').textContent = '0';
+            document.getElementById('opponent-lines').textContent = '0';
+            document.getElementById('opponent-level').textContent = '1';
+
+            // Initialize game controls
+            initGameControls();
+        }
+
+        function initGameBoard(boardId, rows, cols) {
+            const board = document.getElementById(boardId);
+            board.innerHTML = '';
+            board.style.position = 'relative';
+            
+            // Create grid background
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'tetris-block';
+                    cell.style.width = (boardId === 'my-board' ? '32px' : '16px');
+                    cell.style.height = (boardId === 'my-board' ? '32px' : '16px');
+                    cell.style.left = (c * (boardId === 'my-board' ? 32 : 16)) + 'px';
+                    cell.style.top = (r * (boardId === 'my-board' ? 32 : 16)) + 'px';
+                    cell.style.background = 'rgba(255,255,255,0.05)';
+                    cell.style.border = '1px solid rgba(255,255,255,0.1)';
+                    board.appendChild(cell);
                 }
             }
+        }
 
-            touchStartY = 0;
-            touchStartX = 0;
+        function initGameControls() {
+            // Keyboard controls
+            document.addEventListener('keydown', handleKeyPress);
+            
+            // Mobile controls
+            document.getElementById('btn-left').addEventListener('click', () => sendGameInput('left'));
+            document.getElementById('btn-right').addEventListener('click', () => sendGameInput('right'));
+            document.getElementById('btn-rotate').addEventListener('click', () => sendGameInput('rotate'));
+            document.getElementById('btn-drop').addEventListener('click', () => sendGameInput('drop'));
+            
+            // Touch controls for swipe
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
+            document.getElementById('my-board').addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+            
+            document.getElementById('my-board').addEventListener('touchend', (e) => {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX > 30) sendGameInput('right');
+                    else if (deltaX < -30) sendGameInput('left');
+                } else {
+                    if (deltaY > 30) sendGameInput('drop');
+                    else if (deltaY < -30) sendGameInput('rotate');
+                }
+            });
+        }
+
+        function handleKeyPress(event) {
+            if (!gameState.inGame) return;
+            
+            switch(event.key) {
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    sendGameInput('left');
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    sendGameInput('right');
+                    break;
+                case 'ArrowUp':
+                    event.preventDefault();
+                    sendGameInput('rotate');
+                    break;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    sendGameInput('down');
+                    break;
+                case ' ':
+                    event.preventDefault();
+                    sendGameInput('drop');
+                    break;
+            }
+        }
+
+        function sendGameInput(action) {
+            if (socket && gameState.inGame) {
+                socket.emit('game-input', { action: action });
+            }
+        }
+
+        function updateGameDisplay(gameData) {
+            // Update scores and stats
+            if (gameData.players) {
+                const myData = gameData.players[gameState.currentPlayer.id];
+                const opponentData = Object.values(gameData.players).find(p => p.id !== gameState.currentPlayer.id);
+                
+                if (myData) {
+                    document.getElementById('my-score').textContent = myData.score || 0;
+                    document.getElementById('my-lines').textContent = myData.lines || 0;
+                    document.getElementById('my-level').textContent = myData.level || 1;
+                }
+                
+                if (opponentData) {
+                    document.getElementById('opponent-player-name').textContent = opponentData.name;
+                    document.getElementById('opponent-score').textContent = opponentData.score || 0;
+                    document.getElementById('opponent-lines').textContent = opponentData.lines || 0;
+                    document.getElementById('opponent-level').textContent = opponentData.level || 1;
+                }
+            }
+            
+            // Update game boards if board data is provided
+            if (gameData.boards) {
+                updateBoard('my-board', gameData.boards[gameState.currentPlayer.id]);
+                const opponentId = Object.keys(gameData.boards).find(id => id !== gameState.currentPlayer.id);
+                if (opponentId) {
+                    updateBoard('opponent-board', gameData.boards[opponentId]);
+                }
+            }
+        }
+
+        function updateBoard(boardId, boardData) {
+            if (!boardData) return;
+            
+            const board = document.getElementById(boardId);
+            const blocks = board.querySelectorAll('.tetris-block');
+            const cellSize = boardId === 'my-board' ? 32 : 16;
+            
+            // Clear existing pieces
+            blocks.forEach(block => {
+                if (!block.classList.contains('grid-cell')) {
+                    block.remove();
+                }
+            });
+            
+            // Draw board state
+            if (boardData.grid) {
+                boardData.grid.forEach((row, r) => {
+                    row.forEach((cell, c) => {
+                        if (cell) {
+                            const block = document.createElement('div');
+                            block.className = `tetris-block block-${cell}`;
+                            block.style.width = cellSize + 'px';
+                            block.style.height = cellSize + 'px';
+                            block.style.left = (c * cellSize) + 'px';
+                            block.style.top = (r * cellSize) + 'px';
+                            board.appendChild(block);
+                        }
+                    });
+                });
+            }
+        }
+
+        function showGameOver(data) {
+            const winnerMessage = document.getElementById('winner-message');
+            const finalScoreP1 = document.getElementById('final-score-p1');
+            const finalScoreP2 = document.getElementById('final-score-p2');
+            
+            if (data.winner === gameState.currentPlayer.id) {
+                winnerMessage.textContent = '🎉 คุณชนะ!';
+                winnerMessage.style.color = '#4CAF50';
+            } else {
+                winnerMessage.textContent = '😢 คุณแพ้!';
+                winnerMessage.style.color = '#f44336';
+            }
+            
+            if (data.finalScores) {
+                const scores = Object.values(data.finalScores);
+                finalScoreP1.textContent = scores[0] || 0;
+                finalScoreP2.textContent = scores[1] || 0;
+            }
+            
+            showScreen('game-over-screen');
+        }
+
+        // Event listeners
+        document.getElementById('btn-create-room').addEventListener('click', () => {
+            showScreen('create-room-screen');
+        });
+
+        document.getElementById('btn-join-room').addEventListener('click', () => {
+            showScreen('join-room-screen');
+        });
+
+        document.getElementById('btn-confirm-create').addEventListener('click', () => {
+            const playerName = document.getElementById('create-player-name').value.trim();
+            if (!playerName) {
+                alert('กรุณากรอกชื่อผู้เล่น');
+                return;
+            }
+            socket.emit('create-room', { playerName: playerName });
+        });
+
+        document.getElementById('btn-confirm-join').addEventListener('click', () => {
+            const playerName = document.getElementById('join-player-name').value.trim();
+            const roomId = document.getElementById('join-room-id').value.trim();
+            if (!playerName || !roomId) {
+                alert('กรุณากรอกชื่อผู้เล่นและรหัสห้อง');
+                return;
+            }
+            socket.emit('join-room', { playerName: playerName, roomId: roomId });
+        });
+
+        document.getElementById('btn-ready').addEventListener('click', () => {
+            gameState.isReady = !gameState.isReady;
+            socket.emit('player-ready', { ready: gameState.isReady });
+            document.getElementById('btn-ready').textContent = gameState.isReady ? '⏳ ยกเลิกพร้อม' : '🎮 พร้อมเล่น';
+        });
+
+        document.getElementById('btn-leave-room').addEventListener('click', () => {
+            socket.emit('leave-room');
+            gameState.room = null;
+            gameState.currentPlayer = null;
+            gameState.isReady = false;
+            showScreen('menu-screen');
+        });
+
+        document.getElementById('btn-play-again').addEventListener('click', () => {
+            socket.emit('play-again');
+            showScreen('waiting-screen');
+        });
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initSocket();
+            showScreen('menu-screen');
         });
     </script>
 </body>
