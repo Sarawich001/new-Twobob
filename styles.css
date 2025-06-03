@@ -1,6 +1,6 @@
 /* =========================================
-   UNIFIED TETRIS GAME CSS
-   Combined and optimized styles
+   RESPONSIVE TETRIS GAME CSS - FIXED VERSION
+   กระดานที่พอดีกับทุกหน้าจอ
    ========================================= */
 
 /* =================================
@@ -30,7 +30,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: clamp(10px, 2vw, 20px);
+    padding: clamp(5px, 1vw, 15px);
 }
 
 .screen {
@@ -38,7 +38,7 @@ body {
     text-align: center;
     animation: fadeIn 0.5s ease-in;
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
@@ -132,6 +132,7 @@ body {
     display: inline-block;
     width: 100%;
     text-align: center;
+    min-height: 44px;
 }
 
 .btn:hover {
@@ -180,6 +181,7 @@ body {
     gap: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    min-height: 44px;
 }
 
 .controls-toggle:hover {
@@ -294,7 +296,7 @@ body {
 }
 
 /* =================================
-   GAME SCREEN LAYOUT
+   GAME SCREEN LAYOUT - ปรับใหม่หมด
    ================================= */
 
 .game-container {
@@ -303,7 +305,7 @@ body {
     align-items: center;
     min-height: 100vh;
     width: 100%;
-    padding: 10px;
+    padding: clamp(5px, 1vw, 10px);
     box-sizing: border-box;
 }
 
@@ -312,22 +314,24 @@ body {
     width: 100%;
     max-width: 1400px;
     height: 100vh;
-    gap: 20px;
-    align-items: center;
+    gap: clamp(10px, 2vw, 30px);
+    align-items: stretch;
     justify-content: center;
+    padding: clamp(5px, 1vw, 15px);
 }
 
 /* =================================
-   PANEL STYLES (UNIFIED)
+   PANEL STYLES - ปรับให้ responsive ดีขึ้น
    ================================= */
 
 .player-info, .left-panel, .right-panel {
     flex: 0 0 auto;
-    min-width: 200px;
-    max-width: 280px;
+    width: clamp(160px, 18vw, 250px);
     display: flex;
     flex-direction: column;
-    gap: clamp(0.8rem, 2vw, 1.5rem);
+    gap: clamp(8px, 1.5vw, 15px);
+    max-height: 100vh;
+    overflow-y: auto;
 }
 
 /* Game Info Cards */
@@ -336,38 +340,38 @@ body {
 .stats-card, 
 .opponent-stats-card, 
 .next-piece-container {
-    padding: clamp(15px, 3vw, 18px);
+    padding: clamp(8px, 2vw, 15px);
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 15px;
+    border-radius: 10px;
     backdrop-filter: blur(10px);
     text-align: center;
     width: 100%;
-    font-size: clamp(0.85rem, 2vw, 1rem);
+    font-size: clamp(0.7rem, 1.8vw, 1rem);
+    min-height: fit-content;
 }
 
 .player-info-card, .stats-card {
     background: rgba(0, 255, 255, 0.1);
     border: 2px solid #00ffff;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
 }
 
 .opponent-info-card, .opponent-stats-card {
     background: rgba(255, 107, 107, 0.1);
     border: 2px solid #ff6b6b;
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.2);
 }
 
 .next-piece-container {
     background: rgba(138, 43, 226, 0.2);
     border: 2px solid #8a2be2;
-    box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
-    margin: 15px 0;
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.2);
 }
 
 .player-label, .opponent-label, .next-piece-title {
     font-weight: bold;
-    margin-bottom: 0.5rem;
-    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    margin-bottom: 0.3rem;
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
 }
 
 .player-label {
@@ -384,73 +388,76 @@ body {
 
 .player-name-display {
     color: white;
-    font-size: clamp(1rem, 2.5vw, 1.4rem);
+    font-size: clamp(0.9rem, 2vw, 1.2rem);
     font-weight: bold;
 }
 
 #next-piece-preview, .next-piece-preview {
-    width: clamp(60px, 15vw, 120px);
-    height: clamp(60px, 15vw, 120px);
+    width: clamp(50px, 12vw, 80px);
+    height: clamp(50px, 12vw, 80px);
     background: rgba(0,0,0,0.8);
     border: 2px solid #333;
-    border-radius: 10px;
+    border-radius: 8px;
     margin: 0 auto;
     position: relative;
 }
 
 /* =================================
-   GAME BOARDS LAYOUT
+   GAME BOARDS LAYOUT - ใหม่หมด
    ================================= */
 
 .boards-container {
     display: flex;
-    gap: 30px;
+    flex-direction: column;
+    gap: clamp(15px, 3vw, 25px);
     align-items: center;
     justify-content: center;
     flex: 1;
+    min-width: 0;
+    height: 100%;
 }
 
 .main-player-area {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(0.8rem, 2vw, 1.2rem);
+    gap: clamp(8px, 1.5vw, 12px);
     width: 100%;
+    flex: 1;
+    justify-content: center;
 }
 
 /* =================================
-   TETRIS BOARD STYLES
+   TETRIS BOARD STYLES - ปรับขนาดใหม่
    ================================= */
 
 .tetris-board, .responsive-board {
     background: rgba(0,0,0,0.9);
     border: 3px solid;
-    border-radius: 15px;
+    border-radius: 12px;
     overflow: hidden;
     position: relative;
     transition: all 0.3s ease;
 }
 
+/* กระดานหลัก - คำนวณขนาดใหม่ */
 .main-board {
-    --cell-size: clamp(16px, 3.5vw, 24px);
-    width: calc(var(--cell-size) * 10);
-    height: calc(var(--cell-size) * 20);
-    min-width: 160px;
-    max-width: 240px;
-    aspect-ratio: 1/2;
+    --board-width: min(40vw, 60vh, 300px);
+    --cell-size: calc(var(--board-width) / 10);
+    width: var(--board-width);
+    height: calc(var(--board-width) * 2);
     border-color: #00ffff;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
 }
 
+/* กระดานฝ่ายตรงข้าม */
 .opponent-board {
-    --cell-size: clamp(8px, 1.8vw, 12px);
-    width: calc(var(--cell-size) * 10);
-    height: calc(var(--cell-size) * 20);
-    min-width: 80px;
-    max-width: 120px;
-    aspect-ratio: 1/2;
+    --board-width: min(25vw, 35vh, 180px);
+    --cell-size: calc(var(--board-width) / 10);
+    width: var(--board-width);
+    height: calc(var(--board-width) * 2);
     border-color: #ff6b6b;
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
     opacity: 0.9;
 }
 
@@ -499,7 +506,7 @@ body {
 }
 
 .game-over-text {
-    font-size: clamp(1.2rem, 4vw, 2rem);
+    font-size: clamp(1rem, 3vw, 1.8rem);
     font-weight: bold;
     color: #ff6b6b;
     text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
@@ -537,44 +544,45 @@ body {
 }
 
 /* =================================
-   MOBILE CONTROLS
+   MOBILE CONTROLS - ปรับใหม่
    ================================= */
 
 .mobile-controls {
     display: none;
     position: fixed;
-    bottom: 20px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0,0,0,0.9);
     border-radius: 15px;
-    padding: clamp(12px, 3vw, 18px);
+    padding: clamp(8px, 2vw, 15px);
     backdrop-filter: blur(10px);
     z-index: 100;
-    width: clamp(280px, 85vw, 400px);
+    width: clamp(250px, 80vw, 350px);
 }
 
 .control-buttons, .control-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: clamp(8px, 2vw, 12px);
-    margin-bottom: 10px;
+    gap: clamp(6px, 1.5vw, 10px);
+    margin-bottom: 8px;
 }
 
 .control-btn, .control-button {
     background: rgba(255,255,255,0.2);
     border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 12px;
-    padding: clamp(8px, 2.5vw, 15px);
+    border-radius: 10px;
+    padding: clamp(8px, 2vw, 12px);
     color: white;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: clamp(0.8rem, 2.5vw, 1rem);
+    font-size: clamp(0.7rem, 2vw, 0.9rem);
     aspect-ratio: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 40px;
 }
 
 .control-btn:hover, .control-button:hover {
@@ -590,9 +598,9 @@ body {
 
 .control-instructions {
     text-align: center;
-    font-size: clamp(0.7rem, 2vw, 0.9rem);
+    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
     color: rgba(255,255,255,0.8);
-    margin-top: 8px;
+    margin-top: 5px;
 }
 
 /* =================================
@@ -625,105 +633,85 @@ body {
 }
 
 /* =================================
-   RESPONSIVE BREAKPOINTS
+   RESPONSIVE BREAKPOINTS - ปรับใหม่หมด
    ================================= */
 
-/* Large Desktop */
+/* Desktop - 1200px+ */
 @media (min-width: 1200px) {
     .game-screen {
         gap: 40px;
     }
+    
     .player-info, .left-panel, .right-panel {
-        min-width: 250px;
-        padding: 20px;
+        width: 280px;
     }
-    .boards-container {
-        gap: 50px;
+    
+    .main-board {
+        --board-width: min(35vw, 450px);
+    }
+    
+    .opponent-board {
+        --board-width: min(20vw, 250px);
     }
 }
 
-/* Desktop/Laptop */
+/* Laptop - 992px to 1199px */
 @media (max-width: 1199px) and (min-width: 992px) {
     .game-screen {
         gap: 25px;
     }
+    
     .player-info, .left-panel, .right-panel {
-        min-width: 220px;
-        font-size: 14px;
+        width: clamp(180px, 20vw, 220px);
     }
-    .boards-container {
-        gap: 35px;
+    
+    .main-board {
+        --board-width: min(40vw, 350px);
+    }
+    
+    .opponent-board {
+        --board-width: min(25vw, 200px);
     }
 }
 
-/* Tablet Landscape */
+/* Tablet Landscape - 768px to 991px */
 @media (max-width: 991px) and (min-width: 768px) {
     .game-screen {
         flex-direction: column;
         gap: 15px;
-        padding: 10px;
-    }
-    
-    .player-info, .left-panel, .right-panel {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-around;
-        min-width: auto;
-        width: 100%;
-        max-width: 600px;
-        flex-wrap: wrap;
-    }
-    
-    .player-info > *, .left-panel > *, .right-panel > * {
-        flex: 1;
-        min-width: clamp(120px, 30vw, 180px);
-    }
-    
-    .boards-container {
-        gap: 25px;
-    }
-    
-    .mobile-controls {
-        display: block;
-    }
-}
-
-/* Tablet Portrait */
-@media (max-width: 767px) and (min-width: 576px) {
-    .game-screen {
-        flex-direction: column;
-        gap: 10px;
-        padding: 5px;
         height: auto;
-        min-height: calc(100vh - 80px);
-        padding-bottom: 100px;
+        min-height: 100vh;
+        padding-bottom: 80px;
     }
     
     .player-info, .left-panel, .right-panel {
-        display: flex;
         flex-direction: row;
+        width: 100%;
+        max-width: 100%;
+        justify-content: space-around;
         flex-wrap: wrap;
-        justify-content: center;
-        font-size: 12px;
-        padding: 10px;
-        min-height: auto;
-        max-width: none;
+        gap: 10px;
     }
     
     .player-info > *, .left-panel > *, .right-panel > * {
         flex: 1;
-        min-width: clamp(120px, 30vw, 180px);
-        text-align: center;
+        min-width: 150px;
+        max-width: 200px;
     }
     
     .boards-container {
-        flex-direction: column;
-        gap: 15px;
+        flex-direction: row;
+        gap: 20px;
+        justify-content: center;
         align-items: center;
     }
     
+    .main-board {
+        --board-width: min(45vw, 280px);
+    }
+    
     .opponent-board {
-        order: -1;
+        --board-width: min(30vw, 180px);
     }
     
     .mobile-controls {
@@ -732,48 +720,40 @@ body {
         bottom: auto;
         left: auto;
         transform: none;
-        margin-top: 10px;
+        margin-top: 15px;
     }
 }
 
-/* Mobile */
-@media (max-width: 575px) {
-    .game-container {
-        padding: 5px;
-    }
-    
+/* Tablet Portrait - 576px to 767px */
+@media (max-width: 767px) and (min-width: 576px) {
     .game-screen {
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
         height: auto;
         min-height: 100vh;
+        padding: 5px;
+        padding-bottom: 100px;
     }
     
     .player-info, .left-panel, .right-panel {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        font-size: 11px;
-        padding: 8px;
-        min-height: auto;
         flex-direction: row;
+        flex-wrap: wrap;
         justify-content: center;
-        max-width: none;
+        gap: 8px;
+        padding: 5px;
     }
     
     .player-info > *, .left-panel > *, .right-panel > * {
         flex: 1;
         min-width: 120px;
-        text-align: center;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 5px;
-        padding: 5px;
+        max-width: 160px;
+        font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+        padding: 8px;
     }
     
     .boards-container {
         flex-direction: column;
-        gap: 10px;
-        width: 100%;
+        gap: 15px;
         align-items: center;
     }
     
@@ -781,14 +761,76 @@ body {
         order: -1;
     }
     
-    .next-piece-container {
-        margin: 5px 0;
-        padding: 5px;
+    .main-board {
+        --board-width: min(70vw, 300px);
+    }
+    
+    .opponent-board {
+        --board-width: min(50vw, 200px);
     }
     
     .mobile-controls {
         display: block;
-        position: sticky;
+        position: fixed;
+        bottom: 5px;
+        width: 95vw;
+    }
+}
+
+/* Mobile - 320px to 575px */
+@media (max-width: 575px) {
+    .game-container {
+        padding: 2px;
+    }
+    
+    .game-screen {
+        flex-direction: column;
+        gap: 5px;
+        height: auto;
+        min-height: 100vh;
+        padding: 3px;
+        padding-bottom: 80px;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 5px;
+        padding: 3px;
+        justify-content: center;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        flex: 1;
+        min-width: 100px;
+        max-width: 140px;
+        font-size: clamp(0.5rem, 1.2vw, 0.7rem);
+        padding: 5px;
+    }
+    
+    .boards-container {
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .opponent-board {
+        order: -1;
+    }
+    
+    .main-board {
+        --board-width: min(85vw, 280px);
+    }
+    
+    .opponent-board {
+        --board-width: min(60vw, 180px);
+    }
+    
+    .mobile-controls {
+        display: block;
+        position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
@@ -796,78 +838,40 @@ body {
         border-radius: 0;
         border-top-left-radius: 15px;
         border-top-right-radius: 15px;
-        margin: 0;
         width: 100%;
+        padding: 8px;
     }
     
     .control-buttons, .control-grid {
-        max-width: 100%;
-        justify-content: center;
-    }
-    
-    .control-btn, .control-button {
-        width: 45px;
-        height: 45px;
-        font-size: 14px;
-    }
-    
-    .main-board {
-        --cell-size: clamp(14px, 4vw, 20px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 140px;
-        max-width: 200px;
-    }
-    
-    .opponent-board {
-        --cell-size: clamp(7px, 2vw, 10px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 70px;
-        max-width: 100px;
-    }
-}
-
-/* Very Small Mobile */
-@media (max-width: 380px) {
-    .player-info, .left-panel, .right-panel {
-        flex-direction: column;
+        grid-template-columns: repeat(4, 1fr);
         gap: 5px;
     }
     
-    .player-info > *, .left-panel > *, .right-panel > * {
-        min-width: auto;
-        font-size: 10px;
-    }
-    
     .control-btn, .control-button {
-        width: 40px;
-        height: 40px;
-        font-size: 12px;
-    }
-    
-    .game-title {
-        font-size: clamp(1.5rem, 8vw, 2.5rem);
-    }
-    
-    .btn, .controls-toggle {
-        font-size: clamp(0.9rem, 3vw, 1rem);
-        padding: clamp(10px, 3vw, 14px) clamp(16px, 4vw, 24px);
+        min-height: 35px;
+        font-size: 0.7rem;
+        padding: 5px;
     }
 }
 
-/* Ultra Small Mobile */
+/* Very Small Mobile - 320px and below */
 @media (max-width: 320px) {
     .main-board {
-        --cell-size: 12px;
-        width: 120px;
-        height: 240px;
+        --board-width: min(90vw, 250px);
     }
     
     .opponent-board {
-        --cell-size: 6px;
-        width: 60px;
-        height: 120px;
+        --board-width: min(65vw, 150px);
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        min-width: 90px;
+        font-size: 0.5rem;
+    }
+    
+    .control-btn, .control-button {
+        min-height: 30px;
+        font-size: 0.6rem;
     }
 }
 
@@ -876,201 +880,70 @@ body {
     .game-screen {
         flex-direction: row;
         height: 100vh;
+        padding: 2px;
     }
     
     .player-info, .left-panel, .right-panel {
         flex-direction: column;
-        width: 150px;
-        font-size: 10px;
-        padding: 5px;
-        max-width: 150px;
+        width: clamp(120px, 18vw, 160px);
+        font-size: 0.6rem;
+        padding: 2px;
+        gap: 3px;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        padding: 3px;
+        min-width: auto;
     }
     
     .boards-container {
         flex-direction: row;
-        gap: 15px;
+        gap: 10px;
         flex: 1;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .main-board {
+        --board-width: min(35vh, 200px);
+    }
+    
+    .opponent-board {
+        --board-width: min(25vh, 140px);
     }
     
     .mobile-controls {
         position: fixed;
-        bottom: 10px;
-        right: 10px;
+        bottom: 5px;
+        right: 5px;
         left: auto;
         transform: none;
         width: auto;
+        max-width: 200px;
     }
     
     .control-buttons, .control-grid {
-        grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: 1fr;
-        max-width: 220px;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
     }
-    
-    .main-board {
-        --cell-size: clamp(10px, 2.5vw, 14px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 100px;
-        max-width: 140px;
-    }
-    
-    .opponent-board {
-        --cell-size: clamp(5px, 1.2vw, 7px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 50px;
-        max-width: 70px;
-    }
-}
-
-/* =================================
-   HIGH DPI & ACCESSIBILITY
+   /* =================================
+   LOADING SCREEN & ANIMATIONS
    ================================= */
 
-/* High DPI screens optimization */
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    .tetris-board, .responsive-board {
-        border-width: 2px;
-    }
-    
-    .tetris-block {
-        border-width: 0.5px;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: crisp-edges;
-    }
+.loading-screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    padding: 2rem;
 }
 
-/* Accessibility - Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        animation-delay: -1ms !important;
-        scroll-behavior: auto !important;
-        transition: none !important;
-    }
-    
-    .screen {
-        animation: none !important;
-    }
-    
-    .btn:hover, .control-btn:hover, .controls-toggle:hover {
-        transform: none !important;
-    }
-}
-
-/* =================================
-   ACCESSIBILITY IMPROVEMENTS
-   ================================= */
-
-/* Focus states for keyboard navigation */
-.btn:focus,
-.control-btn:focus,
-.controls-toggle:focus,
-.form-input:focus {
-    outline: 3px solid #ffd700;
-    outline-offset: 2px;
-}
-
-/* Screen reader only text */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-    .tetris-board, .responsive-board {
-        border-width: 4px;
-        border-color: #ffffff;
-    }
-    
-    .tetris-block {
-        border-width: 2px;
-        border-color: #000000;
-    }
-    
-    .btn, .control-btn, .controls-toggle {
-        border: 3px solid #ffffff;
-    }
-}
-
-/* =================================
-   PRINT STYLES
-   ================================= */
-
-@media print {
-    body {
-        background: white;
-        color: black;
-    }
-    
-    .mobile-controls,
-    .controls-accordion,
-    .btn {
-        display: none;
-    }
-    
-    .game-screen {
-        display: block;
-        height: auto;
-    }
-    
-    .tetris-board {
-        border-color: black;
-        background: white;
-    }
-}
-
-/* =================================
-   DARK MODE PREFERENCE
-   ================================= */
-
-@media (prefers-color-scheme: light) {
-    body {
-        background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
-    }
-    
-    .tetris-board, .responsive-board {
-        background: rgba(255,255,255,0.9);
-        color: #000;
-    }
-    
-    .player-info-card, .stats-card,
-    .opponent-info-card, .opponent-stats-card,
-    .next-piece-container {
-        background: rgba(255,255,255,0.8);
-        color: #333;
-    }
-}
-
-/* =================================
-   LOADING STATES & ANIMATIONS
-   ================================= */
-
-.loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border: 2px solid transparent;
-    border-top-color: #ffffff;
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-left: 4px solid #4ecdc4;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -1080,15 +953,512 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Pulse animation for connection status */
-.connection-status.connecting {
-    animation: pulse 2s infinite;
+.loading-text {
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+    color: rgba(255, 255, 255, 0.8);
+    animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.7; }
-    100% { opacity: 1; }
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* =================================
+   PAUSE OVERLAY
+   ================================= */
+
+.pause-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+    backdrop-filter: blur(5px);
+}
+
+.pause-text {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+    margin-bottom: 1rem;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from { text-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+    to { text-shadow: 0 0 25px rgba(255, 215, 0, 0.8), 0 0 35px rgba(255, 215, 0, 0.4); }
+}
+
+.pause-instructions {
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+}
+
+/* =================================
+   NOTIFICATION SYSTEM
+   ================================= */
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+    max-width: 300px;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification.success {
+    border-left: 4px solid #4CAF50;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+}
+
+.notification.error {
+    border-left: 4px solid #f44336;
+    box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
+}
+
+.notification.warning {
+    border-left: 4px solid #ff9800;
+    box-shadow: 0 0 15px rgba(255, 152, 0, 0.3);
+}
+
+/* =================================
+   STATS DISPLAY STYLES
+   ================================= */
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 5px 0;
+    font-size: clamp(0.7rem, 1.6vw, 0.9rem);
+    align-items: center;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: normal;
+}
+
+.stat-value {
+    color: white;
+    font-weight: bold;
+    text-align: right;
+}
+
+.level-display {
+    color: #ffd700;
+}
+
+.score-display {
+    color: #00ff00;
+}
+
+.lines-display {
+    color: #ff6b6b;
+}
+
+.time-display {
+    color: #4ecdc4;
+}
+
+/* =================================
+   COUNTDOWN OVERLAY
+   ================================= */
+
+.countdown-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    backdrop-filter: blur(5px);
+}
+
+.countdown-number {
+    font-size: clamp(3rem, 10vw, 6rem);
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+    animation: countdownPulse 1s ease-in-out;
+}
+
+@keyframes countdownPulse {
+    0% { 
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% { 
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* =================================
+   HOLD PIECE CONTAINER
+   ================================= */
+
+.hold-piece-container {
+    background: rgba(255, 165, 0, 0.2);
+    border: 2px solid #ffa500;
+    box-shadow: 0 0 15px rgba(255, 165, 0, 0.2);
+}
+
+.hold-piece-title {
+    color: #ffa500;
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
+}
+
+#hold-piece-preview, .hold-piece-preview {
+    width: clamp(50px, 12vw, 80px);
+    height: clamp(50px, 12vw, 80px);
+    background: rgba(0,0,0,0.8);
+    border: 2px solid #333;
+    border-radius: 8px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* =================================
+   MULTIPLAYER WAITING SCREEN
+   ================================= */
+
+.waiting-screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    padding: 2rem;
+}
+
+.waiting-message {
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.waiting-dots {
+    font-size: 2rem;
+    animation: waitingDots 1.5s infinite;
+}
+
+@keyframes waitingDots {
+    0%, 20% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* =================================
+   ERROR MESSAGES
+   ================================= */
+
+.error-message {
+    background: rgba(244, 67, 54, 0.2);
+    border: 2px solid #f44336;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    color: #ffcdd2;
+    text-align: center;
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    backdrop-filter: blur(10px);
+}
+
+.success-message {
+    background: rgba(76, 175, 80, 0.2);
+    border: 2px solid #4CAF50;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    color: #c8e6c9;
+    text-align: center;
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    backdrop-filter: blur(10px);
+}
+
+/* =================================
+   SCORE ANIMATIONS
+   ================================= */
+
+.score-popup {
+    position: absolute;
+    z-index: 50;
+    font-weight: bold;
+    pointer-events: none;
+    animation: scoreFloat 1.5s ease-out forwards;
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+@keyframes scoreFloat {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50px) scale(1.2);
+    }
+}
+
+.score-popup.single { color: #ffffff; }
+.score-popup.double { color: #ffff00; }
+.score-popup.triple { color: #ff8000; }
+.score-popup.tetris { color: #ff0080; }
+
+/* =================================
+   LEVEL UP ANIMATION
+   ================================= */
+
+.level-up-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 215, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    pointer-events: none;
+    animation: levelUpFlash 2s ease-out forwards;
+}
+
+.level-up-text {
+    font-size: clamp(2rem, 6vw, 4rem);
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+    animation: levelUpBounce 2s ease-out forwards;
+}
+
+@keyframes levelUpFlash {
+    0% { background: rgba(255, 215, 0, 0.3); }
+    50% { background: rgba(255, 215, 0, 0.1); }
+    100% { background: rgba(255, 215, 0, 0); }
+}
+
+@keyframes levelUpBounce {
+    0% { 
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% { 
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% { 
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+/* =================================
+   SETTINGS MODAL
+   ================================= */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 1rem;
+}
+
+.modal-title {
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    font-weight: bold;
+    color: white;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    transition: background 0.3s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.setting-group {
+    margin-bottom: 1.5rem;
+}
+
+.setting-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: white;
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+}
+
+.setting-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    backdrop-filter: blur(10px);
+}
+
+.setting-input:focus {
+    outline: none;
+    border-color: #4ecdc4;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.setting-checkbox {
+    margin-right: 10px;
+    transform: scale(1.2);
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+/* =================================
+   LEADERBOARD STYLES
+   ================================= */
+
+.leaderboard-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.leaderboard-table {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.leaderboard-header {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 15px;
+    display: grid;
+    grid-template-columns: 60px 1fr 100px 100px;
+    font-weight: bold;
+    color: white;
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    gap: 15px;
+}
+
+.leaderboard-row {
+    padding: 12px 15px;
+    display: grid;
+    grid-template-columns: 60px 1fr 100px 100px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background 0.3s ease;
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
+    gap: 15px;
+    align-items: center;
+}
+
+.leaderboard-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.leaderboard-rank {
+    font-weight: bold;
+    text-align: center;
+}
+
+.leaderboard-rank.gold { color: #ffd700; }
+.leaderboard-rank.silver { color: #c0c0c0; }
+.leaderboard-rank.bronze { color: #cd7f32; }
+
+.leaderboard-name {
+    color: white;
+    font-weight: bold;
+}
+
+.leaderboard-score {
+    color: #00ff00;
+    font-weight: bold;
+    text-align: right;
+}
+
+.leaderboard-level {
+    color: #ffd700;
+    font-weight: bold;
+    text-align: right;
 }
 
 /* =================================
@@ -1103,179 +1473,124 @@ body {
     visibility: hidden;
 }
 
-.text-center {
-    text-align: center;
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
 }
 
-.text-left {
-    text-align: left;
+.fade-out {
+    animation: fadeOut 0.5s ease-out;
 }
 
-.text-right {
-    text-align: right;
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
 }
 
-.mb-0 { margin-bottom: 0; }
-.mb-1 { margin-bottom: 0.5rem; }
-.mb-2 { margin-bottom: 1rem; }
-.mb-3 { margin-bottom: 1.5rem; }
-
-.mt-0 { margin-top: 0; }
-.mt-1 { margin-top: 0.5rem; }
-.mt-2 { margin-top: 1rem; }
-.mt-3 { margin-top: 1.5rem; }
-
-.p-0 { padding: 0; }
-.p-1 { padding: 0.5rem; }
-.p-2 { padding: 1rem; }
-.p-3 { padding: 1.5rem; }
-
-/* =================================
-   GAME SPECIFIC ANIMATIONS
-   ================================= */
-
-/* Block drop animation */
-@keyframes blockDrop {
-    0% { transform: translateY(-20px); opacity: 0; }
-    100% { transform: translateY(0); opacity: 1; }
+.slide-in-left {
+    animation: slideInLeft 0.5s ease-out;
 }
 
-.tetris-block.dropping {
-    animation: blockDrop 0.3s ease-out;
+.slide-in-right {
+    animation: slideInRight 0.5s ease-out;
 }
 
-/* Line clear animation */
-@keyframes lineClear {
-    0% { opacity: 1; transform: scaleX(1); }
-    50% { opacity: 0.5; transform: scaleX(0.8); }
-    100% { opacity: 0; transform: scaleX(0); }
+@keyframes slideInLeft {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
 }
 
-.line-clearing {
-    animation: lineClear 0.5s ease-in-out;
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
 }
 
-/* Board shake on game over */
+.bounce {
+    animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
 }
 
-.tetris-board.game-over {
-    animation: shake 0.5s ease-in-out 3;
+/* =================================
+   ACCESSIBILITY IMPROVEMENTS
+   ================================= */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
-/* Victory celebration */
-@keyframes celebrate {
-    0%, 100% { transform: scale(1) rotate(0deg); }
-    25% { transform: scale(1.05) rotate(-2deg); }
-    75% { transform: scale(1.05) rotate(2deg); }
+.focus-visible:focus {
+    outline: 2px solid #4ecdc4;
+    outline-offset: 2px;
 }
 
-.winner-announcement {
-    animation: celebrate 2s ease-in-out infinite;
+.high-contrast {
+    filter: contrast(1.5);
+}
+
+.reduced-motion * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
 }
 
 /* =================================
-   TOUCH DEVICE OPTIMIZATIONS
+   DARK MODE SUPPORT
    ================================= */
 
-@media (hover: none) and (pointer: coarse) {
-    .btn, .control-btn, .controls-toggle {
-        min-height: 44px; /* Touch target size */
-        min-width: 44px;
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     }
     
-    .control-btn, .control-button {
-        padding: 12px;
-        font-size: 16px; /* Prevent zoom on iOS */
+    .tetris-board {
+        background: rgba(0,0,0,0.95);
     }
     
     .form-input {
-        font-size: 16px; /* Prevent zoom on iOS */
-        min-height: 44px;
-    }
-    
-    /* Remove hover effects on touch devices */
-    .btn:hover,
-    .control-btn:hover,
-    .controls-toggle:hover {
-        transform: none;
-        box-shadow: none;
-    }
-    
-    /* Add active states for better feedback */
-    .btn:active {
-        transform: scale(0.98);
-        opacity: 0.8;
-    }
-    
-    .control-btn:active,
-    .control-button:active {
-        transform: scale(0.95);
-        background: rgba(255,255,255,0.4);
+        background: rgba(255, 255, 255, 0.05);
     }
 }
 
 /* =================================
-   PERFORMANCE OPTIMIZATIONS
+   PRINT STYLES
    ================================= */
 
-/* GPU acceleration for animations */
-.tetris-block,
-.btn,
-.control-btn,
-.screen {
-    will-change: transform;
-    transform: translateZ(0);
-}
-
-/* Optimize repaints */
-.tetris-board,
-.responsive-board {
-    contain: layout style paint;
-}
-
-/* =================================
-   BROWSER SPECIFIC FIXES
-   ================================= */
-
-/* Safari specific fixes */
-@supports (-webkit-backdrop-filter: blur()) {
-    .player-info-card,
-    .opponent-info-card,
-    .stats-card,
-    .opponent-stats-card,
-    .next-piece-container,
+@media print {
     .mobile-controls,
-    .controls-content {
-        -webkit-backdrop-filter: blur(10px);
+    .notification,
+    .modal-overlay {
+        display: none !important;
     }
-}
-
-/* Firefox scrollbar styling */
-@-moz-document url-prefix() {
-    .controls-content {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255,255,255,0.3) transparent;
+    
+    body {
+        background: white !important;
+        color: black !important;
     }
-}
-
-/* Edge/Chrome scrollbar styling */
-.controls-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.controls-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.controls-content::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.3);
-    border-radius: 3px;
-}
-
-.controls-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.5);
+    
+    .game-screen {
+        flex-direction: column;
+        gap: 20px;
+    }
 }
