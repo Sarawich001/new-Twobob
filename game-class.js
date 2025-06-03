@@ -59,9 +59,7 @@ class TetrisMultiplayer {
         this.connectToServer();
         this.setupMobileControls();
     }
-// เพิ่มใน game logic เพื่อให้ตรงกับ CSS
-const mainBoard = document.querySelector('.main-board');
-const cellSize = parseInt(window.getComputedStyle(mainBoard).getPropertyValue('--cell-size'));
+
 
 // ใช้ cellSize ในการวาด Tetris blocks
     connectToServer() {
