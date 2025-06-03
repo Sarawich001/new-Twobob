@@ -1,4 +1,4 @@
-// TwoBob Tactics - Tetris Multiplayer Client
+// TwoBob Tactics - Tetris Multiplayer Client (Fixed Version)
 // =========================================
 
 // Global Variables
@@ -81,507 +81,761 @@ function initSocket() {
     });
 
     socket.on('error', (message) => {
+        console.error('Socket error:', message);
         alert('Error: ' + message);
     });
 }
 
 // =========================================
-// UI Management Functions
+// UI Management Functions (with null checks)
 // =========================================
 
 function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.style.display = 'none';
-    });
-    document.getElementById(screenId).style.display = 'block';
+    try {
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.style.display = 'none';
+        });
+        
+        const targetScreen = document.getElementById(screenId);
+        if (targetScreen) {
+            targetScreen.style.display = 'block';
+        } else {
+            console.error(`Screen not found: ${screenId}`);
+        }
+    } catch (error) {
+        console.error('Error showing screen:', error);
+    }
 }
 
 function updateConnectionStatus(connected) {
-    const statusElement = document.getElementById('connection-status');
-    if (connected) {
-        statusElement.className = 'connection-status connected';
-        statusElement.innerHTML = '🟢 เชื่อมต่อแล้ว';
-    } else {
-        statusElement.className = 'connection-status disconnected';
-        statusElement.innerHTML = '🔴 ไม่ได้เชื่อมต่อ';
+    try {
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            if (connected) {
+                statusElement.className = 'connection-status connected';
+                statusElement.innerHTML = '🟢 เชื่อมต่อแล้ว';
+            } else {
+                statusElement.className = 'connection-status disconnected';
+                statusElement.innerHTML = '🔴 ไม่ได้เชื่อมต่อ';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating connection status:', error);
     }
 }
 
 function enableButtons() {
-    document.getElementById('btn-create-room').disabled = false;
-    document.getElementById('btn-join-room').disabled = false;
+    try {
+        const createBtn = document.getElementById('btn-create-room');
+        const joinBtn = document.getElementById('btn-join-room');
+        
+        if (createBtn) createBtn.disabled = false;
+        if (joinBtn) joinBtn.disabled = false;
+    } catch (error) {
+        console.error('Error enabling buttons:', error);
+    }
 }
 
 function disableButtons() {
-    document.getElementById('btn-create-room').disabled = true;
-    document.getElementById('btn-join-room').disabled = true;
+    try {
+        const createBtn = document.getElementById('btn-create-room');
+        const joinBtn = document.getElementById('btn-join-room');
+        
+        if (createBtn) createBtn.disabled = true;
+        if (joinBtn) joinBtn.disabled = true;
+    } catch (error) {
+        console.error('Error disabling buttons:', error);
+    }
 }
 
 // =========================================
-// Room Management Functions
+// Room Management Functions (with null checks)
 // =========================================
 
 function updateRoomDisplay() {
-    document.getElementById('room-id-display').textContent = gameState.room;
+    try {
+        const roomDisplay = document.getElementById('room-id-display');
+        if (roomDisplay) {
+            roomDisplay.textContent = gameState.room || '-';
+        }
+    } catch (error) {
+        console.error('Error updating room display:', error);
+    }
 }
 
 function updatePlayersList(players) {
-    const playersList = document.getElementById('players-list');
-    playersList.innerHTML = '';
-    
-    players.forEach((player, index) => {
-        const li = document.createElement('li');
-        li.textContent = `${player.name} ${player.ready ? '✅' : '⏳'}`;
-        if (player.id === gameState.currentPlayer.id) {
-            li.classList.add('current-player');
+    try {
+        const playersList = document.getElementById('players-list');
+        if (!playersList) return;
+        
+        playersList.innerHTML = '';
+        
+        if (Array.isArray(players)) {
+            players.forEach((player, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${player.name || 'Unknown'} ${player.ready ? '✅' : '⏳'}`;
+                if (gameState.currentPlayer && player.id === gameState.currentPlayer.id) {
+                    li.classList.add('current-player');
+                }
+                playersList.appendChild(li);
+            });
         }
-        playersList.appendChild(li);
-    });
 
-    // Enable ready button if we have a name
-    const readyBtn = document.getElementById('btn-ready');
-    readyBtn.disabled = false;
+        // Enable ready button if we have a name
+        const readyBtn = document.getElementById('btn-ready');
+        if (readyBtn) {
+            readyBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error updating players list:', error);
+    }
 }
 
 function updateReadyStatus(data) {
-    const indicator1 = document.getElementById('ready-indicator-1');
-    const indicator2 = document.getElementById('ready-indicator-2');
-    
-    if (data.player1) {
-        indicator1.textContent = `${data.player1.name}: ${data.player1.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
-    }
-    if (data.player2) {
-        indicator2.textContent = `${data.player2.name}: ${data.player2.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
+    try {
+        const indicator1 = document.getElementById('ready-indicator-1');
+        const indicator2 = document.getElementById('ready-indicator-2');
+        
+        if (indicator1 && data.player1) {
+            indicator1.textContent = `${data.player1.name}: ${data.player1.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
+        }
+        if (indicator2 && data.player2) {
+            indicator2.textContent = `${data.player2.name}: ${data.player2.ready ? 'พร้อม ✅' : 'รอ... ⏳'}`;
+        }
+    } catch (error) {
+        console.error('Error updating ready status:', error);
     }
 }
 
 // =========================================
-// Game Functions
+// Game Functions (with error handling)
 // =========================================
 
 function initGame(gameData) {
-    // Initialize game boards
-    initGameBoard('my-board', 20, 10);
-    initGameBoard('opponent-board', 20, 10);
-    
-    // Set player names
-    document.getElementById('my-player-name').textContent = gameState.currentPlayer.name;
-    document.getElementById('opponent-player-name').textContent = 'กำลังรอ...';
-    
-    // Reset scores
-    resetGameStats();
-    
-    // Initialize game controls
-    initGameControls();
+    try {
+        // Initialize game boards
+        initGameBoard('my-board', 20, 10);
+        initGameBoard('opponent-board', 20, 10);
+        
+        // Set player names
+        const myNameEl = document.getElementById('my-player-name');
+        const oppNameEl = document.getElementById('opponent-player-name');
+        
+        if (myNameEl && gameState.currentPlayer) {
+            myNameEl.textContent = gameState.currentPlayer.name || 'YOU';
+        }
+        if (oppNameEl) {
+            oppNameEl.textContent = 'กำลังรอ...';
+        }
+        
+        // Reset scores
+        resetGameStats();
+        
+        // Initialize game controls
+        initGameControls();
+    } catch (error) {
+        console.error('Error initializing game:', error);
+    }
 }
 
 function initGameBoard(boardId, rows, cols) {
-    const board = document.getElementById(boardId);
-    board.innerHTML = '';
-    board.style.position = 'relative';
-    
-    // Create grid background
-    const cellSize = boardId === 'my-board' ? 32 : 16;
-    
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const cell = document.createElement('div');
-            cell.className = 'tetris-block grid-cell';
-            cell.style.width = cellSize + 'px';
-            cell.style.height = cellSize + 'px';
-            cell.style.left = (c * cellSize) + 'px';
-            cell.style.top = (r * cellSize) + 'px';
-            cell.style.background = 'rgba(255,255,255,0.05)';
-            cell.style.border = '1px solid rgba(255,255,255,0.1)';
-            board.appendChild(cell);
+    try {
+        const board = document.getElementById(boardId);
+        if (!board) {
+            console.error(`Game board not found: ${boardId}`);
+            return;
         }
+        
+        board.innerHTML = '';
+        board.style.position = 'relative';
+        
+        // Create grid background
+        const cellSize = boardId === 'my-board' ? 32 : 16;
+        
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'tetris-block grid-cell';
+                cell.style.width = cellSize + 'px';
+                cell.style.height = cellSize + 'px';
+                cell.style.left = (c * cellSize) + 'px';
+                cell.style.top = (r * cellSize) + 'px';
+                cell.style.position = 'absolute';
+                cell.style.background = 'rgba(255,255,255,0.05)';
+                cell.style.border = '1px solid rgba(255,255,255,0.1)';
+                board.appendChild(cell);
+            }
+        }
+    } catch (error) {
+        console.error('Error initializing game board:', error);
     }
 }
 
 function resetGameStats() {
-    document.getElementById('my-score').textContent = '0';
-    document.getElementById('my-lines').textContent = '0';
-    document.getElementById('my-level').textContent = '1';
-    document.getElementById('opponent-score').textContent = '0';
-    document.getElementById('opponent-lines').textContent = '0';
-    document.getElementById('opponent-level').textContent = '1';
+    try {
+        const elements = {
+            'my-score': '0',
+            'my-lines': '0',
+            'my-level': '1',
+            'opponent-score': '0',
+            'opponent-lines': '0',
+            'opponent-level': '1'
+        };
+        
+        Object.entries(elements).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = value;
+            }
+        });
+    } catch (error) {
+        console.error('Error resetting game stats:', error);
+    }
 }
 
 function updateGameDisplay(gameData) {
-    // Update scores and stats
-    if (gameData.players) {
-        const myData = gameData.players[gameState.currentPlayer.id];
-        const opponentData = Object.values(gameData.players).find(p => p.id !== gameState.currentPlayer.id);
-        
-        if (myData) {
-            document.getElementById('my-score').textContent = myData.score || 0;
-            document.getElementById('my-lines').textContent = myData.lines || 0;
-            document.getElementById('my-level').textContent = myData.level || 1;
+    try {
+        // Update scores and stats
+        if (gameData.players && gameState.currentPlayer) {
+            const myData = gameData.players[gameState.currentPlayer.id];
+            const opponentData = Object.values(gameData.players).find(p => p.id !== gameState.currentPlayer.id);
+            
+            if (myData) {
+                const myScore = document.getElementById('my-score');
+                const myLines = document.getElementById('my-lines');
+                const myLevel = document.getElementById('my-level');
+                
+                if (myScore) myScore.textContent = myData.score || 0;
+                if (myLines) myLines.textContent = myData.lines || 0;
+                if (myLevel) myLevel.textContent = myData.level || 1;
+            }
+            
+            if (opponentData) {
+                const oppName = document.getElementById('opponent-player-name');
+                const oppScore = document.getElementById('opponent-score');
+                const oppLines = document.getElementById('opponent-lines');
+                const oppLevel = document.getElementById('opponent-level');
+                
+                if (oppName) oppName.textContent = opponentData.name || 'ฝ่ายตรงข้าม';
+                if (oppScore) oppScore.textContent = opponentData.score || 0;
+                if (oppLines) oppLines.textContent = opponentData.lines || 0;
+                if (oppLevel) oppLevel.textContent = opponentData.level || 1;
+            }
         }
         
-        if (opponentData) {
-            document.getElementById('opponent-player-name').textContent = opponentData.name;
-            document.getElementById('opponent-score').textContent = opponentData.score || 0;
-            document.getElementById('opponent-lines').textContent = opponentData.lines || 0;
-            document.getElementById('opponent-level').textContent = opponentData.level || 1;
+        // Update game boards if board data is provided
+        if (gameData.boards && gameState.currentPlayer) {
+            updateBoard('my-board', gameData.boards[gameState.currentPlayer.id]);
+            const opponentId = Object.keys(gameData.boards).find(id => id !== gameState.currentPlayer.id);
+            if (opponentId) {
+                updateBoard('opponent-board', gameData.boards[opponentId]);
+            }
         }
-    }
-    
-    // Update game boards if board data is provided
-    if (gameData.boards) {
-        updateBoard('my-board', gameData.boards[gameState.currentPlayer.id]);
-        const opponentId = Object.keys(gameData.boards).find(id => id !== gameState.currentPlayer.id);
-        if (opponentId) {
-            updateBoard('opponent-board', gameData.boards[opponentId]);
+        
+        // Update next piece if provided
+        if (gameData.nextPieces && gameState.currentPlayer && gameData.nextPieces[gameState.currentPlayer.id]) {
+            updateNextPiece(gameData.nextPieces[gameState.currentPlayer.id]);
         }
-    }
-    
-    // Update next piece if provided
-    if (gameData.nextPieces && gameData.nextPieces[gameState.currentPlayer.id]) {
-        updateNextPiece(gameData.nextPieces[gameState.currentPlayer.id]);
+    } catch (error) {
+        console.error('Error updating game display:', error);
     }
 }
 
 function updateBoard(boardId, boardData) {
-    if (!boardData) return;
-    
-    const board = document.getElementById(boardId);
-    const cellSize = boardId === 'my-board' ? 32 : 16;
-    
-    // Clear existing game pieces (keep grid cells)
-    const gamePieces = board.querySelectorAll('.tetris-block:not(.grid-cell)');
-    gamePieces.forEach(piece => piece.remove());
-    
-    // Draw board state
-    if (boardData.grid) {
-        boardData.grid.forEach((row, r) => {
-            row.forEach((cell, c) => {
-                if (cell) {
-                    const block = document.createElement('div');
-                    block.className = `tetris-block block-${cell}`;
-                    block.style.width = cellSize + 'px';
-                    block.style.height = cellSize + 'px';
-                    block.style.left = (c * cellSize) + 'px';
-                    block.style.top = (r * cellSize) + 'px';
-                    board.appendChild(block);
+    try {
+        if (!boardData) return;
+        
+        const board = document.getElementById(boardId);
+        if (!board) return;
+        
+        const cellSize = boardId === 'my-board' ? 32 : 16;
+        
+        // Clear existing game pieces (keep grid cells)
+        const gamePieces = board.querySelectorAll('.tetris-block:not(.grid-cell)');
+        gamePieces.forEach(piece => piece.remove());
+        
+        // Draw board state
+        if (boardData.grid && Array.isArray(boardData.grid)) {
+            boardData.grid.forEach((row, r) => {
+                if (Array.isArray(row)) {
+                    row.forEach((cell, c) => {
+                        if (cell) {
+                            const block = document.createElement('div');
+                            block.className = `tetris-block block-${cell}`;
+                            block.style.width = cellSize + 'px';
+                            block.style.height = cellSize + 'px';
+                            block.style.left = (c * cellSize) + 'px';
+                            block.style.top = (r * cellSize) + 'px';
+                            block.style.position = 'absolute';
+                            board.appendChild(block);
+                        }
+                    });
                 }
             });
-        });
-    }
-    
-    // Draw current piece if it exists
-    if (boardData.currentPiece) {
-        drawCurrentPiece(boardId, boardData.currentPiece, cellSize);
+        }
+        
+        // Draw current piece if it exists
+        if (boardData.currentPiece) {
+            drawCurrentPiece(boardId, boardData.currentPiece, cellSize);
+        }
+    } catch (error) {
+        console.error('Error updating board:', error);
     }
 }
 
 function drawCurrentPiece(boardId, pieceData, cellSize) {
-    const board = document.getElementById(boardId);
-    
-    if (pieceData.shape && pieceData.position) {
-        const { x, y } = pieceData.position;
+    try {
+        const board = document.getElementById(boardId);
+        if (!board || !pieceData) return;
         
-        pieceData.shape.forEach((row, r) => {
-            row.forEach((cell, c) => {
-                if (cell) {
-                    const block = document.createElement('div');
-                    block.className = `tetris-block block-${pieceData.type} current-piece`;
-                    block.style.width = cellSize + 'px';
-                    block.style.height = cellSize + 'px';
-                    block.style.left = ((x + c) * cellSize) + 'px';
-                    block.style.top = ((y + r) * cellSize) + 'px';
-                    block.style.opacity = '0.8';
-                    board.appendChild(block);
+        if (pieceData.shape && pieceData.position && Array.isArray(pieceData.shape)) {
+            const { x, y } = pieceData.position;
+            
+            pieceData.shape.forEach((row, r) => {
+                if (Array.isArray(row)) {
+                    row.forEach((cell, c) => {
+                        if (cell) {
+                            const block = document.createElement('div');
+                            block.className = `tetris-block block-${pieceData.type} current-piece`;
+                            block.style.width = cellSize + 'px';
+                            block.style.height = cellSize + 'px';
+                            block.style.left = ((x + c) * cellSize) + 'px';
+                            block.style.top = ((y + r) * cellSize) + 'px';
+                            block.style.position = 'absolute';
+                            block.style.opacity = '0.8';
+                            board.appendChild(block);
+                        }
+                    });
                 }
             });
-        });
+        }
+    } catch (error) {
+        console.error('Error drawing current piece:', error);
     }
 }
 
 function updateNextPiece(nextPieceData) {
-    const nextPieceContainer = document.getElementById('next-piece-preview');
-    nextPieceContainer.innerHTML = '';
-    
-    if (nextPieceData && nextPieceData.shape) {
-        const blockSize = 20;
+    try {
+        const nextPieceContainer = document.getElementById('next-piece-preview');
+        if (!nextPieceContainer) return;
         
-        nextPieceData.shape.forEach((row, r) => {
-            row.forEach((cell, c) => {
-                if (cell) {
-                    const block = document.createElement('div');
-                    block.className = `tetris-block block-${nextPieceData.type}`;
-                    block.style.width = blockSize + 'px';
-                    block.style.height = blockSize + 'px';
-                    block.style.left = (c * blockSize) + 'px';
-                    block.style.top = (r * blockSize) + 'px';
-                    block.style.position = 'absolute';
-                    nextPieceContainer.appendChild(block);
+        nextPieceContainer.innerHTML = '';
+        
+        if (nextPieceData && nextPieceData.shape && Array.isArray(nextPieceData.shape)) {
+            const blockSize = 20;
+            
+            nextPieceData.shape.forEach((row, r) => {
+                if (Array.isArray(row)) {
+                    row.forEach((cell, c) => {
+                        if (cell) {
+                            const block = document.createElement('div');
+                            block.className = `tetris-block block-${nextPieceData.type}`;
+                            block.style.width = blockSize + 'px';
+                            block.style.height = blockSize + 'px';
+                            block.style.left = (c * blockSize) + 'px';
+                            block.style.top = (r * blockSize) + 'px';
+                            block.style.position = 'absolute';
+                            nextPieceContainer.appendChild(block);
+                        }
+                    });
                 }
             });
-        });
+        }
+    } catch (error) {
+        console.error('Error updating next piece:', error);
     }
 }
 
 function showGameOver(data) {
-    const winnerMessage = document.getElementById('winner-message');
-    const finalScoreP1 = document.getElementById('final-score-p1');
-    const finalScoreP2 = document.getElementById('final-score-p2');
-    
-    if (data.winner === gameState.currentPlayer.id) {
-        winnerMessage.textContent = '🎉 คุณชนะ!';
-        winnerMessage.style.color = '#4CAF50';
-    } else {
-        winnerMessage.textContent = '😢 คุณแพ้!';
-        winnerMessage.style.color = '#f44336';
+    try {
+        const winnerMessage = document.getElementById('winner-message');
+        const finalScoreP1 = document.getElementById('final-score-p1');
+        const finalScoreP2 = document.getElementById('final-score-p2');
+        
+        if (winnerMessage) {
+            if (gameState.currentPlayer && data.winner === gameState.currentPlayer.id) {
+                winnerMessage.textContent = '🎉 คุณชนะ!';
+                winnerMessage.style.color = '#4CAF50';
+            } else {
+                winnerMessage.textContent = '😢 คุณแพ้!';
+                winnerMessage.style.color = '#f44336';
+            }
+        }
+        
+        if (data.finalScores && finalScoreP1 && finalScoreP2) {
+            const scores = Object.values(data.finalScores);
+            finalScoreP1.textContent = scores[0] || 0;
+            finalScoreP2.textContent = scores[1] || 0;
+        }
+        
+        showScreen('game-over-screen');
+    } catch (error) {
+        console.error('Error showing game over:', error);
     }
-    
-    if (data.finalScores) {
-        const scores = Object.values(data.finalScores);
-        finalScoreP1.textContent = scores[0] || 0;
-        finalScoreP2.textContent = scores[1] || 0;
-    }
-    
-    showScreen('game-over-screen');
 }
 
 // =========================================
-// Game Controls
+// Game Controls (with error handling)
 // =========================================
 
 function initGameControls() {
-    // Keyboard controls
-    document.addEventListener('keydown', handleKeyPress);
-    
-    // Mobile controls
-    document.getElementById('btn-left').addEventListener('click', () => sendGameInput('left'));
-    document.getElementById('btn-right').addEventListener('click', () => sendGameInput('right'));
-    document.getElementById('btn-rotate').addEventListener('click', () => sendGameInput('rotate'));
-    document.getElementById('btn-drop').addEventListener('click', () => sendGameInput('drop'));
-    
-    // Touch controls for swipe
-    initTouchControls();
+    try {
+        // Remove existing event listeners first
+        document.removeEventListener('keydown', handleKeyPress);
+        
+        // Keyboard controls
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // Mobile controls
+        const buttons = {
+            'btn-left': 'left',
+            'btn-right': 'right',
+            'btn-rotate': 'rotate',
+            'btn-drop': 'drop'
+        };
+        
+        Object.entries(buttons).forEach(([btnId, action]) => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                // Remove existing listeners
+                btn.replaceWith(btn.cloneNode(true));
+                const newBtn = document.getElementById(btnId);
+                newBtn.addEventListener('click', () => sendGameInput(action));
+            }
+        });
+        
+        // Touch controls for swipe
+        initTouchControls();
+    } catch (error) {
+        console.error('Error initializing game controls:', error);
+    }
 }
 
 function initTouchControls() {
-    let touchStartX = 0;
-    let touchStartY = 0;
-    
-    const gameBoard = document.getElementById('my-board');
-    
-    gameBoard.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-    });
-    
-    gameBoard.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
+    try {
+        let touchStartX = 0;
+        let touchStartY = 0;
         
-        const minSwipeDistance = 30;
+        const gameBoard = document.getElementById('my-board');
+        if (!gameBoard) return;
         
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            // Horizontal swipe
-            if (Math.abs(deltaX) > minSwipeDistance) {
-                if (deltaX > 0) {
-                    sendGameInput('right');
-                } else {
-                    sendGameInput('left');
+        // Remove existing listeners
+        const newBoard = gameBoard.cloneNode(true);
+        gameBoard.parentNode.replaceChild(newBoard, gameBoard);
+        const freshBoard = document.getElementById('my-board');
+        
+        freshBoard.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches && e.touches[0]) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+        
+        freshBoard.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!e.changedTouches || !e.changedTouches[0]) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            const minSwipeDistance = 30;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (Math.abs(deltaX) > minSwipeDistance) {
+                    if (deltaX > 0) {
+                        sendGameInput('right');
+                    } else {
+                        sendGameInput('left');
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(deltaY) > minSwipeDistance) {
+                    if (deltaY > 0) {
+                        sendGameInput('drop');
+                    } else {
+                        sendGameInput('rotate');
+                    }
                 }
             }
-        } else {
-            // Vertical swipe
-            if (Math.abs(deltaY) > minSwipeDistance) {
-                if (deltaY > 0) {
-                    sendGameInput('drop');
-                } else {
-                    sendGameInput('rotate');
-                }
-            }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error initializing touch controls:', error);
+    }
 }
 
 function handleKeyPress(event) {
-    if (!gameState.inGame) return;
-    
-    switch(event.key) {
-        case 'ArrowLeft':
-            event.preventDefault();
-            sendGameInput('left');
-            break;
-        case 'ArrowRight':
-            event.preventDefault();
-            sendGameInput('right');
-            break;
-        case 'ArrowUp':
-            event.preventDefault();
-            sendGameInput('rotate');
-            break;
-        case 'ArrowDown':
-            event.preventDefault();
-            sendGameInput('down');
-            break;
-        case ' ':
-            event.preventDefault();
-            sendGameInput('drop');
-            break;
-        case 'Escape':
-            event.preventDefault();
-            togglePause();
-            break;
+    try {
+        if (!gameState.inGame) return;
+        
+        switch(event.key) {
+            case 'ArrowLeft':
+                event.preventDefault();
+                sendGameInput('left');
+                break;
+            case 'ArrowRight':
+                event.preventDefault();
+                sendGameInput('right');
+                break;
+            case 'ArrowUp':
+                event.preventDefault();
+                sendGameInput('rotate');
+                break;
+            case 'ArrowDown':
+                event.preventDefault();
+                sendGameInput('down');
+                break;
+            case ' ':
+                event.preventDefault();
+                sendGameInput('drop');
+                break;
+            case 'Escape':
+                event.preventDefault();
+                togglePause();
+                break;
+        }
+    } catch (error) {
+        console.error('Error handling key press:', error);
     }
 }
 
 function sendGameInput(action) {
-    if (socket && gameState.inGame) {
-        socket.emit('game-input', { action: action });
+    try {
+        if (socket && gameState.inGame) {
+            socket.emit('game-input', { action: action });
+        }
+    } catch (error) {
+        console.error('Error sending game input:', error);
     }
 }
 
 function togglePause() {
-    if (socket && gameState.inGame) {
-        socket.emit('pause-game');
+    try {
+        if (socket && gameState.inGame) {
+            socket.emit('pause-game');
+        }
+    } catch (error) {
+        console.error('Error toggling pause:', error);
     }
 }
 
 // =========================================
-// UI Controls
+// UI Controls (with error handling)
 // =========================================
 
 function initControlsAccordion() {
-    document.getElementById('controls-toggle').addEventListener('click', () => {
-        const content = document.getElementById('controls-content');
-        const icon = document.getElementById('toggle-icon');
-        
-        if (content.classList.contains('expanded')) {
-            content.classList.remove('expanded');
-            icon.classList.remove('rotated');
-        } else {
-            content.classList.add('expanded');
-            icon.classList.add('rotated');
+    try {
+        const toggleBtn = document.getElementById('controls-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const content = document.getElementById('controls-content');
+                const icon = document.getElementById('toggle-icon');
+                
+                if (content && icon) {
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        icon.classList.remove('rotated');
+                    } else {
+                        content.classList.add('expanded');
+                        icon.classList.add('rotated');
+                    }
+                }
+            });
         }
-    });
+    } catch (error) {
+        console.error('Error initializing controls accordion:', error);
+    }
 }
 
 // =========================================
-// Event Listeners Setup
+// Event Listeners Setup (with error handling)
 // =========================================
 
 function setupEventListeners() {
-    // Menu buttons
-    document.getElementById('btn-create-room').addEventListener('click', () => {
-        showScreen('create-room-screen');
-    });
-
-    document.getElementById('btn-join-room').addEventListener('click', () => {
-        showScreen('join-room-screen');
-    });
-
-    // Room creation
-    document.getElementById('btn-confirm-create').addEventListener('click', () => {
-        const playerName = document.getElementById('create-player-name').value.trim();
-        if (!playerName) {
-            alert('กรุณากรอกชื่อผู้เล่น');
-            return;
+    try {
+        // Menu buttons
+        const createBtn = document.getElementById('btn-create-room');
+        const joinBtn = document.getElementById('btn-join-room');
+        
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                showScreen('create-room-screen');
+            });
         }
-        socket.emit('create-room', { playerName: playerName });
-    });
 
-    // Room joining
-    document.getElementById('btn-confirm-join').addEventListener('click', () => {
-        const playerName = document.getElementById('join-player-name').value.trim();
-        const roomId = document.getElementById('join-room-id').value.trim();
-        if (!playerName || !roomId) {
-            alert('กรุณากรอกชื่อผู้เล่นและรหัสห้อง');
-            return;
+        if (joinBtn) {
+            joinBtn.addEventListener('click', () => {
+                showScreen('join-room-screen');
+            });
         }
-        socket.emit('join-room', { playerName: playerName, roomId: roomId });
-    });
 
-    // Ready button
-    document.getElementById('btn-ready').addEventListener('click', () => {
-        gameState.isReady = !gameState.isReady;
-        socket.emit('player-ready', { ready: gameState.isReady });
-        document.getElementById('btn-ready').textContent = gameState.isReady ? '⏳ ยกเลิกพร้อม' : '🎮 พร้อมเล่น';
-    });
+        // Room creation
+        const confirmCreateBtn = document.getElementById('btn-confirm-create');
+        if (confirmCreateBtn) {
+            confirmCreateBtn.addEventListener('click', () => {
+                const playerNameInput = document.getElementById('create-player-name');
+                const playerName = playerNameInput ? playerNameInput.value.trim() : '';
+                
+                if (!playerName) {
+                    alert('กรุณากรอกชื่อผู้เล่น');
+                    return;
+                }
+                if (socket) {
+                    socket.emit('create-room', { playerName: playerName });
+                }
+            });
+        }
 
-    // Leave room
-    document.getElementById('btn-leave-room').addEventListener('click', () => {
-        socket.emit('leave-room');
-        gameState.room = null;
-        gameState.currentPlayer = null;
-        gameState.isReady = false;
-        showScreen('menu-screen');
-    });
+        // Room joining
+        const confirmJoinBtn = document.getElementById('btn-confirm-join');
+        if (confirmJoinBtn) {
+            confirmJoinBtn.addEventListener('click', () => {
+                const playerNameInput = document.getElementById('join-player-name');
+                const roomIdInput = document.getElementById('join-room-id');
+                
+                const playerName = playerNameInput ? playerNameInput.value.trim() : '';
+                const roomId = roomIdInput ? roomIdInput.value.trim() : '';
+                
+                if (!playerName || !roomId) {
+                    alert('กรุณากรอกชื่อผู้เล่นและรหัสห้อง');
+                    return;
+                }
+                if (socket) {
+                    socket.emit('join-room', { playerName: playerName, roomId: roomId });
+                }
+            });
+        }
 
-    // Play again
-    document.getElementById('btn-play-again').addEventListener('click', () => {
-        socket.emit('play-again');
-        showScreen('waiting-screen');
-    });
+        // Ready button
+        const readyBtn = document.getElementById('btn-ready');
+        if (readyBtn) {
+            readyBtn.addEventListener('click', () => {
+                gameState.isReady = !gameState.isReady;
+                if (socket) {
+                    socket.emit('player-ready', { ready: gameState.isReady });
+                }
+                readyBtn.textContent = gameState.isReady ? '⏳ ยกเลิกพร้อม' : '🎮 พร้อมเล่น';
+            });
+        }
 
-    // Pause button
-    document.getElementById('btn-pause').addEventListener('click', togglePause);
+        // Leave room
+        const leaveBtn = document.getElementById('btn-leave-room');
+        if (leaveBtn) {
+            leaveBtn.addEventListener('click', () => {
+                if (socket) {
+                    socket.emit('leave-room');
+                }
+                gameState.room = null;
+                gameState.currentPlayer = null;
+                gameState.isReady = false;
+                showScreen('menu-screen');
+            });
+        }
 
-    // Input validation
-    setupInputValidation();
+        // Play again
+        const playAgainBtn = document.getElementById('btn-play-again');
+        if (playAgainBtn) {
+            playAgainBtn.addEventListener('click', () => {
+                if (socket) {
+                    socket.emit('play-again');
+                }
+                showScreen('waiting-screen');
+            });
+        }
+
+        // Input validation
+        setupInputValidation();
+    } catch (error) {
+        console.error('Error setting up event listeners:', error);
+    }
 }
 
 function setupInputValidation() {
-    // Allow only alphanumeric and Thai characters for player names
-    const playerNameInputs = document.querySelectorAll('#create-player-name, #join-player-name');
-    playerNameInputs.forEach(input => {
-        input.addEventListener('input', (e) => {
-            // Allow Thai characters, English letters, numbers, and spaces
-            e.target.value = e.target.value.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s]/g, '');
+    try {
+        // Allow only alphanumeric and Thai characters for player names
+        const playerNameInputs = document.querySelectorAll('#create-player-name, #join-player-name');
+        playerNameInputs.forEach(input => {
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    // Allow Thai characters, English letters, numbers, and spaces
+                    e.target.value = e.target.value.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s]/g, '');
+                });
+            }
         });
-    });
 
-    // Allow only alphanumeric for room ID
-    document.getElementById('join-room-id').addEventListener('input', (e) => {
-        e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    });
-
-    // Enter key handling
-    document.getElementById('create-player-name').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('btn-confirm-create').click();
+        // Allow only alphanumeric for room ID
+        const roomIdInput = document.getElementById('join-room-id');
+        if (roomIdInput) {
+            roomIdInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            });
         }
-    });
 
-    document.getElementById('join-room-id').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('btn-confirm-join').click();
+        // Enter key handling
+        const createNameInput = document.getElementById('create-player-name');
+        const joinRoomInput = document.getElementById('join-room-id');
+        
+        if (createNameInput) {
+            createNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const createBtn = document.getElementById('btn-confirm-create');
+                    if (createBtn) createBtn.click();
+                }
+            });
         }
-    });
+
+        if (joinRoomInput) {
+            joinRoomInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const joinBtn = document.getElementById('btn-confirm-join');
+                    if (joinBtn) joinBtn.click();
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error setting up input validation:', error);
+    }
 }
 
 // =========================================
-// Initialization
+// Initialization (with error handling)
 // =========================================
 
 function init() {
-    // Initialize socket connection
-    initSocket();
-    
-    // Setup all event listeners
-    setupEventListeners();
-    
-    // Initialize controls accordion
-    initControlsAccordion();
-    
-    // Show initial screen
-    showScreen('menu-screen');
-    
-    console.log('TwoBob Tactics Client initialized');
+    try {
+        console.log('Initializing TwoBob Tactics Client...');
+        
+        // Initialize socket connection
+        initSocket();
+        
+        // Setup all event listeners
+        setupEventListeners();
+        
+        // Initialize controls accordion
+        initControlsAccordion();
+        
+        // Show initial screen
+        showScreen('menu-screen');
+        
+        console.log('TwoBob Tactics Client initialized successfully');
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        alert('เกิดข้อผิดพลาดในการเริ่มต้นเกม กรุณาโหลดหน้าใหม่');
+    }
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        init();
+    } catch (error) {
+        console.error('Failed to initialize on DOM loaded:', error);
+    }
+});
 
 // Export functions for testing (if running in Node.js environment)
 if (typeof module !== 'undefined' && module.exports) {
@@ -592,3 +846,19 @@ if (typeof module !== 'undefined' && module.exports) {
         gameState
     };
 }
+
+// Global error handler
+window.addEventListener('error', (event) => {
+    console.error('Global JavaScript error:', event.error);
+    console.error('Error details:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+    });
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+});
