@@ -1,3 +1,8 @@
+/* =========================================
+   UNIFIED TETRIS GAME CSS
+   Combined and optimized styles
+   ========================================= */
+
 /* =================================
    GLOBAL STYLES & RESET
    ================================= */
@@ -17,7 +22,7 @@ body {
 }
 
 /* =================================
-   LAYOUT & CONTAINERS
+   SCREEN TRANSITIONS & CONTAINERS
    ================================= */
 
 .container {
@@ -293,93 +298,47 @@ body {
    ================================= */
 
 .game-container {
-    display: grid;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.game-screen {
+    display: flex;
     width: 100%;
     max-width: 1400px;
-    min-height: 100vh;
-    padding: clamp(10px, 2vw, 20px);
-    gap: clamp(0.8rem, 2vw, 2rem);
-    align-items: start;
-    justify-items: center;
-}
-
-/* Responsive Grid Templates */
-@media (min-width: 1200px) {
-    .game-container {
-        grid-template-areas: 
-            "left-panel main-board right-panel";
-        grid-template-columns: 1fr 2fr 1fr;
-        align-items: center;
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-    .game-container {
-        grid-template-areas: 
-            "left-panel main-board right-panel";
-        grid-template-columns: 0.8fr 2fr 0.8fr;
-        align-items: center;
-    }
-}
-
-@media (max-width: 767px) {
-    .game-container {
-        grid-template-areas: 
-            "left-panel right-panel"
-            "main-board main-board";
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto 1fr;
-        gap: clamp(1rem, 3vw, 1.5rem);
-        min-height: calc(100vh - 80px);
-        padding-bottom: 100px; /* Space for mobile controls */
-    }
+    height: 100vh;
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
 }
 
 /* =================================
-   PANEL STYLES
+   PANEL STYLES (UNIFIED)
    ================================= */
 
-.left-panel, .right-panel {
+.player-info, .left-panel, .right-panel {
+    flex: 0 0 auto;
+    min-width: 200px;
+    max-width: 280px;
     display: flex;
     flex-direction: column;
     gap: clamp(0.8rem, 2vw, 1.5rem);
-    width: 100%;
-    max-width: 280px;
 }
 
-.left-panel {
-    grid-area: left-panel;
-}
-
-.right-panel {
-    grid-area: right-panel;
-}
-
-@media (max-width: 767px) {
-    .left-panel, .right-panel {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        max-width: none;
-    }
-    
-    .left-panel > *, .right-panel > * {
-        flex: 1;
-        min-width: clamp(120px, 30vw, 180px);
-    }
-}
-
-/* =================================
-   CARD STYLES
-   ================================= */
-
+/* Game Info Cards */
 .player-info-card, 
 .opponent-info-card, 
 .stats-card, 
 .opponent-stats-card, 
 .next-piece-container {
+    padding: clamp(15px, 3vw, 18px);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 15px;
-    padding: clamp(1rem, 2.5vw, 1.8rem);
     backdrop-filter: blur(10px);
     text-align: center;
     width: 100%;
@@ -402,6 +361,7 @@ body {
     background: rgba(138, 43, 226, 0.2);
     border: 2px solid #8a2be2;
     box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
+    margin: 15px 0;
 }
 
 .player-label, .opponent-label, .next-piece-title {
@@ -428,7 +388,7 @@ body {
     font-weight: bold;
 }
 
-.next-piece-preview {
+#next-piece-preview, .next-piece-preview {
     width: clamp(60px, 15vw, 120px);
     height: clamp(60px, 15vw, 120px);
     background: rgba(0,0,0,0.8);
@@ -439,11 +399,18 @@ body {
 }
 
 /* =================================
-   GAME BOARD STYLES
+   GAME BOARDS LAYOUT
    ================================= */
 
+.boards-container {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+
 .main-player-area {
-    grid-area: main-board;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -451,22 +418,28 @@ body {
     width: 100%;
 }
 
-.tetris-board {
+/* =================================
+   TETRIS BOARD STYLES
+   ================================= */
+
+.tetris-board, .responsive-board {
     background: rgba(0,0,0,0.9);
-    border: 3px solid #00ffff;
+    border: 3px solid;
     border-radius: 15px;
     overflow: hidden;
     position: relative;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    transition: all 0.3s ease;
 }
 
 .main-board {
     --cell-size: clamp(16px, 3.5vw, 24px);
-    width: calc(var(--cell-size) * 10);  /* 10 columns exactly */
-    height: calc(var(--cell-size) * 20); /* 20 rows exactly */
-    min-width: 160px;  /* Minimum playable size */
-    max-width: 240px;  /* Maximum for better UX */
+    width: calc(var(--cell-size) * 10);
+    height: calc(var(--cell-size) * 20);
+    min-width: 160px;
+    max-width: 240px;
     aspect-ratio: 1/2;
+    border-color: #00ffff;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
 }
 
 .opponent-board {
@@ -478,29 +451,20 @@ body {
     aspect-ratio: 1/2;
     border-color: #ff6b6b;
     box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+    opacity: 0.9;
 }
 
-/* Mobile specific adjustments */
-@media (max-width: 480px) {
-    .main-board {
-        --cell-size: clamp(14px, 4vw, 20px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 140px;
-        max-width: 200px;
-    }
-    
-    .opponent-board {
-        --cell-size: clamp(7px, 2vw, 10px);
-        width: calc(var(--cell-size) * 10);
-        height: calc(var(--cell-size) * 20);
-        min-width: 70px;
-        max-width: 100px;
-    }
+/* Debug mode */
+.tetris-board.debug {
+    background-image: 
+        linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 
+        calc(100% / 10) calc(100% / 20);
 }
 
 /* =================================
-   GAME ELEMENTS
+   TETRIS BLOCKS
    ================================= */
 
 .tetris-block {
@@ -517,6 +481,10 @@ body {
 .block-j { background: #0000f0; }
 .block-l { background: #f0a000; }
 
+/* =================================
+   GAME OVER OVERLAY
+   ================================= */
+
 .game-over-overlay {
     position: absolute;
     top: 0;
@@ -529,13 +497,7 @@ body {
     justify-content: center;
     z-index: 10;
 }
-.tetris-board.debug {
-    background-image: 
-        linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 
-        calc(100% / 10) calc(100% / 20);
-}
+
 .game-over-text {
     font-size: clamp(1.2rem, 4vw, 2rem);
     font-weight: bold;
@@ -581,7 +543,7 @@ body {
 .mobile-controls {
     display: none;
     position: fixed;
-    bottom: 10px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0,0,0,0.9);
@@ -592,28 +554,14 @@ body {
     width: clamp(280px, 85vw, 400px);
 }
 
-@media (max-width: 320px) {
-    .main-board {
-        --cell-size: 12px;
-        width: 120px;  /* 12px * 10 */
-        height: 240px; /* 12px * 20 */
-    }
-    
-    .opponent-board {
-        --cell-size: 6px;
-        width: 60px;   /* 6px * 10 */
-        height: 120px; /* 6px * 20 */
-    }
-}
-
-.control-grid {
+.control-buttons, .control-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: clamp(8px, 2vw, 12px);
     margin-bottom: 10px;
 }
 
-.control-button {
+.control-btn, .control-button {
     background: rgba(255,255,255,0.2);
     border: 2px solid rgba(255,255,255,0.3);
     border-radius: 12px;
@@ -629,7 +577,12 @@ body {
     justify-content: center;
 }
 
-.control-button:active {
+.control-btn:hover, .control-button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.05);
+}
+
+.control-btn:active, .control-button:active {
     background: rgba(255,255,255,0.4);
     transform: scale(0.95);
     border-color: rgba(255,255,255,0.6);
@@ -672,35 +625,288 @@ body {
 }
 
 /* =================================
-   HIGH DPI & ACCESSIBILITY
+   RESPONSIVE BREAKPOINTS
    ================================= */
 
-/* High DPI screens optimization */
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    .tetris-board {
-        border-width: 2px;
+/* Large Desktop */
+@media (min-width: 1200px) {
+    .game-screen {
+        gap: 40px;
+    }
+    .player-info, .left-panel, .right-panel {
+        min-width: 250px;
+        padding: 20px;
+    }
+    .boards-container {
+        gap: 50px;
+    }
+}
+
+/* Desktop/Laptop */
+@media (max-width: 1199px) and (min-width: 992px) {
+    .game-screen {
+        gap: 25px;
+    }
+    .player-info, .left-panel, .right-panel {
+        min-width: 220px;
+        font-size: 14px;
+    }
+    .boards-container {
+        gap: 35px;
+    }
+}
+
+/* Tablet Landscape */
+@media (max-width: 991px) and (min-width: 768px) {
+    .game-screen {
+        flex-direction: column;
+        gap: 15px;
+        padding: 10px;
     }
     
-    .tetris-block {
-        border-width: 0.5px;
+    .player-info, .left-panel, .right-panel {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        min-width: auto;
+        width: 100%;
+        max-width: 600px;
+        flex-wrap: wrap;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        flex: 1;
+        min-width: clamp(120px, 30vw, 180px);
+    }
+    
+    .boards-container {
+        gap: 25px;
+    }
+    
+    .mobile-controls {
+        display: block;
     }
 }
 
-/* Accessibility - Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+/* Tablet Portrait */
+@media (max-width: 767px) and (min-width: 576px) {
+    .game-screen {
+        flex-direction: column;
+        gap: 10px;
+        padding: 5px;
+        height: auto;
+        min-height: calc(100vh - 80px);
+        padding-bottom: 100px;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        font-size: 12px;
+        padding: 10px;
+        min-height: auto;
+        max-width: none;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        flex: 1;
+        min-width: clamp(120px, 30vw, 180px);
+        text-align: center;
+    }
+    
+    .boards-container {
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+    }
+    
+    .opponent-board {
+        order: -1;
+    }
+    
+    .mobile-controls {
+        display: block;
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        margin-top: 10px;
     }
 }
 
-/* =================================
-   SPECIAL MEDIA QUERIES
-   ================================= */
+/* Mobile */
+@media (max-width: 575px) {
+    .game-container {
+        padding: 5px;
+    }
+    
+    .game-screen {
+        flex-direction: column;
+        gap: 8px;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 11px;
+        padding: 8px;
+        min-height: auto;
+        flex-direction: row;
+        justify-content: center;
+        max-width: none;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 5px;
+        padding: 5px;
+    }
+    
+    .boards-container {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        align-items: center;
+    }
+    
+    .opponent-board {
+        order: -1;
+    }
+    
+    .next-piece-container {
+        margin: 5px 0;
+        padding: 5px;
+    }
+    
+    .mobile-controls {
+        display: block;
+        position: sticky;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        border-radius: 0;
+        border-top-left-radius: 15px;
+        border-top-right-radius: 15px;
+        margin: 0;
+        width: 100%;
+    }
+    
+    .control-buttons, .control-grid {
+        max-width: 100%;
+        justify-content: center;
+    }
+    
+    .control-btn, .control-button {
+        width: 45px;
+        height: 45px;
+        font-size: 14px;
+    }
+    
+    .main-board {
+        --cell-size: clamp(14px, 4vw, 20px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 140px;
+        max-width: 200px;
+    }
+    
+    .opponent-board {
+        --cell-size: clamp(7px, 2vw, 10px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 70px;
+        max-width: 100px;
+    }
+}
 
-/* Landscape mobile optimization */
-@media (max-width: 767px) and (orientation: landscape) and (max-height: 500px) {
+/* Very Small Mobile */
+@media (max-width: 380px) {
+    .player-info, .left-panel, .right-panel {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .player-info > *, .left-panel > *, .right-panel > * {
+        min-width: auto;
+        font-size: 10px;
+    }
+    
+    .control-btn, .control-button {
+        width: 40px;
+        height: 40px;
+        font-size: 12px;
+    }
+    
+    .game-title {
+        font-size: clamp(1.5rem, 8vw, 2.5rem);
+    }
+    
+    .btn, .controls-toggle {
+        font-size: clamp(0.9rem, 3vw, 1rem);
+        padding: clamp(10px, 3vw, 14px) clamp(16px, 4vw, 24px);
+    }
+}
+
+/* Ultra Small Mobile */
+@media (max-width: 320px) {
+    .main-board {
+        --cell-size: 12px;
+        width: 120px;
+        height: 240px;
+    }
+    
+    .opponent-board {
+        --cell-size: 6px;
+        width: 60px;
+        height: 120px;
+    }
+}
+
+/* Landscape Mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+    .game-screen {
+        flex-direction: row;
+        height: 100vh;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        flex-direction: column;
+        width: 150px;
+        font-size: 10px;
+        padding: 5px;
+        max-width: 150px;
+    }
+    
+    .boards-container {
+        flex-direction: row;
+        gap: 15px;
+        flex: 1;
+    }
+    
+    .mobile-controls {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        left: auto;
+        transform: none;
+        width: auto;
+    }
+    
+    .control-buttons, .control-grid {
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: 1fr;
+        max-width: 220px;
+    }
+    
     .main-board {
         --cell-size: clamp(10px, 2.5vw, 14px);
         width: calc(var(--cell-size) * 10);
@@ -718,19 +924,358 @@ body {
     }
 }
 
-/* Very small screens */
-@media (max-width: 320px) {
-    .game-title {
-        font-size: clamp(1.5rem, 8vw, 2.5rem);
+/* =================================
+   HIGH DPI & ACCESSIBILITY
+   ================================= */
+
+/* High DPI screens optimization */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .tetris-board, .responsive-board {
+        border-width: 2px;
     }
     
-    .main-board {
-        width: clamp(200px, 75vw, 260px);
-        height: calc(clamp(200px, 75vw, 260px) * 2);
+    .tetris-block {
+        border-width: 0.5px;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* Accessibility - Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: -1ms !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
     }
     
-    .btn, .controls-toggle {
-        font-size: clamp(0.9rem, 3vw, 1rem);
-        padding: clamp(10px, 3vw, 14px) clamp(16px, 4vw, 24px);
+    .screen {
+        animation: none !important;
     }
+    
+    .btn:hover, .control-btn:hover, .controls-toggle:hover {
+        transform: none !important;
+    }
+}
+
+/* =================================
+   ACCESSIBILITY IMPROVEMENTS
+   ================================= */
+
+/* Focus states for keyboard navigation */
+.btn:focus,
+.control-btn:focus,
+.controls-toggle:focus,
+.form-input:focus {
+    outline: 3px solid #ffd700;
+    outline-offset: 2px;
+}
+
+/* Screen reader only text */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .tetris-board, .responsive-board {
+        border-width: 4px;
+        border-color: #ffffff;
+    }
+    
+    .tetris-block {
+        border-width: 2px;
+        border-color: #000000;
+    }
+    
+    .btn, .control-btn, .controls-toggle {
+        border: 3px solid #ffffff;
+    }
+}
+
+/* =================================
+   PRINT STYLES
+   ================================= */
+
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .mobile-controls,
+    .controls-accordion,
+    .btn {
+        display: none;
+    }
+    
+    .game-screen {
+        display: block;
+        height: auto;
+    }
+    
+    .tetris-board {
+        border-color: black;
+        background: white;
+    }
+}
+
+/* =================================
+   DARK MODE PREFERENCE
+   ================================= */
+
+@media (prefers-color-scheme: light) {
+    body {
+        background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    }
+    
+    .tetris-board, .responsive-board {
+        background: rgba(255,255,255,0.9);
+        color: #000;
+    }
+    
+    .player-info-card, .stats-card,
+    .opponent-info-card, .opponent-stats-card,
+    .next-piece-container {
+        background: rgba(255,255,255,0.8);
+        color: #333;
+    }
+}
+
+/* =================================
+   LOADING STATES & ANIMATIONS
+   ================================= */
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse animation for connection status */
+.connection-status.connecting {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* =================================
+   UTILITY CLASSES
+   ================================= */
+
+.hidden {
+    display: none !important;
+}
+
+.invisible {
+    visibility: hidden;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+
+/* =================================
+   GAME SPECIFIC ANIMATIONS
+   ================================= */
+
+/* Block drop animation */
+@keyframes blockDrop {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+.tetris-block.dropping {
+    animation: blockDrop 0.3s ease-out;
+}
+
+/* Line clear animation */
+@keyframes lineClear {
+    0% { opacity: 1; transform: scaleX(1); }
+    50% { opacity: 0.5; transform: scaleX(0.8); }
+    100% { opacity: 0; transform: scaleX(0); }
+}
+
+.line-clearing {
+    animation: lineClear 0.5s ease-in-out;
+}
+
+/* Board shake on game over */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.tetris-board.game-over {
+    animation: shake 0.5s ease-in-out 3;
+}
+
+/* Victory celebration */
+@keyframes celebrate {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.05) rotate(-2deg); }
+    75% { transform: scale(1.05) rotate(2deg); }
+}
+
+.winner-announcement {
+    animation: celebrate 2s ease-in-out infinite;
+}
+
+/* =================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ================================= */
+
+@media (hover: none) and (pointer: coarse) {
+    .btn, .control-btn, .controls-toggle {
+        min-height: 44px; /* Touch target size */
+        min-width: 44px;
+    }
+    
+    .control-btn, .control-button {
+        padding: 12px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .form-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        min-height: 44px;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .btn:hover,
+    .control-btn:hover,
+    .controls-toggle:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    
+    /* Add active states for better feedback */
+    .btn:active {
+        transform: scale(0.98);
+        opacity: 0.8;
+    }
+    
+    .control-btn:active,
+    .control-button:active {
+        transform: scale(0.95);
+        background: rgba(255,255,255,0.4);
+    }
+}
+
+/* =================================
+   PERFORMANCE OPTIMIZATIONS
+   ================================= */
+
+/* GPU acceleration for animations */
+.tetris-block,
+.btn,
+.control-btn,
+.screen {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Optimize repaints */
+.tetris-board,
+.responsive-board {
+    contain: layout style paint;
+}
+
+/* =================================
+   BROWSER SPECIFIC FIXES
+   ================================= */
+
+/* Safari specific fixes */
+@supports (-webkit-backdrop-filter: blur()) {
+    .player-info-card,
+    .opponent-info-card,
+    .stats-card,
+    .opponent-stats-card,
+    .next-piece-container,
+    .mobile-controls,
+    .controls-content {
+        -webkit-backdrop-filter: blur(10px);
+    }
+}
+
+/* Firefox scrollbar styling */
+@-moz-document url-prefix() {
+    .controls-content {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.3) transparent;
+    }
+}
+
+/* Edge/Chrome scrollbar styling */
+.controls-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.controls-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.controls-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+}
+
+.controls-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
 }
