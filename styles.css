@@ -461,14 +461,20 @@ body {
 }
 
 .main-board {
-    width: clamp(280px, 60vw, 400px);
-    height: calc(clamp(280px, 60vw, 400px) * 2);
+    --cell-size: clamp(16px, 3.5vw, 24px);
+    width: calc(var(--cell-size) * 10);  /* 10 columns exactly */
+    height: calc(var(--cell-size) * 20); /* 20 rows exactly */
+    min-width: 160px;  /* Minimum playable size */
+    max-width: 240px;  /* Maximum for better UX */
     aspect-ratio: 1/2;
 }
 
 .opponent-board {
-    width: clamp(140px, 30vw, 200px);
-    height: calc(clamp(140px, 30vw, 200px) * 2);
+    --cell-size: clamp(8px, 1.8vw, 12px);
+    width: calc(var(--cell-size) * 10);
+    height: calc(var(--cell-size) * 20);
+    min-width: 80px;
+    max-width: 120px;
     aspect-ratio: 1/2;
     border-color: #ff6b6b;
     box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
@@ -477,13 +483,19 @@ body {
 /* Mobile specific adjustments */
 @media (max-width: 480px) {
     .main-board {
-        width: clamp(240px, 70vw, 320px);
-        height: calc(clamp(240px, 70vw, 320px) * 2);
+        --cell-size: clamp(14px, 4vw, 20px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 140px;
+        max-width: 200px;
     }
     
     .opponent-board {
-        width: clamp(120px, 35vw, 160px);
-        height: calc(clamp(120px, 35vw, 160px) * 2);
+        --cell-size: clamp(7px, 2vw, 10px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 70px;
+        max-width: 100px;
     }
 }
 
@@ -517,7 +529,13 @@ body {
     justify-content: center;
     z-index: 10;
 }
-
+.tetris-board.debug {
+    background-image: 
+        linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 
+        calc(100% / 10) calc(100% / 20);
+}
 .game-over-text {
     font-size: clamp(1.2rem, 4vw, 2rem);
     font-weight: bold;
@@ -574,9 +592,17 @@ body {
     width: clamp(280px, 85vw, 400px);
 }
 
-@media (max-width: 767px) {
-    .mobile-controls {
-        display: block;
+@media (max-width: 320px) {
+    .main-board {
+        --cell-size: 12px;
+        width: 120px;  /* 12px * 10 */
+        height: 240px; /* 12px * 20 */
+    }
+    
+    .opponent-board {
+        --cell-size: 6px;
+        width: 60px;   /* 6px * 10 */
+        height: 120px; /* 6px * 20 */
     }
 }
 
@@ -675,27 +701,20 @@ body {
 
 /* Landscape mobile optimization */
 @media (max-width: 767px) and (orientation: landscape) and (max-height: 500px) {
-    .game-container {
-        grid-template-areas: 
-            "left-panel main-board right-panel";
-        grid-template-columns: 0.6fr 1.8fr 0.6fr;
-        padding: 5px;
-        gap: 0.8rem;
-    }
-    
-    .left-panel, .right-panel {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
     .main-board {
-        width: clamp(200px, 40vw, 280px);
-        height: calc(clamp(200px, 40vw, 280px) * 2);
+        --cell-size: clamp(10px, 2.5vw, 14px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 100px;
+        max-width: 140px;
     }
     
-    .mobile-controls {
-        bottom: 5px;
-        padding: 8px;
+    .opponent-board {
+        --cell-size: clamp(5px, 1.2vw, 7px);
+        width: calc(var(--cell-size) * 10);
+        height: calc(var(--cell-size) * 20);
+        min-width: 50px;
+        max-width: 70px;
     }
 }
 
