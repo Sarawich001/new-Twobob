@@ -59,9 +59,211 @@ class TetrisMultiplayer {
         this.connectToServer();
         this.setupMobileControls();
     }
-
-
+    this.viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        isMobile: window.innerWidth <= 768,
+        isTablet: window.innerWidth <= 1024 && window.innerWidth > 768
+    };
+this.calculateBlockSizes();
 // ใช้ cellSize ในการวาด Tetris blocks
+    calculateBlockSizes() {
+    const { width, height, isMobile, isTablet } = this.viewport;
+    
+    if (isMobile) {
+        // Mobile: ใช้ 80% ของความกว้างหน้าจอ
+        const availableWidth = width * 0.8;
+        this.BLOCK_SIZE = Math.floor(availableWidth / this.BOARD_WIDTH);
+        this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.4);
+        
+        // ปรับให้ไม่เล็กเกินไป
+        this.BLOCK_SIZE = Math.max(20, Math.min(35, this.BLOCK_SIZE));
+        this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.4);
+        
+    } else if (isTablet) {
+        // Tablet: ใช้ 60% ของความกว้าง
+        const availableWidth = width * 0.6;
+        this.BLOCK_SIZE = Math.floor(availableWidth / (this.BOARD_WIDTH * 2)); // หารด้วย 2 เพราะมี 2 boards
+        this.BLOCK_SIZE = Math.max(25, Math.min(40, this.BLOCK_SIZE));
+        this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.7);
+        
+    } else {
+        // Desktop: ใช้ขนาดคงที่หรือคำนวณจากความสูง
+        const availableHeight = height * 0.8;
+        this.BLOCK_SIZE = Math.floor(availableHeight / this.BOARD_HEIGHT);
+        this.BLOCK_SIZE = Math.max(25, Math.min(35, this.BLOCK_SIZE));
+        this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.5);
+    }
+    
+    console.log(`Block sizes: Main=${this.BLOCK_SIZE}, Small=${this.SMALL_BLOCK_SIZE}`);
+}
+    setupResizeHandler() {
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            this.handleResize();
+        }, 100);
+    });
+}
+    handleResize() {
+    this.viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        isMobile: window.innerWidth <= 768,
+        isTablet: window.innerWidth <= 1024 && window.innerWidth > 768
+    };
+    
+    this.calculateBlockSizes();
+    this.updateBoardDimensions();
+}
+    updateBoard() {
+    const boardEl = document.getElementById('my-board');
+    if (!boardEl) return;
+    
+    // ปรับขนาดของ board container
+    this.setBoardDimensions(boardEl, this.BLOCK_SIZE);
+    
+    boardEl.innerHTML = '';
+    
+    // Draw placed blocks
+    for (let i = 0; i < this.BOARD_HEIGHT; i++) {
+        for (let j = 0; j < this.BOARD_WIDTH; j++) {
+            if (this.gameState.board[i][j]) {
+                const block = this.createBlock(j, i, this.BLOCK_SIZE, this.gameState.board[i][j]);
+                boardEl.appendChild(block);
+            }
+        }
+    }
+    
+    // Draw current piece
+    if (this.gameState.currentPiece) {
+        const { shape, x, y, color } = this.gameState.currentPiece;
+        for (let i = 0; i < shape.length; i++) {
+            for (let j = 0; j < shape[i].length; j++) {
+                if (shape[i][j]) {
+                    const block = this.createBlock(x + j, y + i, this.BLOCK_SIZE, color, true);
+                    boardEl.appendChild(block);
+                }
+            }
+        }
+    }
+    
+    // Show game over overlay
+    if (this.gameState.gameOver) {
+        const overlay = this.createGameOverOverlay();
+        boardEl.appendChild(overlay);
+    }
+}
+    updateOpponentBoard(data) {
+    console.log('Updating opponent board with data:', data);
+    
+    this.opponentState.board = data.board || [];
+    this.opponentState.score = data.score || 0;
+    this.opponentState.lines = data.lines || 0;
+    this.opponentState.level = data.level || 1;
+    
+    const boardEl = document.getElementById('opponent-board');
+    if (!boardEl) return;
+    
+    // ปรับขนาดของ opponent board
+    this.setBoardDimensions(boardEl, this.SMALL_BLOCK_SIZE);
+    
+    boardEl.innerHTML = '';
+    
+    // Draw opponent's board with smaller blocks
+    for (let i = 0; i < this.BOARD_HEIGHT; i++) {
+        for (let j = 0; j < this.BOARD_WIDTH; j++) {
+            if (data.board[i] && data.board[i][j]) {
+                const block = this.createBlock(j, i, this.SMALL_BLOCK_SIZE, data.board[i][j]);
+                boardEl.appendChild(block);
+            }
+        }
+    }
+    
+    this.updateOpponentStats();
+}
+    // ฟังก์ชันช่วยสร้าง block
+createBlock(x, y, size, color, isCurrent = false) {
+    const block = document.createElement('div');
+    block.className = isCurrent ? 'tetris-block current-piece' : 'tetris-block';
+    block.style.position = 'absolute';
+    block.style.left = x * size + 'px';
+    block.style.top = y * size + 'px';
+    block.style.width = size + 'px';
+    block.style.height = size + 'px';
+    block.style.background = color;
+    block.style.boxSizing = 'border-box';
+    
+    if (isCurrent) {
+        block.style.border = '2px solid rgba(255,255,255,0.8)';
+        block.style.boxShadow = '0 0 5px rgba(255,255,255,0.5)';
+    } else {
+        block.style.border = '1px solid rgba(255,255,255,0.3)';
+    }
+    
+    return block;
+}
+
+// ฟังก์ชันกำหนดขนาด board
+setBoardDimensions(boardEl, blockSize) {
+    const width = this.BOARD_WIDTH * blockSize;
+    const height = this.BOARD_HEIGHT * blockSize;
+    
+    boardEl.style.width = width + 'px';
+    boardEl.style.height = height + 'px';
+    boardEl.style.position = 'relative';
+    boardEl.style.border = '2px solid #333';
+    boardEl.style.background = 'rgba(0,0,0,0.8)';
+}
+
+// ฟังก์ชันสร้าง game over overlay
+createGameOverOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'game-over-overlay';
+    overlay.style.position = 'absolute';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = 'rgba(0,0,0,0.8)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.color = '#fff';
+    overlay.style.fontSize = Math.max(16, this.BLOCK_SIZE * 0.8) + 'px';
+    overlay.style.fontWeight = 'bold';
+    overlay.style.textAlign = 'center';
+    overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
+    return overlay;
+}
+
+// ปรับปรุงฟังก์ชัน updateBoardDimensions
+updateBoardDimensions() {
+    if (this.gameStarted) {
+        this.updateBoard();
+        
+        // อัพเดท opponent board ด้วย
+        const opponentBoardEl = document.getElementById('opponent-board');
+        if (opponentBoardEl && this.opponentState.board.length > 0) {
+            this.updateOpponentBoard({
+                board: this.opponentState.board,
+                score: this.opponentState.score,
+                lines: this.opponentState.lines,
+                level: this.opponentState.level
+            });
+        }
+    }
+}
+
+// ปรับปรุงฟังก์ชัน init
+init() {
+    this.initializeBoard();
+    this.setupEventListeners();
+    this.setupResizeHandler(); // เพิ่มบรรทัดนี้
+    this.connectToServer();
+    this.setupMobileControls();
+}
     connectToServer() {
         // เชื่อมต่อกับ server (Render จะใช้ WSS โดยอัตโนมัติ)
         this.socket = io();
