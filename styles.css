@@ -1,6 +1,6 @@
 /* =========================================
-   IMPROVED TETRIS CSS - CONSISTENT BOARD LAYOUT
-   ปรับปรุงให้บอร์ดมีขนาดที่เหมาะสมและสอดคล้องกัน
+   COMPLETE TETRIS CSS - MERGED & IMPROVED
+   รวม CSS ที่ปรับปรุงแล้วสำหรับเกม Tetris
    ========================================= */
 
 /* =================================
@@ -182,7 +182,7 @@ body {
 }
 
 /* =================================
-   CONTROLS ACCORDION - IMPROVED
+   CONTROLS ACCORDION
    ================================= */
 
 .controls-accordion {
@@ -280,7 +280,7 @@ body {
 }
 
 /* =================================
-   ROOM INFO STYLES - IMPROVED
+   ROOM INFO STYLES
    ================================= */
 
 .room-info {
@@ -332,6 +332,20 @@ body {
 }
 
 /* =================================
+   CSS VARIABLES FOR CONSISTENT SIZING
+   ================================= */
+
+:root {
+    /* ขนาด cell ที่สอดคล้องกันสำหรับทุกบอร์ด */
+    --main-cell-size: min(
+        calc((100vh - 120px) / 20), 
+        calc((100vw - 400px) / 12)
+    );
+    --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
+    --preview-cell-size: calc(var(--main-cell-size) * 0.25);
+}
+
+/* =================================
    GAME SCREEN LAYOUT - CONSISTENT PROPORTIONS
    ================================= */
 
@@ -357,20 +371,6 @@ body {
     box-sizing: border-box;
 }
 
-/* =================================
-   CONSISTENT TETRIS BOARD LAYOUT - 10x20 STANDARD
-   ================================= */
-
-:root {
-    /* ขนาด cell ที่สอดคล้องกันสำหรับทุกบอร์ด */
-    --main-cell-size: min(
-        calc((100vh - 120px) / 20), 
-        calc((100vw - 400px) / 12)
-    );
-    --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
-    --preview-cell-size: calc(var(--main-cell-size) * 0.25);
-}
-
 .boards-container {
     display: flex;
     flex-direction: column;
@@ -393,7 +393,7 @@ body {
    STANDARD TETRIS BOARDS - CONSISTENT SIZING
    ================================= */
 
-.tetris-board, .responsive-board {
+.tetris-board, .responsive-board, .game-board {
     background: rgba(0, 0, 0, 0.9);
     border: 3px solid;
     border-radius: 8px;
@@ -406,10 +406,11 @@ body {
     min-height: 500px;
     max-width: 400px;
     max-height: 800px;
+    margin: 0 auto;
 }
 
 /* Main player board - ใหญ่กว่า */
-.main-board, #my-board {
+.main-board, #my-board, .player-section .game-board {
     border-color: #3498db;
     box-shadow: 
         0 0 20px rgba(52, 152, 219, 0.4),
@@ -433,7 +434,7 @@ body {
 }
 
 /* Opponent board - เล็กกว่า แต่ยังคงสัดส่วน 10x20 */
-.opponent-board, #opponent-board {
+.opponent-board, #opponent-board, .opponent-section .game-board {
     width: calc(var(--opponent-cell-size) * 10);
     height: calc(var(--opponent-cell-size) * 20);
     min-width: 175px;
@@ -471,6 +472,7 @@ body {
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 2px;
     transition: all 0.1s ease;
+    box-sizing: border-box;
     box-shadow: 
         inset 0 0 0 1px rgba(255,255,255,0.2),
         0 1px 3px rgba(0,0,0,0.5);
@@ -536,7 +538,7 @@ body {
    IMPROVED SIDE PANELS
    ================================= */
 
-.player-info, .left-panel, .right-panel {
+.player-info, .left-panel, .right-panel, .player-section, .opponent-section {
     flex: 0 0 auto;
     width: 180px;
     display: flex;
@@ -553,7 +555,8 @@ body {
 .stats-card, 
 .opponent-stats-card, 
 .next-piece-container,
-.hold-piece-container {
+.hold-piece-container,
+.stats {
     padding: 16px;
     background: rgba(52, 73, 94, 0.9);
     border-radius: 12px;
@@ -563,10 +566,13 @@ body {
     font-size: 0.9rem;
     border: 2px solid transparent;
     transition: all 0.2s ease;
+    color: white;
+    font-family: monospace;
 }
 
 .player-info-card:hover,
-.stats-card:hover {
+.stats-card:hover,
+.stats:hover {
     border-color: rgba(52, 152, 219, 0.5);
     transform: translateY(-2px);
 }
@@ -607,6 +613,20 @@ body {
     color: white;
     font-size: 1rem;
     font-weight: 600;
+}
+
+/* Stats headers */
+.stats h3 {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    color: #3498db;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stats div {
+    margin: 5px 0;
+    font-size: 12px;
 }
 
 /* Improved piece preview - ขนาดสอดคล้องกับบอร์ด */
@@ -702,13 +722,14 @@ body {
     justify-content: center;
     z-index: 10;
     backdrop-filter: blur(5px);
+    border-radius: 5px;
 }
 
 .game-over-text {
     font-size: clamp(1.5rem, 4vw, 2.5rem);
     font-weight: 800;
     color: #e74c3c;
-    text-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+    text-shadow: 0 0 10px rgba(231, 76, 60, 0.5), 2px 2px 4px rgba(0,0,0,0.8);
     margin-bottom: 1rem;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -721,10 +742,10 @@ body {
 }
 
 /* =================================
-   ENHANCED MOBILE CONTROLS
+   ENHANCED MOBILE & CONTROL STYLES
    ================================= */
 
-.mobile-controls {
+.mobile-controls, .controls {
     display: none;
     position: fixed;
     bottom: 15px;
@@ -797,463 +818,594 @@ body {
         --preview-cell-size: calc(var(--main-cell-size) * 0.25);
     }
     
-    .player-info, .left-panel, .right-panel {
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
         width: 220px;
     }
 }
 
 /* Standard Desktop */
-@media (max-width: 1399px) and (min-width: 1024px) {
+@media (max-width: 1399px) and (min-width: 1025px) {
     :root {
         --main-cell-size: min(calc((100vh - 120px) / 20), calc((100vw - 400px) / 12));
         --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
         --preview-cell-size: calc(var(--main-cell-size) * 0.25);
     }
     
-    .player-info, .left-panel, .right-panel {
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
         width: 180px;
+    }
+    
+    .game-container {
+        flex-direction: row;
+        justify-content: center;
+        gap: 30px;
+    }
+    
+    .controls {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 8px;
+        max-width: 250px;
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    
+    .control-button {
+        height: 40px;
+        font-size: 14px;
     }
 }
 
 /* Tablet Landscape */
-@media (max-width: 1023px) and (min-width: 768px) {
+@media (max-width: 1024px) and (min-width: 769px) {
     :root {
         --main-cell-size: min(calc((100vh - 140px) / 20), calc((100vw - 320px) / 12));
         --opponent-cell-size: calc(var(--main-cell-size) * 0.65);
         --preview-cell-size: calc(var(--main-cell-size) * 0.2);
     }
     
-    .game-screen {
+    .game-screen, .game-container {
         gap: 12px;
         padding: 8px;
+        flex-direction: row;
+        justify-content: space-around;
     }
     
-    .player-info, .left-panel, .right-panel {
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
         width: 140px;
+        flex: 1;
+        max-width: 350px;
+    }
+    
+    .opponent-section {
+        flex: 0 0 auto;
     }
     
     .mobile-controls {
         display: block;
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card {
+        padding: 12px;
+        font-size: 0.8rem;
+    }
+    
+    .stat-row {
+        font-size: 0.75rem;
+        margin: 4px 0;
+    }
+    
+    .next-piece-preview, .hold-piece-preview {
+        width: 50px;
+        height: 50px;
     }
 }
 
 /* Tablet Portrait */
-@media (max-width: 767px) and (min-width: 481px) {
+@media (max-width: 768px) and (min-width: 481px) {
     :root {
-        --main-cell-size: min(calc((60vh) / 20), calc((90vw) / 12));
+        --main-cell-size: min(calc((100vh - 160px) / 20), calc((100vw - 40px) / 12));
         --opponent-cell-size: calc(var(--main-cell-size) * 0.6);
         --preview-cell-size: calc(var(--main-cell-size) * 0.18);
     }
     
-    .game-screen {
+    .game-screen, .game-container {
         flex-direction: column;
-        gap: 8px;
-        padding: 5px;
-        padding-bottom: 120px;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        height: auto;
+        min-height: 100vh;
     }
     
     .boards-container {
-        gap: 15px;
+        order: 2;
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
+        order: 1;
+        width: 100%;
+        max-width: 400px;
+        flex-direction: row;
+        justify-content: space-around;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .opponent-section {
+        order: 3;
+        margin-top: 10px;
     }
     
     .mobile-controls {
         display: block;
+        position: fixed;
         bottom: 10px;
-        width: 95vw;
-        max-width: 340px;
+        width: clamp(320px, 90vw, 400px);
     }
     
-    .player-info, .left-panel, .right-panel {
-        flex-direction: row;
-        width: 100%;
-        gap: 8px;
-        overflow-x: auto;
-        overflow-y: visible;
-        max-height: none;
-        padding: 0;
-    }
-    
-    .player-info-card, 
-    .opponent-info-card, 
-    .stats-card, 
-    .opponent-stats-card,
-    .next-piece-container,
-    .hold-piece-container {
+    .stats-card, .player-info-card, .opponent-info-card,
+    .next-piece-container, .hold-piece-container {
         flex: 1;
         min-width: 120px;
         padding: 10px;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+    }
+    
+    .control-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    
+    .control-btn {
+        padding: 10px;
+        font-size: 0.7rem;
+        min-height: 40px;
     }
 }
 
-/* Small Mobile */
+/* Mobile Landscape */
+@media (max-width: 850px) and (max-height: 480px) and (orientation: landscape) {
+    :root {
+        --main-cell-size: min(calc((100vh - 100px) / 20), calc((100vw - 300px) / 12));
+        --opponent-cell-size: calc(var(--main-cell-size) * 0.55);
+        --preview-cell-size: calc(var(--main-cell-size) * 0.16);
+    }
+    
+    .game-screen, .game-container {
+        flex-direction: row;
+        gap: 8px;
+        padding: 5px;
+        height: 100vh;
+        overflow: hidden;
+    }
+    
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
+        width: 120px;
+        gap: 8px;
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card,
+    .next-piece-container, .hold-piece-container {
+        padding: 8px;
+        font-size: 0.7rem;
+    }
+    
+    .mobile-controls {
+        display: block;
+        bottom: 5px;
+        width: clamp(250px, 80vw, 320px);
+        padding: 12px;
+    }
+    
+    .control-grid {
+        gap: 6px;
+    }
+    
+    .control-btn {
+        padding: 8px;
+        font-size: 0.65rem;
+        min-height: 36px;
+    }
+}
+
+/* Mobile Portrait */
 @media (max-width: 480px) {
     :root {
-        --main-cell-size: min(calc((55vh) / 20), 
-        calc((95vw) / 12)
-    );
-    --opponent-cell-size: calc(var(--main-cell-size) * 0.55);
-    --preview-cell-size: calc(var(--main-cell-size) * 0.15);
+        --main-cell-size: min(calc((100vh - 200px) / 20), calc((100vw - 20px) / 10));
+        --opponent-cell-size: calc(var(--main-cell-size) * 0.5);
+        --preview-cell-size: calc(var(--main-cell-size) * 0.15);
+    }
+    
+    .container {
+        padding: 5px;
+    }
+    
+    .game-screen, .game-container {
+        flex-direction: column;
+        gap: 10px;
+        padding: 5px;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .boards-container {
+        order: 2;
+        width: 100%;
+        align-items: center;
+    }
+    
+    .main-board, .tetris-board {
+        max-width: calc(100vw - 20px);
+        max-height: calc((100vw - 20px) * 2);
+    }
+    
+    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
+        order: 1;
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 5px;
+        flex-wrap: wrap;
+        max-height: none;
+        overflow: visible;
+    }
+    
+    .opponent-section {
+        order: 3;
+        justify-content: center;
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card,
+    .next-piece-container, .hold-piece-container {
+        flex: 1;
+        min-width: 100px;
+        max-width: 150px;
+        padding: 8px;
+        font-size: 0.7rem;
+        margin: 2px;
+    }
+    
+    .stat-row {
+        font-size: 0.65rem;
+        margin: 2px 0;
+    }
+    
+    .next-piece-preview, .hold-piece-preview {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .mobile-controls {
+        display: block;
+        position: fixed;
+        bottom: 5px;
+        width: calc(100vw - 20px);
+        max-width: 340px;
+        padding: 10px;
+    }
+    
+    .control-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+    }
+    
+    .control-btn {
+        padding: 8px;
+        font-size: 0.6rem;
+        min-height: 36px;
+        border-radius: 8px;
+    }
+    
+    .control-instructions {
+        font-size: 0.65rem;
+        margin-top: 6px;
+    }
+    
+    /* Menu adjustments for mobile */
+    .menu-screen {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .game-title {
+        font-size: clamp(2rem, 8vw, 3rem);
+        margin-bottom: 1rem;
+    }
+    
+    .room-info {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .room-id {
+        font-size: clamp(1.2rem, 6vw, 1.8rem);
+    }
+    
+    .controls-content.expanded {
+        padding: 15px;
+        max-height: 300px;
+    }
 }
 
-.game-screen {
-    flex-direction: column;
-    gap: 6px;
-    padding: 3px;
-    padding-bottom: 130px;
-}
-
-.boards-container {
-    gap: 10px;
-}
-
-.main-player-area {
-    gap: 8px;
-}
-
-.mobile-controls {
-    display: block;
-    bottom: 8px;
-    width: 98vw;
-    max-width: 320px;
-    padding: 12px;
-}
-
-.control-buttons, .control-grid {
-    gap: 8px;
-}
-
-.control-btn, .control-button {
-    padding: 10px;
-    font-size: 0.7rem;
-    min-height: 40px;
-}
-
-.player-info, .left-panel, .right-panel {
-    flex-direction: row;
-    width: 100%;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: visible;
-    max-height: none;
-    padding: 0;
-}
-
-.player-info-card, 
-.opponent-info-card, 
-.stats-card, 
-.opponent-stats-card,
-.next-piece-container,
-.hold-piece-container {
-    flex: 1;
-    min-width: 100px;
-    padding: 8px;
-    font-size: 0.7rem;
-}
-
-.stat-row {
-    font-size: 0.7rem;
-    margin: 4px 0;
-}
-
-.stat-label {
-    font-size: 0.65rem;
-}
-
-.stat-value {
-    font-size: 0.75rem;
-}
-
-#next-piece-preview, .next-piece-preview,
-#hold-piece-preview, .hold-piece-preview {
-    min-width: 45px;
-    min-height: 45px;
-    max-width: 70px;
-    max-height: 70px;
-}
-}
-
-/* Extra Small Mobile - Portrait */
-@media (max-width: 380px) {
-:root {
-    --main-cell-size: min(
-        calc((50vh) / 20), 
-        calc((98vw) / 12)
-    );
-    --opponent-cell-size: calc(var(--main-cell-size) * 0.5);
-    --preview-cell-size: calc(var(--main-cell-size) * 0.12);
-}
-
-.game-title {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
-}
-
-.menu-buttons {
-    max-width: 280px;
-}
-
-.btn {
-    padding: 12px 20px;
-    font-size: 0.9rem;
-    min-height: 44px;
-}
-
-.room-info {
-    padding: 1.5rem;
-    max-width: 300px;
-}
-
-.room-id {
-    font-size: 1.5rem;
-}
-
-.game-screen {
-    padding: 2px;
-    padding-bottom: 140px;
-    gap: 4px;
-}
-
-.boards-container {
-    gap: 8px;
-}
-
-.mobile-controls {
-    bottom: 5px;
-    width: 99vw;
-    max-width: 300px;
-    padding: 10px;
-}
-
-.control-buttons, .control-grid {
-    gap: 6px;
-}
-
-.control-btn, .control-button {
-    padding: 8px;
-    font-size: 0.65rem;
-    min-height: 36px;
-}
-
-.control-instructions {
-    font-size: 0.7rem;
-}
-
-.player-info-card, 
-.opponent-info-card, 
-.stats-card, 
-.opponent-stats-card,
-.next-piece-container,
-.hold-piece-container {
-    min-width: 80px;
-    padding: 6px;
-    font-size: 0.65rem;
-}
-
-.player-label, .opponent-label, .next-piece-title, .hold-piece-title {
-    font-size: 0.7rem;
-}
-
-.player-name-display {
-    font-size: 0.8rem;
-}
-
-.stat-row {
-    font-size: 0.65rem;
-    margin: 3px 0;
-}
-
-.stat-label {
-    font-size: 0.6rem;
-}
-
-.stat-value {
-    font-size: 0.7rem;
-}
-
-#next-piece-preview, .next-piece-preview,
-#hold-piece-preview, .hold-piece-preview {
-    min-width: 35px;
-    min-height: 35px;
-    max-width: 55px;
-    max-height: 55px;
-}
-
-.game-over-text {
-    font-size: 1.8rem;
-}
-
-.final-score {
-    font-size: 1rem;
-}
+/* Ultra Small Mobile */
+@media (max-width: 320px) {
+    :root {
+        --main-cell-size: min(calc((100vh - 180px) / 20), calc((100vw - 10px) / 10));
+        --opponent-cell-size: calc(var(--main-cell-size) * 0.45);
+        --preview-cell-size: calc(var(--main-cell-size) * 0.12);
+    }
+    
+    .game-title {
+        font-size: clamp(1.5rem, 10vw, 2.5rem);
+    }
+    
+    .btn, .controls-toggle {
+        padding: 12px 20px;
+        font-size: 0.9rem;
+    }
+    
+    .control-btn {
+        padding: 6px;
+        font-size: 0.55rem;
+        min-height: 32px;
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card,
+    .next-piece-container, .hold-piece-container {
+        padding: 6px;
+        font-size: 0.65rem;
+        min-width: 80px;
+    }
+    
+    .mobile-controls {
+        padding: 8px;
+    }
+    
+    .control-grid {
+        gap: 4px;
+    }
 }
 
 /* =================================
-   UTILITIES & ANIMATIONS
+   TOUCH DEVICE IMPROVEMENTS
    ================================= */
 
-/* Smooth transitions for all interactive elements */
-* {
-transition: none;
+@media (hover: none) and (pointer: coarse) {
+    .btn, .control-btn, .controls-toggle {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+    
+    .control-btn:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .control-btn:active {
+        background: rgba(41, 128, 185, 0.9);
+        transform: scale(0.98);
+    }
+    
+    .mobile-controls {
+        display: block;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
 }
 
-*:hover, *:focus, *:active {
-transition: all 0.2s ease;
+/* =================================
+   HIGH DPI DISPLAYS
+   ================================= */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .tetris-block, .tetris-block-small {
+        border-width: 0.5px;
+    }
+    
+    .game-board, .tetris-board, .responsive-board {
+        border-width: 2px;
+    }
 }
 
-/* Prevent text selection on game elements */
-.tetris-board, .tetris-block, .control-btn, .mobile-controls {
--webkit-user-select: none;
--moz-user-select: none;
--ms-user-select: none;
-user-select: none;
--webkit-touch-callout: none;
--webkit-tap-highlight-color: transparent;
-}
+/* =================================
+   PRINT STYLES
+   ================================= */
 
-/* Loading animation for boards */
-@keyframes boardPulse {
-0%, 100% { 
-    border-opacity: 0.3; 
-    box-shadow: 0 0 10px rgba(52, 152, 219, 0.2);
-}
-50% { 
-    border-opacity: 0.8; 
-    box-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
-}
-}
-
-.loading-board {
-animation: boardPulse 2s ease-in-out infinite;
-}
-
-/* Block drop animation */
-@keyframes blockDrop {
-0% { transform: translateY(-20px); opacity: 0.5; }
-100% { transform: translateY(0); opacity: 1; }
-}
-
-.block-dropping {
-animation: blockDrop 0.15s ease-out;
-}
-
-/* Line clear animation */
-@keyframes lineClear {
-0% { opacity: 1; transform: scaleX(1); }
-50% { opacity: 0.5; transform: scaleX(1.1); }
-100% { opacity: 0; transform: scaleX(0); }
-}
-
-.line-clearing {
-animation: lineClear 0.3s ease-in-out;
-}
-
-/* Game over shake animation */
-@keyframes gameOverShake {
-0%, 100% { transform: translateX(0); }
-10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-20%, 40%, 60%, 80% { transform: translateX(5px); }
-}
-
-.game-over-shake {
-animation: gameOverShake 0.5s ease-in-out;
+@media print {
+    .mobile-controls, .controls {
+        display: none !important;
+    }
+    
+    .game-screen {
+        background: white;
+        color: black;
+    }
+    
+    .tetris-board, .game-board {
+        border: 2px solid black;
+        background: white;
+    }
 }
 
 /* =================================
    ACCESSIBILITY IMPROVEMENTS
    ================================= */
 
-/* Focus indicators for keyboard navigation */
-.btn:focus,
-.control-btn:focus,
-.controls-toggle:focus {
-outline: 3px solid rgba(52, 152, 219, 0.8);
-outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-.tetris-board, .responsive-board {
-    border-width: 4px;
-}
-
-.tetris-block {
-    border-width: 2px;
-}
-
-.btn {
-    border: 2px solid rgba(255,255,255,0.8);
-}
-}
-
-/* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-*, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .screen {
+        animation: none;
+    }
+    
+    .btn::before {
+        transition: none;
+    }
 }
 
-.screen {
-    animation: none;
-}
-
-.btn::before {
-    transition: none;
-}
+@media (prefers-color-scheme: light) {
+    body {
+        background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 50%, #ecf0f1 100%);
+        color: #2c3e50;
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card,
+    .next-piece-container, .hold-piece-container {
+        background: rgba(255, 255, 255, 0.9);
+        color: #2c3e50;
+        border-color: rgba(52, 152, 219, 0.3);
+    }
 }
 
 /* =================================
-   PRINT STYLES (for debugging)
+   PERFORMANCE OPTIMIZATIONS
    ================================= */
 
-@media print {
-.screen:not(.game-screen) {
-    display: none !important;
+.tetris-block, .tetris-block-small {
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.game-board, .tetris-board {
+    contain: layout style paint;
 }
 
 .mobile-controls {
-    display: none !important;
-}
-
-.game-screen {
-    background: white !important;
-    color: black !important;
-}
-
-.tetris-board {
-    border: 2px solid black !important;
-    background: white !important;
-}
+    contain: layout style;
 }
 
 /* =================================
-   SCROLLBAR STYLING
+   BROWSER SPECIFIC FIXES
    ================================= */
 
-/* Custom scrollbar for better aesthetics */
-::-webkit-scrollbar {
-width: 8px;
-height: 8px;
+/* Safari specific */
+@supports (-webkit-appearance: none) {
+    .mobile-controls {
+        -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .stats-card, .player-info-card, .opponent-info-card {
+        -webkit-backdrop-filter: blur(10px);
+    }
 }
 
-::-webkit-scrollbar-track {
-background: rgba(52, 73, 94, 0.3);
-border-radius: 4px;
+/* Firefox specific */
+@-moz-document url-prefix() {
+    .mobile-controls {
+        background: rgba(52, 73, 94, 0.98);
+    }
 }
 
-::-webkit-scrollbar-thumb {
-background: rgba(52, 152, 219, 0.6);
-border-radius: 4px;
-transition: background 0.2s ease;
+/* Edge specific */
+@supports (-ms-ime-align: auto) {
+    .control-grid {
+        display: -ms-grid;
+    }
 }
 
-::-webkit-scrollbar-thumb:hover {
-background: rgba(52, 152, 219, 0.8);
+/* =================================
+   UTILITY CLASSES
+   ================================= */
+
+.hidden {
+    display: none !important;
 }
 
-/* Firefox scrollbar */
-* {
-scrollbar-width: thin;
-scrollbar-color: rgba(52, 152, 219, 0.6) rgba(52, 73, 94, 0.3);
+.visible {
+    display: block !important;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.no-scroll {
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* =================================
+   ANIMATION KEYFRAMES
+   ================================= */
+
+@keyframes slideInFromBottom {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(52, 152, 219, 0.8);
+    }
+}
+
+/* Line clear animation */
+@keyframes lineClear {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; background: white; }
+    100% { opacity: 0; }
+}
+
+.line-clearing {
+    animation: lineClear 0.3s ease-out;
+}
+
+/* Piece drop animation */
+@keyframes pieceDrop {
+    0% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+}
+
+.piece-dropped {
+    animation: pieceDrop 0.1s ease-out;
 }
