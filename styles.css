@@ -1,6 +1,6 @@
 /* =========================================
-   RESPONSIVE TETRIS GAME CSS - OPTIMIZED VERSION
-   กระดานใช้พื้นที่หน้าจอได้เต็มที่
+   DYNAMIC TETRIS BOARD - AUTO HEIGHT ADJUSTMENT
+   กระดานปรับขนาดตามบล็อคที่มีอยู่จริง
    ========================================= */
 
 /* =================================
@@ -436,7 +436,7 @@ body {
 }
 
 /* =================================
-   TETRIS BOARD STYLES - MAXIMIZED SIZE
+   DYNAMIC TETRIS BOARD STYLES - ใหม่!
    ================================= */
 
 .tetris-board, .responsive-board {
@@ -446,9 +446,13 @@ body {
     overflow: hidden;
     position: relative;
     transition: all 0.3s ease;
+    /* เพิ่ม properties สำหรับ dynamic height */
+    --min-visible-rows: 8; /* แสดงอย่างน้อย 8 แถว */
+    --max-visible-rows: 20; /* แสดงสูงสุด 20 แถว (เต็มกระดาน) */
+    --current-height-rows: 20; /* จำนวนแถวปัจจุบันที่ต้องแสดง */
 }
 
-/* กระดานหลัก - ใช้พื้นที่สูงสุด */
+/* กระดานหลัก - ปรับขนาดตามเนื้อหา */
 .main-board {
     --available-width: calc(100vw - clamp(240px, 30vw, 400px) - 40px);
     --available-height: calc(100vh - 40px);
@@ -457,10 +461,52 @@ body {
     --cell-size: calc(var(--board-width) / 10);
     
     width: var(--board-width);
-    height: calc(var(--board-width) * 2);
+    /* Dynamic height calculation */
+    height: calc(var(--cell-size) * var(--current-height-rows));
     max-height: calc(100vh - 40px);
     border-color: #00ffff;
     box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
+    
+    /* เพิ่ม smooth transition สำหรับการเปลี่ยนแปลงขนาด */
+    transition: height 0.3s ease, transform 0.1s ease;
+}
+
+/* Class สำหรับปรับขนาดแบบไดนามิก */
+.main-board.dynamic-height {
+    /* คำนวณความสูงตามจำนวนแถวที่มีบล็อค + buffer */
+    --occupied-rows: var(--highest-block-row, 0);
+    --visible-rows: max(var(--min-visible-rows), min(var(--max-visible-rows), calc(var(--occupied-rows) + 4)));
+    --current-height-rows: var(--visible-rows);
+    height: calc(var(--cell-size) * var(--visible-rows));
+}
+
+/* Animation สำหรับการขยายกระดาน */
+.main-board.expanding {
+    animation: expandBoard 0.3s ease-out;
+}
+
+.main-board.contracting {
+    animation: contractBoard 0.3s ease-out;
+}
+
+@keyframes expandBoard {
+    from {
+        transform: scaleY(0.95);
+        opacity: 0.9;
+    }
+    to {
+        transform: scaleY(1);
+        opacity: 1;
+    }
+}
+
+@keyframes contractBoard {
+    from {
+        transform: scaleY(1.05);
+    }
+    to {
+        transform: scaleY(1);
+    }
 }
 
 /* กระดานฝ่ายตรงข้าม - ขนาดที่เหมาะสม */
@@ -476,13 +522,28 @@ body {
     opacity: 0.9;
 }
 
+/* เพิ่มกระดานฝ่ายตรงข้ามให้รองรับ dynamic height */
+.opponent-board.dynamic-height {
+    --occupied-rows: var(--opponent-highest-block-row, 0);
+    --visible-rows: max(6, min(15, calc(var(--occupied-rows) + 3)));
+    --current-height-rows: var(--visible-rows);
+    height: calc(var(--cell-size) * var(--visible-rows));
+}
+
 /* Debug mode */
 .tetris-board.debug {
     background-image: 
         linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
     background-size: 
-        calc(100% / 10) calc(100% / 20);
+        calc(100% / 10) calc(100% / var(--current-height-rows));
+}
+
+/* เพิ่ม visual feedback เมื่อกระดานเปลี่ยนขนาด */
+.tetris-board.size-changing {
+    box-shadow: 
+        0 0 25px rgba(255, 255, 255, 0.3),
+        inset 0 0 25px rgba(255, 255, 255, 0.1);
 }
 
 /* =================================
@@ -493,15 +554,90 @@ body {
     position: absolute;
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 2px;
+    /* เพิ่ม transition สำหรับการเคลื่อนไหวที่ smooth */
+    transition: all 0.1s ease;
 }
 
-.block-i { background: #00f0f0; }
-.block-o { background: #f0f000; }
-.block-t { background: #a000f0; }
-.block-s { background: #00f000; }
-.block-z { background: #f00000; }
-.block-j { background: #0000f0; }
-.block-l { background: #f0a000; }
+.block-i { 
+    background: #00f0f0; 
+    box-shadow: inset 0 0 5px rgba(0, 240, 240, 0.5);
+}
+.block-o { 
+    background: #f0f000; 
+    box-shadow: inset 0 0 5px rgba(240, 240, 0, 0.5);
+}
+.block-t { 
+    background: #a000f0; 
+    box-shadow: inset 0 0 5px rgba(160, 0, 240, 0.5);
+}
+.block-s { 
+    background: #00f000; 
+    box-shadow: inset 0 0 5px rgba(0, 240, 0, 0.5);
+}
+.block-z { 
+    background: #f00000; 
+    box-shadow: inset 0 0 5px rgba(240, 0, 0, 0.5);
+}
+.block-j { 
+    background: #0000f0; 
+    box-shadow: inset 0 0 5px rgba(0, 0, 240, 0.5);
+}
+.block-l { 
+    background: #f0a000; 
+    box-shadow: inset 0 0 5px rgba(240, 160, 0, 0.5);
+}
+
+/* เพิ่ม hover effect สำหรับบล็อค */
+.tetris-block:hover {
+    filter: brightness(1.2);
+    transform: scale(1.02);
+}
+
+/* =================================
+   BOARD HEIGHT INDICATORS
+   ================================= */
+
+/* เพิ่ม indicator แสดงพื้นที่ที่มีบล็อค */
+.tetris-board::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(var(--cell-size) * var(--occupied-rows, 0));
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.02),
+        rgba(255, 255, 255, 0.05)
+    );
+    pointer-events: none;
+    opacity: 0.3;
+    transition: height 0.3s ease;
+}
+
+/* Visual separator สำหรับแสดงขอบเขตที่มีบล็อค */
+.tetris-board::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--cell-size) * var(--occupied-rows, 0));
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+        to right,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    pointer-events: none;
+    opacity: 0.5;
+    transition: top 0.3s ease, opacity 0.3s ease;
+}
+
+/* ซ่อน separator เมื่อไม่มีบล็อค */
+.tetris-board.empty::after {
+    opacity: 0;
+}
 
 /* =================================
    GAME OVER OVERLAY
@@ -627,7 +763,7 @@ body {
 }
 
 /* =================================
-   RESPONSIVE BREAKPOINTS - OPTIMIZED
+   RESPONSIVE BREAKPOINTS - OPTIMIZED FOR DYNAMIC BOARDS
    ================================= */
 
 /* Large Desktop - 1600px+ */
@@ -638,6 +774,7 @@ body {
     
     .main-board {
         --available-width: calc(100vw - 500px - 60px);
+        --min-visible-rows: 10;
     }
 }
 
@@ -649,6 +786,7 @@ body {
     
     .main-board {
         --available-width: calc(100vw - clamp(360px, 36vw, 440px) - 40px);
+        --min-visible-rows: 9;
     }
 }
 
@@ -664,10 +802,11 @@ body {
     
     .main-board {
         --available-width: calc(100vw - clamp(280px, 32vw, 360px) - 30px);
+        --min-visible-rows: 8;
     }
 }
 
-/* Tablet Landscape - 768px to 991px */
+/* Tablet และ Mobile - ปรับให้รองรับ dynamic height */
 @media (max-width: 991px) and (min-width: 768px) {
     .game-screen {
         flex-direction: column;
@@ -677,40 +816,16 @@ body {
         padding-bottom: 60px;
     }
     
-    .player-info, .left-panel, .right-panel {
-        flex-direction: row;
-        width: 100%;
-        height: auto;
-        max-height: none;
-        justify-content: space-around;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 0;
-    }
-    
-    .player-info > *, .left-panel > *, .right-panel > * {
-        flex: 1;
-        min-width: 120px;
-        max-width: 160px;
-    }
-    
-    .boards-container {
-        flex-direction: row;
-        gap: 15px;
-        justify-content: center;
-        align-items: center;
-        flex: 1;
-        height: auto;
-    }
-    
     .main-board {
         --board-width: min(50vw, 60vh);
-        max-height: 80vh;
+        --min-visible-rows: 6;
+        max-height: 70vh;
     }
     
     .opponent-board {
         --board-width: min(30vw, 40vh);
-        max-height: 60vh;
+        --min-visible-rows: 4;
+        max-height: 50vh;
     }
     
     .mobile-controls {
@@ -720,460 +835,331 @@ body {
     }
 }
 
-/* Tablet Portrait - 576px to 767px */
 @media (max-width: 767px) and (min-width: 576px) {
-    .game-screen {
-        flex-direction: column;
-        gap: 8px;
-        height: 100vh;
-        padding: 3px;
-        padding-bottom: 80px;
-    }
-    
-    .player-info, .left-panel, .right-panel {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 6px;
-        padding: 2px;
-        height: auto;
-    }
-    
-    .player-info > *, .left-panel > *, .right-panel > * {
-        flex: 1;
-        min-width: 100px;
-        max-width: 130px;
-        font-size: clamp(0.5rem, 1.2vw, 0.7rem);
-        padding: 4px;
-    }
-    
-    .boards-container {
-        flex-direction: column;
-        gap: 10px;
-        align-items: center;
-        flex: 1;
-        justify-content: center;
-    }
-    
-    .opponent-board {
-        order: -1;
-    }
-    
     .main-board {
         --board-width: min(80vw, 70vh);
-        max-height: 70vh;
+        --min-visible-rows: 6;
+        max-height: 60vh;
     }
     
     .opponent-board {
         --board-width: min(60vw, 50vh);
-        max-height: 50vh;
+        --min-visible-rows: 4;
+        max-height: 40vh;
     }
     
     .mobile-controls {
         display: block;
-        position: fixed;
-        bottom: 0;
-        width: 100vw;
-        border-radius: 0;
-        border-top-left-radius: 15px;
-        border-top-right-radius: 15px;
+        width: 90vw;
+        max-width: 320px;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        width: 100%;
+        flex-direction: row;
+        max-height: none;
+        overflow: visible;
+        gap: 5px;
+    }
+    
+    .player-info-card, 
+    .opponent-info-card, 
+    .stats-card, 
+    .opponent-stats-card {
+        flex: 1;
+        min-width: 0;
+        margin-bottom: 0;
     }
 }
 
-/* Mobile - 320px to 575px */
+/* Mobile Portrait - 575px and below */
 @media (max-width: 575px) {
-    .game-container {
-        padding: 0;
-    }
-    
     .game-screen {
         flex-direction: column;
-        gap: 5px;
-        height: 100vh;
         padding: 2px;
+        gap: 5px;
         padding-bottom: 70px;
     }
     
-    .player-info, .left-panel, .right-panel {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 4px;
-        padding: 1px;
-        justify-content: center;
-        height: auto;
-    }
-    
-    .player-info > *, .left-panel > *, .right-panel > * {
-        flex: 1;
-        min-width: 80px;
-        max-width: 110px;
-        font-size: clamp(0.45rem, 1vw, 0.6rem);
-        padding: 3px;
-    }
-    
-    .boards-container {
-        flex-direction: column;
-        gap: 8px;
-        align-items: center;
-        flex: 1;
-        justify-content: center;
-    }
-    
-    .opponent-board {
-        order: -1;
-    }
-    
     .main-board {
-        --board-width: min(90vw, 75vh);
-        max-height: 75vh;
+        --board-width: min(95vw, 60vh);
+        --min-visible-rows: 8;
+        max-height: 50vh;
     }
     
     .opponent-board {
-        --board-width: min(70vw, 55vh);
-        max-height: 55vh;
+        --board-width: min(70vw, 35vh);
+        --min-visible-rows: 6;
+        max-height: 30vh;
     }
     
     .mobile-controls {
         display: block;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        transform: none;
-        border-radius: 0;
-        border-top-left-radius: 15px;
-        border-top-right-radius: 15px;
+        width: 95vw;
+        max-width: 280px;
+        bottom: 2px;
+    }
+    
+    .control-btn, .control-button {
+        min-height: 35px;
+        font-size: 0.7rem;
+    }
+    
+    .player-info, .left-panel, .right-panel {
+        flex-direction: row;
         width: 100%;
-        padding: 6px;
-    }
-    
-    .control-buttons, .control-grid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
-    }
-    
-    .control-btn, .control-button {
-        min-height: 32px;
-        font-size: 0.65rem;
-        padding: 4px;
-    }
-}
-
-/* Very Small Mobile - 320px and below */
-@media (max-width: 320px) {
-    .main-board {
-        --board-width: min(95vw, 80vh);
-        max-height: 80vh;
-    }
-    
-    .opponent-board {
-        --board-width: min(75vw, 60vh);
-        max-height: 60vh;
-    }
-    
-    .player-info > *, .left-panel > *, .right-panel > * {
-        min-width: 70px;
-        font-size: 0.4rem;
-    }
-    
-    .control-btn, .control-button {
-        min-height: 28px;
-        font-size: 0.6rem;
-    }
-}
-
-/* Landscape Mobile - สำคัญมาก */
-@media (max-height: 600px) and (orientation: landscape) {
-    .game-screen {
-        flex-direction: row;
-        height: 100vh;
-        padding: 2px;
-        gap: 8px;
-    }
-    
-    .player-info, .left-panel, .right-panel {
-        flex-direction: column;
-        width: clamp(100px, 15vw, 140px);
-        height: 100vh;
-        font-size: 0.6rem;
-        padding: 2px;
         gap: 3px;
-        overflow-y: auto;
     }
     
-    .player-info > *, .left-panel > *, .right-panel > * {
-        padding: 3px;
-        min-width: auto;
-        font-size: 0.55rem;}
-    
-    .boards-container {
-        flex-direction: row;
-        gap: 10px;
-        justify-content: center;
-        align-items: center;
+    .player-info-card, 
+    .opponent-info-card, 
+    .stats-card, 
+    .opponent-stats-card,
+    .next-piece-container,
+    .hold-piece-container {
         flex: 1;
-        height: 100vh;
+        padding: 4px 6px;
+        font-size: 0.6rem;
+        margin-bottom: 0;
+        min-width: 0;
     }
     
-    .main-board {
-        --board-width: min(60vh, 50vw);
-        max-height: 95vh;
-    }
-    
-    .opponent-board {
-        --board-width: min(40vh, 30vw);
-        max-height: 80vh;
-    }
-    
-    .mobile-controls {
-        display: block;
-        position: fixed;
-        right: 5px;
-        bottom: 50%;
-        left: auto;
-        transform: translateY(50%);
-        width: clamp(60px, 12vw, 80px);
-        flex-direction: column;
-    }
-    
-    .control-buttons, .control-grid {
-        grid-template-columns: 1fr;
-        grid-template-rows: repeat(4, 1fr);
-        gap: 3px;
-    }
-    
-    .control-btn, .control-button {
-        min-height: clamp(25px, 6vh, 35px);
-        aspect-ratio: 1;
-        font-size: 0.5rem;
+    #next-piece-preview, .next-piece-preview,
+    #hold-piece-preview, .hold-piece-preview {
+        width: 30px;
+        height: 30px;
     }
 }
 
 /* =================================
-   HIGH DPI & RETINA DISPLAYS
+   DYNAMIC HEIGHT UTILITY CLASSES
    ================================= */
 
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    .tetris-block {
-        border-width: 0.5px;
-    }
-    
-    .tetris-board {
-        border-width: 2px;
-    }
+/* Classes สำหรับควบคุม dynamic height behavior */
+.board-auto-resize {
+    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* =================================
-   PRINT STYLES
-   ================================= */
-
-@media print {
-    .mobile-controls,
-    .btn,
-    .controls-accordion {
-        display: none !important;
-    }
-    
-    .game-screen {
-        color: black !important;
-        background: white !important;
-    }
+.board-smooth-transition {
+    transition: all 0.3s ease-out;
 }
 
-/* =================================
-   ACCESSIBILITY IMPROVEMENTS
-   ================================= */
-
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-    
-    .screen {
-        animation: none;
-    }
-    
-    .btn:hover {
-        transform: none;
-    }
+.board-instant-resize {
+    transition: none;
 }
 
-@media (prefers-high-contrast: high) {
-    .tetris-board {
-        border-width: 4px;
-        border-color: #ffffff;
-    }
-    
-    .tetris-block {
-        border-width: 2px;
-        border-color: #ffffff;
-    }
-    
-    .block-i { background: #ffffff; color: #000000; }
-    .block-o { background: #ffff00; color: #000000; }
-    .block-t { background: #ff00ff; color: #ffffff; }
-    .block-s { background: #00ff00; color: #000000; }
-    .block-z { background: #ff0000; color: #ffffff; }
-    .block-j { background: #0000ff; color: #ffffff; }
-    .block-l { background: #ffa500; color: #000000; }
+/* Height presets สำหรับ different game states */
+.board-height-minimal {
+    --min-visible-rows: 6;
+    --max-visible-rows: 12;
 }
 
-/* =================================
-   FOCUS & KEYBOARD NAVIGATION
-   ================================= */
-
-.btn:focus,
-.control-btn:focus,
-.control-button:focus,
-.controls-toggle:focus {
-    outline: 3px solid #ffd700;
-    outline-offset: 2px;
+.board-height-normal {
+    --min-visible-rows: 8;
+    --max-visible-rows: 16;
 }
 
-.tetris-board:focus {
-    outline: 3px solid #00ffff;
-    outline-offset: 4px;
-}
-
-/* =================================
-   LOADING STATES
-   ================================= */
-
-.loading {
-    position: relative;
-    pointer-events: none;
-}
-
-.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border: 2px solid #ffffff;
-    border-top: 2px solid transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* =================================
-   ERROR STATES
-   ================================= */
-
-.error-state {
-    background: rgba(244, 67, 54, 0.1) !important;
-    border-color: #f44336 !important;
-    color: #f44336 !important;
-}
-
-.error-message {
-    color: #f44336;
-    font-size: clamp(0.8rem, 2vw, 1rem);
-    text-align: center;
-    padding: 1rem;
-    background: rgba(244, 67, 54, 0.1);
-    border-radius: 8px;
-    border: 1px solid #f44336;
-    margin: 1rem 0;
+.board-height-full {
+    --min-visible-rows: 12;
+    --max-visible-rows: 20;
 }
 
 /* =================================
    PERFORMANCE OPTIMIZATIONS
    ================================= */
 
+/* GPU acceleration สำหรับ smooth animations */
 .tetris-board,
 .tetris-block {
-    will-change: transform;
     transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform, height;
 }
 
-.game-screen {
-    contain: layout style paint;
+/* Optimize transitions */
+.main-board.dynamic-height {
+    contain: layout style;
 }
 
 /* =================================
-   DARK MODE SUPPORT
+   ACCESSIBILITY IMPROVEMENTS
    ================================= */
 
-@media (prefers-color-scheme: dark) {
-    body {
-        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .tetris-board {
+        border-width: 4px;
+    }
+    
+    .tetris-block {
+        border-width: 2px;
+        border-color: white;
+    }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .tetris-board,
+    .tetris-block,
+    .main-board {
+        transition: none;
+        animation: none;
+    }
+    
+    .main-board.expanding,
+    .main-board.contracting {
+        animation: none;
+    }
+}
+
+/* =================================
+   DEBUG AND DEVELOPMENT HELPERS
+   ================================= */
+
+/* Debug grid overlay */
+.tetris-board.show-grid {
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            rgba(255,255,255,0.1) 0px,
+            rgba(255,255,255,0.1) 1px,
+            transparent 1px,
+            transparent calc(100% / var(--current-height-rows))
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0.1) 0px,
+            rgba(255,255,255,0.1) 1px,
+            transparent 1px,
+            transparent 10%
+        );
+}
+
+/* Visual height indicator */
+.tetris-board.show-height-info::before {
+    content: attr(data-height-info);
+    position: absolute;
+    top: -25px;
+    left: 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.8);
+    padding: 2px 6px;
+    border-radius: 4px;
+    z-index: 1;
+}
+
+/* =================================
+   LOADING AND PLACEHOLDER STATES
+   ================================= */
+
+.board-loading {
+    background: linear-gradient(
+        45deg,
+        rgba(0,0,0,0.8) 25%,
+        rgba(255,255,255,0.1) 25%,
+        rgba(255,255,255,0.1) 50%,
+        rgba(0,0,0,0.8) 50%,
+        rgba(0,0,0,0.8) 75%,
+        rgba(255,255,255,0.1) 75%
+    );
+    background-size: 20px 20px;
+    animation: loading-stripes 1s linear infinite;
+}
+
+@keyframes loading-stripes {
+    0% { background-position: 0 0; }
+    100% { background-position: 20px 20px; }
+}
+
+/* =================================
+   BOARD RESIZE ANIMATIONS - ENHANCED
+   ================================= */
+
+/* Smooth resize with spring effect */
+.main-board.spring-resize {
+    transition: height 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Elastic resize for dramatic height changes */
+.main-board.elastic-resize {
+    transition: height 0.6s cubic-bezier(0.68, -0.6, 0.32, 1.6);
+}
+
+/* Quick snap for small adjustments */
+.main-board.snap-resize {
+    transition: height 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* =================================
+   THEME VARIATIONS FOR DYNAMIC BOARDS
+   ================================= */
+
+/* Neon theme */
+.tetris-board.theme-neon {
+    border-color: #00ff41;
+    box-shadow: 
+        0 0 20px rgba(0, 255, 65, 0.5),
+        inset 0 0 20px rgba(0, 255, 65, 0.1);
+}
+
+.tetris-board.theme-neon.main-board {
+    border-color: #00ffff;
+    box-shadow: 
+        0 0 30px rgba(0, 255, 255, 0.6),
+        inset 0 0 30px rgba(0, 255, 255, 0.1);
+}
+
+/* Retro theme */
+.tetris-board.theme-retro {
+    border-color: #ffff00;
+    background: rgba(128, 0, 128, 0.9);
+    box-shadow: 
+        0 0 15px rgba(255, 255, 0, 0.4),
+        inset 0 0 15px rgba(255, 255, 0, 0.1);
+}
+
+/* =================================
+   UTILITY CLASSES FOR JAVASCRIPT INTEGRATION
+   ================================= */
+
+/* Data attributes for dynamic sizing */
+[data-dynamic-height="true"] {
+    --enable-dynamic-height: 1;
+}
+
+[data-min-rows] {
+    --min-visible-rows: attr(data-min-rows number, 8);
+}
+
+[data-max-rows] {
+    --max-visible-rows: attr(data-max-rows number, 20);
+}
+
+/* State classes for different resize behaviors */
+.resize-immediate { transition: height 0.1s ease; }
+.resize-smooth { transition: height 0.3s ease; }
+.resize-bouncy { transition: height 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+.resize-disabled { transition: none; }
+
+/* =================================
+   PRINT STYLES (IF NEEDED)
+   ================================= */
+
+@media print {
+    .mobile-controls,
+    .control-buttons,
+    .control-grid {
+        display: none;
     }
     
     .tetris-board {
-        background: rgba(0,0,0,0.95);
-    }
-}
-
-/* =================================
-   ULTRA-WIDE SCREEN SUPPORT
-   ================================= */
-
-@media (min-aspect-ratio: 21/9) {
-    .game-screen {
-        max-width: 1920px;
-        margin: 0 auto;
+        box-shadow: none;
+        border: 2px solid black;
     }
     
-    .player-info, .left-panel, .right-panel {
-        width: 300px;
-    }
-    
-    .main-board {
-        --available-width: calc(100vw - 600px - 80px);
-    }
-}
-
-/* =================================
-   VERY TALL SCREENS
-   ================================= */
-
-@media (min-aspect-ratio: 1/2) {
     .game-screen {
         flex-direction: column;
-        justify-content: center;
-    }
-    
-    .boards-container {
-        flex-direction: row;
-        gap: 20px;
-    }
-    
-    .main-board {
-        --board-width: min(40vw, 80vh);
-    }
-}
-
-/* =================================
-   HOVER DEVICE OPTIMIZATIONS
-   ================================= */
-
-@media (hover: hover) and (pointer: fine) {
-    .control-btn:hover,
-    .control-button:hover {
-        background: rgba(255,255,255,0.4);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-}
-
-@media (hover: none) and (pointer: coarse) {
-    .control-btn,
-    .control-button {
-        padding: clamp(12px, 3vw, 16px);
-        min-height: 48px;
-    }
-    
-    .btn {
-        min-height: 48px;
-        padding: clamp(16px, 4vw, 24px) clamp(24px, 6vw, 40px);
+        height: auto;
     }
 }
