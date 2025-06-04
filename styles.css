@@ -1,6 +1,6 @@
 /* =========================================
-   DYNAMIC TETRIS BOARD - AUTO HEIGHT ADJUSTMENT
-   กระดานปรับขนาดตามบล็อคที่มีอยู่จริง
+   IMPROVED TETRIS CSS - STANDARD GAMEPLAY
+   ปรับปรุงให้เป็นมาตรฐานการเล่น เหมาะสม และน่าใช้งาน
    ========================================= */
 
 /* =================================
@@ -14,11 +14,12 @@
 }
 
 body {
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
     color: white;
     overflow-x: hidden;
     min-height: 100vh;
+    user-select: none;
 }
 
 /* =================================
@@ -30,14 +31,14 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: clamp(5px, 1vw, 15px);
+    padding: 10px;
     width: 100%;
 }
 
 .screen {
     display: none;
     text-align: center;
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.4s ease-out;
     width: 100%;
     max-width: 100vw;
     margin: 0 auto;
@@ -49,7 +50,7 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
@@ -62,162 +63,184 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: clamp(1rem, 3vw, 2rem);
-    padding: clamp(1rem, 4vw, 2rem);
+    gap: 1.5rem;
+    padding: 2rem;
     height: 100vh;
 }
 
 .game-title {
-    font-size: clamp(2rem, 8vw, 4rem);
-    font-weight: bold;
-    margin-bottom: clamp(1rem, 3vw, 2rem);
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 800;
+    margin-bottom: 2rem;
+    background: linear-gradient(45deg, #3498db, #9b59b6, #e74c3c);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.1;
+    letter-spacing: -1px;
 }
 
 .connection-status {
-    margin-bottom: clamp(1rem, 2vw, 2rem);
-    padding: clamp(12px, 3vw, 18px) clamp(20px, 5vw, 35px);
-    border-radius: 25px;
-    font-weight: bold;
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
+    margin-bottom: 1.5rem;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
     width: 100%;
-    max-width: clamp(280px, 50vw, 400px);
+    max-width: 320px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     text-align: center;
-    display: inline-block;
-    margin-left: auto;
-    margin-right: auto;
+    transition: all 0.3s ease;
 }
 
 .connected {
-    background: rgba(76, 175, 80, 0.3);
-    border: 2px solid #4CAF50;
+    background: rgba(46, 204, 113, 0.2);
+    border: 2px solid #2ecc71;
+    color: #2ecc71;
 }
 
 .disconnected {
-    background: rgba(244, 67, 54, 0.3);
-    border: 2px solid #f44336;
+    background: rgba(231, 76, 60, 0.2);
+    border: 2px solid #e74c3c;
+    color: #e74c3c;
 }
 
 .menu-buttons {
     display: flex;
     flex-direction: column;
-    gap: clamp(0.8rem, 2vw, 1.5rem);
+    gap: 1rem;
     width: 100%;
-    max-width: clamp(280px, 50vw, 400px);
+    max-width: 320px;
     margin: 0 auto;
 }
 
 /* =================================
-   BUTTON STYLES
+   IMPROVED BUTTON STYLES
    ================================= */
 
 .btn {
-    padding: clamp(12px, 3vw, 18px) clamp(20px, 5vw, 35px);
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
-    font-weight: bold;
+    padding: 14px 28px;
+    font-size: 1rem;
+    font-weight: 600;
     border: none;
-    border-radius: 25px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, #3498db, #2980b9);
     color: white;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     text-decoration: none;
     display: inline-block;
     width: 100%;
     text-align: center;
-    min-height: 44px;
+    min-height: 48px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
 }
 
 .btn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
     transform: none;
 }
 
 .btn-single-player {
-    background: linear-gradient(45deg, #ff9500, #ff6b00);
+    background: linear-gradient(135deg, #e67e22, #d35400);
 }
 
 .btn-single-player:hover {
-    background: linear-gradient(45deg, #ffb84d, #ff8533);
+    box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
 }
 
 /* =================================
-   CONTROLS ACCORDION
+   CONTROLS ACCORDION - IMPROVED
    ================================= */
 
 .controls-accordion {
     width: 100%;
-    max-width: clamp(280px, 50vw, 400px);
-    margin: clamp(1rem, 2vw, 1.5rem) auto;
+    max-width: 320px;
+    margin: 1rem auto;
 }
 
 .controls-toggle {
-    background: linear-gradient(45deg, #8a2be2, #4b0082);
+    background: linear-gradient(135deg, #8e44ad, #7d3c98);
     border: none;
     color: white;
-    padding: clamp(12px, 3vw, 18px) clamp(20px, 5vw, 35px);
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
-    font-weight: bold;
-    border-radius: 25px;
+    padding: 14px 28px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    min-height: 44px;
+    letter-spacing: 0.5px;
+    min-height: 48px;
 }
 
 .controls-toggle:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-    background: linear-gradient(45deg, #9932cc, #6a0dad);
+    box-shadow: 0 6px 20px rgba(142, 68, 173, 0.4);
 }
 
 .controls-content {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    background: rgba(138, 43, 226, 0.1);
-    border-radius: 15px;
-    margin-top: 10px;
+    background: rgba(52, 73, 94, 0.9);
+    border-radius: 12px;
+    margin-top: 8px;
     backdrop-filter: blur(10px);
 }
 
 .controls-content.expanded {
-    max-height: 400px;
-    padding: clamp(15px, 3vw, 25px);
-    border: 2px solid rgba(138, 43, 226, 0.3);
+    max-height: 500px;
+    padding: 20px;
+    border: 2px solid rgba(142, 68, 173, 0.3);
 }
 
 .controls-section {
     text-align: left;
-    margin-bottom: 15px;
+    margin-bottom: 16px;
 }
 
 .controls-title {
-    color: #8a2be2;
-    font-weight: bold;
-    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    color: #8e44ad;
+    font-weight: 700;
+    font-size: 1rem;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
@@ -225,7 +248,7 @@ body {
 }
 
 .controls-list {
-    font-size: clamp(0.8rem, 1.8vw, 1rem);
+    font-size: 0.9rem;
     line-height: 1.6;
     color: rgba(255, 255, 255, 0.9);
 }
@@ -233,19 +256,19 @@ body {
 .control-item {
     display: flex;
     justify-content: space-between;
-    margin: 5px 0;
-    padding: 3px 0;
-    flex-wrap: wrap;
-    gap: 5px;
+    margin: 8px 0;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .control-key {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 4px 10px;
     border-radius: 6px;
-    font-weight: bold;
-    font-size: clamp(0.7rem, 1.5vw, 0.9rem);
-    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #ecf0f1;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 .toggle-icon {
@@ -257,49 +280,59 @@ body {
 }
 
 /* =================================
-   ROOM INFO STYLES
+   ROOM INFO STYLES - IMPROVED
    ================================= */
 
 .room-info {
-    background: rgba(255,255,255,0.1);
-    border-radius: 15px;
-    padding: clamp(1.5rem, 4vw, 2.5rem);
-    margin-bottom: clamp(1.5rem, 3vw, 2rem);
+    background: rgba(52, 73, 94, 0.9);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
     backdrop-filter: blur(10px);
     width: 100%;
-    max-width: 500px;
+    max-width: 400px;
     margin-left: auto;
     margin-right: auto;
+    border: 2px solid rgba(52, 152, 219, 0.3);
 }
 
 .room-id {
-    font-size: clamp(1.5rem, 5vw, 2.5rem);
-    font-weight: bold;
-    color: #ffd700;
-    margin-bottom: clamp(0.8rem, 2vw, 1.2rem);
+    font-size: clamp(1.8rem, 4vw, 2.2rem);
+    font-weight: 700;
+    color: #f39c12;
+    margin-bottom: 1rem;
     word-break: break-all;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .players-list {
     list-style: none;
-    margin: clamp(0.8rem, 2vw, 1.2rem) 0;
+    margin: 1rem 0;
 }
 
 .players-list li {
-    padding: clamp(8px, 2vw, 12px);
-    margin: 5px 0;
+    padding: 12px 16px;
+    margin: 8px 0;
     background: rgba(255,255,255,0.1);
-    border-radius: 10px;
-    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.players-list li:hover {
+    background: rgba(255,255,255,0.15);
+    transform: translateX(4px);
 }
 
 .players-list li.current-player {
-    background: rgba(255, 215, 0, 0.3);
-    border: 2px solid #ffd700;
+    background: rgba(241, 196, 15, 0.2);
+    border: 2px solid #f1c40f;
+    color: #f1c40f;
+    font-weight: 600;
 }
 
 /* =================================
-   GAME SCREEN LAYOUT - OPTIMIZED FOR FULL SCREEN
+   GAME SCREEN LAYOUT - STANDARD TETRIS PROPORTIONS
    ================================= */
 
 .game-container {
@@ -317,330 +350,307 @@ body {
     display: flex;
     width: 100vw;
     height: 100vh;
-    gap: clamp(5px, 1.5vw, 20px);
-    align-items: stretch;
-    justify-content: space-between;
-    padding: clamp(5px, 1vw, 10px);
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
     box-sizing: border-box;
 }
 
 /* =================================
-   PANEL STYLES - OPTIMIZED SIZING
-   ================================= */
-
-.player-info, .left-panel, .right-panel {
-    flex: 0 0 auto;
-    width: clamp(120px, 15vw, 200px);
-    display: flex;
-    flex-direction: column;
-    gap: clamp(5px, 1vw, 10px);
-    max-height: 100vh;
-    overflow-y: auto;
-    padding: clamp(2px, 0.5vw, 5px);
-}
-
-/* Game Info Cards - Compact Design */
-.player-info-card, 
-.opponent-info-card, 
-.stats-card, 
-.opponent-stats-card, 
-.next-piece-container {
-    padding: clamp(6px, 1.5vw, 12px);
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-    text-align: center;
-    width: 100%;
-    font-size: clamp(0.6rem, 1.4vw, 0.9rem);
-    min-height: fit-content;
-    margin-bottom: clamp(2px, 0.5vw, 5px);
-}
-
-.player-info-card, .stats-card {
-    background: rgba(0, 255, 255, 0.1);
-    border: 2px solid #00ffff;
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
-}
-
-.opponent-info-card, .opponent-stats-card {
-    background: rgba(255, 107, 107, 0.1);
-    border: 2px solid #ff6b6b;
-    box-shadow: 0 0 15px rgba(255, 107, 107, 0.2);
-}
-
-.next-piece-container, .hold-piece-container {
-    background: rgba(138, 43, 226, 0.2);
-    border: 2px solid #8a2be2;
-    box-shadow: 0 0 15px rgba(138, 43, 226, 0.2);
-}
-
-.player-label, .opponent-label, .next-piece-title, .hold-piece-title {
-    font-weight: bold;
-    margin-bottom: 0.2rem;
-    font-size: clamp(0.7rem, 1.5vw, 0.9rem);
-}
-
-.player-label {
-    color: #00ffff;
-}
-
-.opponent-label {
-    color: #ff6b6b;
-}
-
-.next-piece-title, .hold-piece-title {
-    color: #8a2be2;
-}
-
-.player-name-display {
-    color: white;
-    font-size: clamp(0.8rem, 1.6vw, 1rem);
-    font-weight: bold;
-}
-
-#next-piece-preview, .next-piece-preview,
-#hold-piece-preview, .hold-piece-preview {
-    width: clamp(40px, 8vw, 60px);
-    height: clamp(40px, 8vw, 60px);
-    background: rgba(0,0,0,0.8);
-    border: 2px solid #333;
-    border-radius: 6px;
-    margin: 0 auto;
-    position: relative;
-}
-
-/* =================================
-   GAME BOARDS LAYOUT - MAXIMIZED SPACE USAGE
+   STANDARD TETRIS BOARD LAYOUT
    ================================= */
 
 .boards-container {
     display: flex;
     flex-direction: column;
-    gap: clamp(10px, 2vw, 20px);
+    gap: 15px;
     align-items: center;
     justify-content: center;
     flex: 1;
-    min-width: 0;
     height: 100%;
-    padding: 0 clamp(5px, 1vw, 10px);
+    padding: 0 10px;
 }
 
 .main-player-area {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(5px, 1vw, 10px);
+    gap: 10px;
     width: 100%;
     flex: 1;
     justify-content: center;
 }
 
 /* =================================
-   DYNAMIC TETRIS BOARD STYLES - ใหม่!
+   STANDARD TETRIS BOARD - 10x20 FIXED SIZE
    ================================= */
 
 .tetris-board, .responsive-board {
-    background: rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, 0.9);
     border: 3px solid;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     position: relative;
-    transition: all 0.3s ease;
-    /* เพิ่ม properties สำหรับ dynamic height */
-    --min-visible-rows: 8; /* แสดงอย่างน้อย 8 แถว */
-    --max-visible-rows: 20; /* แสดงสูงสุด 20 แถว (เต็มกระดาน) */
-    --current-height-rows: 20; /* จำนวนแถวปัจจุบันที่ต้องแสดง */
+    /* Standard Tetris proportions: 10 wide x 20 tall */
+    --cell-size: min(
+        calc((100vh - 100px) / 22), 
+        calc((100vw - 400px) / 12)
+    );
+    width: calc(var(--cell-size) * 10);
+    height: calc(var(--cell-size) * 20);
+    max-width: 400px;
+    max-height: 800px;
+    min-width: 250px;
+    min-height: 500px;
 }
 
-/* กระดานหลัก - ปรับขนาดตามเนื้อหา */
+/* Main player board */
 .main-board {
-    --available-width: calc(100vw - clamp(240px, 30vw, 400px) - 40px);
-    --available-height: calc(100vh - 40px);
-    --max-board-width: calc(var(--available-height) / 2);
-    --board-width: min(var(--available-width), var(--max-board-width));
-    --cell-size: calc(var(--board-width) / 10);
-    
-    width: var(--board-width);
-    /* Dynamic height calculation */
-    height: calc(var(--cell-size) * var(--current-height-rows));
-    max-height: calc(100vh - 40px);
-    border-color: #00ffff;
-    box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
-    
-    /* เพิ่ม smooth transition สำหรับการเปลี่ยนแปลงขนาด */
-    transition: height 0.3s ease, transform 0.1s ease;
+    border-color: #3498db;
+    box-shadow: 
+        0 0 20px rgba(52, 152, 219, 0.4),
+        inset 0 0 20px rgba(52, 152, 219, 0.1);
+    background: 
+        linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%),
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent calc(var(--cell-size) - 1px),
+            rgba(52, 152, 219, 0.1) calc(var(--cell-size) - 1px),
+            rgba(52, 152, 219, 0.1) var(--cell-size)
+        ),
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent calc(var(--cell-size) - 1px),
+            rgba(52, 152, 219, 0.1) calc(var(--cell-size) - 1px),
+            rgba(52, 152, 219, 0.1) var(--cell-size)
+        );
 }
 
-/* Class สำหรับปรับขนาดแบบไดนามิก */
-.main-board.dynamic-height {
-    /* คำนวณความสูงตามจำนวนแถวที่มีบล็อค + buffer */
-    --occupied-rows: var(--highest-block-row, 0);
-    --visible-rows: max(var(--min-visible-rows), min(var(--max-visible-rows), calc(var(--occupied-rows) + 4)));
-    --current-height-rows: var(--visible-rows);
-    height: calc(var(--cell-size) * var(--visible-rows));
-}
-
-/* Animation สำหรับการขยายกระดาน */
-.main-board.expanding {
-    animation: expandBoard 0.3s ease-out;
-}
-
-.main-board.contracting {
-    animation: contractBoard 0.3s ease-out;
-}
-
-@keyframes expandBoard {
-    from {
-        transform: scaleY(0.95);
-        opacity: 0.9;
-    }
-    to {
-        transform: scaleY(1);
-        opacity: 1;
-    }
-}
-
-@keyframes contractBoard {
-    from {
-        transform: scaleY(1.05);
-    }
-    to {
-        transform: scaleY(1);
-    }
-}
-
-/* กระดานฝ่ายตรงข้าม - ขนาดที่เหมาะสม */
+/* Opponent board - smaller */
 .opponent-board {
-    --board-width: min(25vw, calc(var(--available-height) / 3));
-    --cell-size: calc(var(--board-width) / 10);
-    
-    width: var(--board-width);
-    height: calc(var(--board-width) * 2);
-    max-height: calc(50vh);
-    border-color: #ff6b6b;
-    box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
+    --cell-size: min(
+        calc((100vh - 100px) / 30), 
+        calc((100vw - 400px) / 18)
+    );
+    width: calc(var(--cell-size) * 10);
+    height: calc(var(--cell-size) * 20);
+    max-width: 250px;
+    max-height: 500px;
+    min-width: 150px;
+    min-height: 300px;
+    border-color: #e74c3c;
+    box-shadow: 
+        0 0 15px rgba(231, 76, 60, 0.3),
+        inset 0 0 15px rgba(231, 76, 60, 0.1);
     opacity: 0.9;
 }
 
-/* เพิ่มกระดานฝ่ายตรงข้ามให้รองรับ dynamic height */
-.opponent-board.dynamic-height {
-    --occupied-rows: var(--opponent-highest-block-row, 0);
-    --visible-rows: max(6, min(15, calc(var(--occupied-rows) + 3)));
-    --current-height-rows: var(--visible-rows);
-    height: calc(var(--cell-size) * var(--visible-rows));
-}
-
-/* Debug mode */
-.tetris-board.debug {
-    background-image: 
-        linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 
-        calc(100% / 10) calc(100% / var(--current-height-rows));
-}
-
-/* เพิ่ม visual feedback เมื่อกระดานเปลี่ยนขนาด */
-.tetris-board.size-changing {
-    box-shadow: 
-        0 0 25px rgba(255, 255, 255, 0.3),
-        inset 0 0 25px rgba(255, 255, 255, 0.1);
-}
-
 /* =================================
-   TETRIS BLOCKS
+   IMPROVED TETRIS BLOCKS
    ================================= */
 
 .tetris-block {
     position: absolute;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.3);
     border-radius: 2px;
-    /* เพิ่ม transition สำหรับการเคลื่อนไหวที่ smooth */
     transition: all 0.1s ease;
+    box-shadow: 
+        inset 0 0 0 1px rgba(255,255,255,0.2),
+        0 1px 3px rgba(0,0,0,0.5);
 }
 
+/* Standard Tetris colors with improved contrast */
 .block-i { 
-    background: #00f0f0; 
-    box-shadow: inset 0 0 5px rgba(0, 240, 240, 0.5);
+    background: linear-gradient(135deg, #00f5ff 0%, #00d4e6 100%);
+    border-color: #00a8cc;
 }
 .block-o { 
-    background: #f0f000; 
-    box-shadow: inset 0 0 5px rgba(240, 240, 0, 0.5);
+    background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+    border-color: #cc8800;
 }
 .block-t { 
-    background: #a000f0; 
-    box-shadow: inset 0 0 5px rgba(160, 0, 240, 0.5);
+    background: linear-gradient(135deg, #a020f0 0%, #7a1fb8 100%);
+    border-color: #5c1a87;
 }
 .block-s { 
-    background: #00f000; 
-    box-shadow: inset 0 0 5px rgba(0, 240, 0, 0.5);
+    background: linear-gradient(135deg, #32cd32 0%, #228b22 100%);
+    border-color: #1a661a;
 }
 .block-z { 
-    background: #f00000; 
-    box-shadow: inset 0 0 5px rgba(240, 0, 0, 0.5);
+    background: linear-gradient(135deg, #ff4500 0%, #cc3300 100%);
+    border-color: #992600;
 }
 .block-j { 
-    background: #0000f0; 
-    box-shadow: inset 0 0 5px rgba(0, 0, 240, 0.5);
+    background: linear-gradient(135deg, #0080ff 0%, #0066cc 100%);
+    border-color: #004d99;
 }
 .block-l { 
-    background: #f0a000; 
-    box-shadow: inset 0 0 5px rgba(240, 160, 0, 0.5);
+    background: linear-gradient(135deg, #ff8c00 0%, #cc6600 100%);
+    border-color: #994d00;
 }
 
-/* เพิ่ม hover effect สำหรับบล็อค */
-.tetris-block:hover {
-    filter: brightness(1.2);
-    transform: scale(1.02);
+/* Ghost piece for better gameplay */
+.ghost-block {
+    opacity: 0.3;
+    border-style: dashed;
+    background: transparent !important;
+    border-color: rgba(255,255,255,0.5);
 }
 
 /* =================================
-   BOARD HEIGHT INDICATORS
+   IMPROVED SIDE PANELS
    ================================= */
 
-/* เพิ่ม indicator แสดงพื้นที่ที่มีบล็อค */
-.tetris-board::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: calc(var(--cell-size) * var(--occupied-rows, 0));
-    background: linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 0.02),
-        rgba(255, 255, 255, 0.05)
-    );
-    pointer-events: none;
-    opacity: 0.3;
-    transition: height 0.3s ease;
+.player-info, .left-panel, .right-panel {
+    flex: 0 0 auto;
+    width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: 5px;
 }
 
-/* Visual separator สำหรับแสดงขอบเขตที่มีบล็อค */
-.tetris-board::after {
-    content: '';
-    position: absolute;
-    top: calc(var(--cell-size) * var(--occupied-rows, 0));
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-        to right,
-        transparent,
-        rgba(255, 255, 255, 0.3),
-        transparent
-    );
-    pointer-events: none;
-    opacity: 0.5;
-    transition: top 0.3s ease, opacity 0.3s ease;
+/* Improved info cards */
+.player-info-card, 
+.opponent-info-card, 
+.stats-card, 
+.opponent-stats-card, 
+.next-piece-container,
+.hold-piece-container {
+    padding: 16px;
+    background: rgba(52, 73, 94, 0.9);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    text-align: center;
+    width: 100%;
+    font-size: 0.9rem;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
 }
 
-/* ซ่อน separator เมื่อไม่มีบล็อค */
-.tetris-board.empty::after {
-    opacity: 0;
+.player-info-card:hover,
+.stats-card:hover {
+    border-color: rgba(52, 152, 219, 0.5);
+    transform: translateY(-2px);
+}
+
+.opponent-info-card:hover,
+.opponent-stats-card:hover {
+    border-color: rgba(231, 76, 60, 0.5);
+    transform: translateY(-2px);
+}
+
+.next-piece-container:hover,
+.hold-piece-container:hover {
+    border-color: rgba(155, 89, 182, 0.5);
+    transform: translateY(-2px);
+}
+
+.player-label, .opponent-label, .next-piece-title, .hold-piece-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.player-label {
+    color: #3498db;
+}
+
+.opponent-label {
+    color: #e74c3c;
+}
+
+.next-piece-title, .hold-piece-title {
+    color: #9b59b6;
+}
+
+.player-name-display {
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Improved piece preview */
+#next-piece-preview, .next-piece-preview,
+#hold-piece-preview, .hold-piece-preview {
+    width: 80px;
+    height: 80px;
+    background: rgba(0,0,0,0.8);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    margin: 0 auto;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+#next-piece-preview:hover, .next-piece-preview:hover,
+#hold-piece-preview:hover, .hold-piece-preview:hover {
+    border-color: rgba(255,255,255,0.4);
+    transform: scale(1.05);
 }
 
 /* =================================
-   GAME OVER OVERLAY
+   IMPROVED STATS DISPLAY
+   ================================= */
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+    font-size: 0.85rem;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    color: white;
+    font-weight: 700;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+.level-display {
+    color: #f39c12;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.score-display {
+    color: #2ecc71;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.lines-display {
+    color: #e74c3c;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.time-display {
+    color: #3498db;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* =================================
+   GAME OVER OVERLAY - IMPROVED
    ================================= */
 
 .game-over-overlay {
@@ -649,266 +659,168 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.9);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 10;
+    backdrop-filter: blur(5px);
 }
 
 .game-over-text {
-    font-size: clamp(1rem, 3vw, 1.8rem);
-    font-weight: bold;
-    color: #ff6b6b;
-    text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: #e74c3c;
+    text-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.final-score {
+    font-size: 1.2rem;
+    color: #3498db;
+    margin-bottom: 1.5rem;
 }
 
 /* =================================
-   STATS DISPLAY STYLES
-   ================================= */
-
-.stat-row {
-    display: flex;
-    justify-content: space-between;
-    margin: 3px 0;
-    font-size: clamp(0.6rem, 1.3vw, 0.8rem);
-    align-items: center;
-}
-
-.stat-label {
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: normal;
-}
-
-.stat-value {
-    color: white;
-    font-weight: bold;
-    text-align: right;
-}
-
-.level-display {
-    color: #ffd700;
-}
-
-.score-display {
-    color: #00ff00;
-}
-
-.lines-display {
-    color: #ff6b6b;
-}
-
-.time-display {
-    color: #4ecdc4;
-}
-
-/* =================================
-   MOBILE CONTROLS - IMPROVED
+   ENHANCED MOBILE CONTROLS
    ================================= */
 
 .mobile-controls {
     display: none;
     position: fixed;
-    bottom: 10px;
+    bottom: 15px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.9);
-    border-radius: 15px;
-    padding: clamp(8px, 2vw, 15px);
+    background: rgba(52, 73, 94, 0.95);
+    border-radius: 16px;
+    padding: 16px;
     backdrop-filter: blur(10px);
     z-index: 100;
-    width: clamp(250px, 80vw, 350px);
+    width: clamp(280px, 85vw, 360px);
+    border: 2px solid rgba(52, 152, 219, 0.3);
 }
 
 .control-buttons, .control-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: clamp(6px, 1.5vw, 10px);
-    margin-bottom: 8px;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 
 .control-btn, .control-button {
-    background: rgba(255,255,255,0.2);
-    border: 2px solid rgba(255,255,255,0.3);
+    background: rgba(52, 152, 219, 0.8);
+    border: 2px solid rgba(52, 152, 219, 1);
     border-radius: 10px;
-    padding: clamp(8px, 2vw, 12px);
+    padding: 12px;
     color: white;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: clamp(0.7rem, 2vw, 0.9rem);
+    font-size: 0.8rem;
     aspect-ratio: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 40px;
+    min-height: 44px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .control-btn:hover, .control-button:hover {
-    background: rgba(255,255,255,0.3);
+    background: rgba(52, 152, 219, 1);
     transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
 }
 
 .control-btn:active, .control-button:active {
-    background: rgba(255,255,255,0.4);
+    background: rgba(41, 128, 185, 1);
     transform: scale(0.95);
-    border-color: rgba(255,255,255,0.6);
+    box-shadow: 0 2px 6px rgba(52, 152, 219, 0.6);
 }
 
 .control-instructions {
     text-align: center;
-    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+    font-size: 0.75rem;
     color: rgba(255,255,255,0.8);
-    margin-top: 5px;
+    margin-top: 8px;
+    font-weight: 500;
 }
 
 /* =================================
-   RESPONSIVE BREAKPOINTS - OPTIMIZED FOR DYNAMIC BOARDS
+   RESPONSIVE DESIGN - IMPROVED
    ================================= */
 
-/* Large Desktop - 1600px+ */
-@media (min-width: 1600px) {
+/* Large Desktop */
+@media (min-width: 1400px) {
     .player-info, .left-panel, .right-panel {
-        width: 250px;
+        width: 220px;
     }
     
-    .main-board {
-        --available-width: calc(100vw - 500px - 60px);
-        --min-visible-rows: 10;
+    .tetris-board {
+        --cell-size: min(calc((100vh - 100px) / 22), calc((100vw - 500px) / 12));
     }
 }
 
-/* Standard Desktop - 1200px to 1599px */
-@media (max-width: 1599px) and (min-width: 1200px) {
+/* Standard Desktop */
+@media (max-width: 1399px) and (min-width: 1024px) {
     .player-info, .left-panel, .right-panel {
-        width: clamp(180px, 18vw, 220px);
-    }
-    
-    .main-board {
-        --available-width: calc(100vw - clamp(360px, 36vw, 440px) - 40px);
-        --min-visible-rows: 9;
+        width: 180px;
     }
 }
 
-/* Laptop - 992px to 1199px */
-@media (max-width: 1199px) and (min-width: 992px) {
+/* Tablet Landscape */
+@media (max-width: 1023px) and (min-width: 768px) {
     .game-screen {
         gap: 15px;
+        padding: 10px;
     }
     
     .player-info, .left-panel, .right-panel {
-        width: clamp(140px, 16vw, 180px);
+        width: 140px;
     }
     
-    .main-board {
-        --available-width: calc(100vw - clamp(280px, 32vw, 360px) - 30px);
-        --min-visible-rows: 8;
+    .mobile-controls {
+        display: block;
     }
 }
 
-/* Tablet และ Mobile - ปรับให้รองรับ dynamic height */
-@media (max-width: 991px) and (min-width: 768px) {
+/* Tablet Portrait & Mobile */
+@media (max-width: 767px) {
     .game-screen {
         flex-direction: column;
         gap: 10px;
-        height: 100vh;
-        padding: 5px;
-        padding-bottom: 60px;
+        padding: 8px;
+        padding-bottom: 120px;
     }
     
-    .main-board {
-        --board-width: min(50vw, 60vh);
-        --min-visible-rows: 6;
-        max-height: 70vh;
+    .tetris-board {
+        --cell-size: min(calc((70vh) / 22), calc((90vw) / 12));
+        max-width: 90vw;
     }
     
     .opponent-board {
-        --board-width: min(30vw, 40vh);
-        --min-visible-rows: 4;
-        max-height: 50vh;
+        --cell-size: min(calc((40vh) / 22), calc((70vw) / 12));
+        max-width: 70vw;
     }
     
     .mobile-controls {
         display: block;
-        position: fixed;
-        bottom: 5px;
-    }
-}
-
-@media (max-width: 767px) and (min-width: 576px) {
-    .main-board {
-        --board-width: min(80vw, 70vh);
-        --min-visible-rows: 6;
-        max-height: 60vh;
-    }
-    
-    .opponent-board {
-        --board-width: min(60vw, 50vh);
-        --min-visible-rows: 4;
-        max-height: 40vh;
-    }
-    
-    .mobile-controls {
-        display: block;
-        width: 90vw;
-        max-width: 320px;
-    }
-    
-    .player-info, .left-panel, .right-panel {
-        width: 100%;
-        flex-direction: row;
-        max-height: none;
-        overflow: visible;
-        gap: 5px;
-    }
-    
-    .player-info-card, 
-    .opponent-info-card, 
-    .stats-card, 
-    .opponent-stats-card {
-        flex: 1;
-        min-width: 0;
-        margin-bottom: 0;
-    }
-}
-
-/* Mobile Portrait - 575px and below */
-@media (max-width: 575px) {
-    .game-screen {
-        flex-direction: column;
-        padding: 2px;
-        gap: 5px;
-        padding-bottom: 70px;
-    }
-    
-    .main-board {
-        --board-width: min(95vw, 60vh);
-        --min-visible-rows: 8;
-        max-height: 50vh;
-    }
-    
-    .opponent-board {
-        --board-width: min(70vw, 35vh);
-        --min-visible-rows: 6;
-        max-height: 30vh;
-    }
-    
-    .mobile-controls {
-        display: block;
+        bottom: 10px;
         width: 95vw;
-        max-width: 280px;
-        bottom: 2px;
-    }
-    
-    .control-btn, .control-button {
-        min-height: 35px;
-        font-size: 0.7rem;
+        max-width: 340px;
     }
     
     .player-info, .left-panel, .right-panel {
         flex-direction: row;
         width: 100%;
-        gap: 3px;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: visible;
+        max-height: none;
+        padding: 0;
     }
     
     .player-info-card, 
@@ -918,74 +830,54 @@ body {
     .next-piece-container,
     .hold-piece-container {
         flex: 1;
-        padding: 4px 6px;
-        font-size: 0.6rem;
-        margin-bottom: 0;
-        min-width: 0;
+        min-width: 120px;
+        padding: 10px;
+        font-size: 0.8rem;
     }
     
     #next-piece-preview, .next-piece-preview,
     #hold-piece-preview, .hold-piece-preview {
-        width: 30px;
-        height: 30px;
+        width: 50px;
+        height: 50px;
     }
 }
 
-/* =================================
-   DYNAMIC HEIGHT UTILITY CLASSES
-   ================================= */
-
-/* Classes สำหรับควบคุม dynamic height behavior */
-.board-auto-resize {
-    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.board-smooth-transition {
-    transition: all 0.3s ease-out;
-}
-
-.board-instant-resize {
-    transition: none;
-}
-
-/* Height presets สำหรับ different game states */
-.board-height-minimal {
-    --min-visible-rows: 6;
-    --max-visible-rows: 12;
-}
-
-.board-height-normal {
-    --min-visible-rows: 8;
-    --max-visible-rows: 16;
-}
-
-.board-height-full {
-    --min-visible-rows: 12;
-    --max-visible-rows: 20;
+/* Small Mobile */
+@media (max-width: 480px) {
+    .game-title {
+        font-size: 2rem;
+    }
+    
+    .tetris-board {
+        --cell-size: min(calc((60vh) / 22), calc((95vw) / 12));
+    }
+    
+    .control-btn, .control-button {
+        min-height: 40px;
+        font-size: 0.7rem;
+        padding: 10px;
+    }
+    
+    .mobile-controls {
+        width: 98vw;
+        padding: 12px;
+    }
 }
 
 /* =================================
    PERFORMANCE OPTIMIZATIONS
    ================================= */
 
-/* GPU acceleration สำหรับ smooth animations */
 .tetris-board,
 .tetris-block {
     transform: translateZ(0);
     backface-visibility: hidden;
-    will-change: transform, height;
-}
-
-/* Optimize transitions */
-.main-board.dynamic-height {
-    contain: layout style;
 }
 
 /* =================================
-   ACCESSIBILITY IMPROVEMENTS
+   ACCESSIBILITY & PREFERENCES
    ================================= */
 
-/* High contrast mode */
 @media (prefers-contrast: high) {
     .tetris-board {
         border-width: 4px;
@@ -997,169 +889,50 @@ body {
     }
 }
 
-/* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-    .tetris-board,
-    .tetris-block,
-    .main-board {
-        transition: none;
-        animation: none;
-    }
-    
-    .main-board.expanding,
-    .main-board.contracting {
-        animation: none;
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }
 
 /* =================================
-   DEBUG AND DEVELOPMENT HELPERS
+   FOCUS STATES FOR KEYBOARD NAVIGATION
    ================================= */
 
-/* Debug grid overlay */
-.tetris-board.show-grid {
-    background-image: 
-        repeating-linear-gradient(
-            0deg,
-            rgba(255,255,255,0.1) 0px,
-            rgba(255,255,255,0.1) 1px,
-            transparent 1px,
-            transparent calc(100% / var(--current-height-rows))
-        ),
-        repeating-linear-gradient(
-            90deg,
-            rgba(255,255,255,0.1) 0px,
-            rgba(255,255,255,0.1) 1px,
-            transparent 1px,
-            transparent 10%
-        );
+.btn:focus,
+.control-btn:focus,
+.control-button:focus,
+.controls-toggle:focus {
+    outline: 3px solid #3498db;
+    outline-offset: 2px;
 }
 
-/* Visual height indicator */
-.tetris-board.show-height-info::before {
-    content: attr(data-height-info);
+/* =================================
+   LOADING STATES
+   ================================= */
+
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
     position: absolute;
-    top: -25px;
-    left: 0;
-    font-size: 12px;
-    color: rgba(255,255,255,0.7);
-    background: rgba(0,0,0,0.8);
-    padding: 2px 6px;
-    border-radius: 4px;
-    z-index: 1;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top: 2px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
-/* =================================
-   LOADING AND PLACEHOLDER STATES
-   ================================= */
-
-.board-loading {
-    background: linear-gradient(
-        45deg,
-        rgba(0,0,0,0.8) 25%,
-        rgba(255,255,255,0.1) 25%,
-        rgba(255,255,255,0.1) 50%,
-        rgba(0,0,0,0.8) 50%,
-        rgba(0,0,0,0.8) 75%,
-        rgba(255,255,255,0.1) 75%
-    );
-    background-size: 20px 20px;
-    animation: loading-stripes 1s linear infinite;
-}
-
-@keyframes loading-stripes {
-    0% { background-position: 0 0; }
-    100% { background-position: 20px 20px; }
-}
-
-/* =================================
-   BOARD RESIZE ANIMATIONS - ENHANCED
-   ================================= */
-
-/* Smooth resize with spring effect */
-.main-board.spring-resize {
-    transition: height 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-/* Elastic resize for dramatic height changes */
-.main-board.elastic-resize {
-    transition: height 0.6s cubic-bezier(0.68, -0.6, 0.32, 1.6);
-}
-
-/* Quick snap for small adjustments */
-.main-board.snap-resize {
-    transition: height 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-/* =================================
-   THEME VARIATIONS FOR DYNAMIC BOARDS
-   ================================= */
-
-/* Neon theme */
-.tetris-board.theme-neon {
-    border-color: #00ff41;
-    box-shadow: 
-        0 0 20px rgba(0, 255, 65, 0.5),
-        inset 0 0 20px rgba(0, 255, 65, 0.1);
-}
-
-.tetris-board.theme-neon.main-board {
-    border-color: #00ffff;
-    box-shadow: 
-        0 0 30px rgba(0, 255, 255, 0.6),
-        inset 0 0 30px rgba(0, 255, 255, 0.1);
-}
-
-/* Retro theme */
-.tetris-board.theme-retro {
-    border-color: #ffff00;
-    background: rgba(128, 0, 128, 0.9);
-    box-shadow: 
-        0 0 15px rgba(255, 255, 0, 0.4),
-        inset 0 0 15px rgba(255, 255, 0, 0.1);
-}
-
-/* =================================
-   UTILITY CLASSES FOR JAVASCRIPT INTEGRATION
-   ================================= */
-
-/* Data attributes for dynamic sizing */
-[data-dynamic-height="true"] {
-    --enable-dynamic-height: 1;
-}
-
-[data-min-rows] {
-    --min-visible-rows: attr(data-min-rows number, 8);
-}
-
-[data-max-rows] {
-    --max-visible-rows: attr(data-max-rows number, 20);
-}
-
-/* State classes for different resize behaviors */
-.resize-immediate { transition: height 0.1s ease; }
-.resize-smooth { transition: height 0.3s ease; }
-.resize-bouncy { transition: height 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
-.resize-disabled { transition: none; }
-
-/* =================================
-   PRINT STYLES (IF NEEDED)
-   ================================= */
-
-@media print {
-    .mobile-controls,
-    .control-buttons,
-    .control-grid {
-        display: none;
-    }
-    
-    .tetris-board {
-        box-shadow: none;
-        border: 2px solid black;
-    }
-    
-    .game-screen {
-        flex-direction: column;
-        height: auto;
-    }
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
