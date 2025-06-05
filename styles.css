@@ -1,1411 +1,1111 @@
-/* =========================================
-   COMPLETE TETRIS CSS - MERGED & IMPROVED
-   รวม CSS ที่ปรับปรุงแล้วสำหรับเกม Tetris
-   ========================================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* =================================
-   GLOBAL STYLES & RESET
-   ================================= */
+@layer base {
+  :root {
+    /* Tetris Board Sizing Variables */
+    --main-cell-size: min(
+      calc((100vh - 120px) / 20), 
+      calc((100vw - 400px) / 12)
+    );
+    --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
+    --preview-cell-size: calc(var(--main-cell-size) * 0.25);
+  }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    @apply font-sans bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 text-white overflow-x-hidden min-h-screen select-none;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
-    color: white;
-    overflow-x: hidden;
-    min-height: 100vh;
-    user-select: none;
-}
+@layer components {
+  /* =================================
+     SCREEN TRANSITIONS & CONTAINERS
+     ================================= */
+  .container {
+    @apply flex justify-center items-center min-h-screen p-2.5 w-full;
+  }
 
-/* =================================
-   SCREEN TRANSITIONS & CONTAINERS
-   ================================= */
-
-.container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 10px;
-    width: 100%;
-}
-
-.screen {
-    display: none;
-    text-align: center;
+  .screen {
+    @apply hidden text-center w-full max-w-full mx-auto h-screen;
     animation: fadeIn 0.4s ease-out;
-    width: 100%;
-    max-width: 100vw;
-    margin: 0 auto;
-    height: 100vh;
-}
+  }
 
-.screen.active {
-    display: block;
-}
+  .screen.active {
+    @apply block;
+  }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+  /* =================================
+     MENU SCREEN STYLES
+     ================================= */
+  .menu-screen {
+    @apply flex flex-col justify-center items-center gap-6 p-8 h-screen;
+  }
 
-/* =================================
-   MENU SCREEN STYLES
-   ================================= */
-
-.menu-screen {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 2rem;
-    height: 100vh;
-}
-
-.game-title {
-    font-size: clamp(2.5rem, 6vw, 4rem);
-    font-weight: 800;
-    margin-bottom: 2rem;
+  .game-title {
+    @apply text-4xl md:text-5xl lg:text-6xl font-extrabold mb-8 text-center leading-tight -tracking-wide;
     background: linear-gradient(45deg, #3498db, #9b59b6, #e74c3c);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    text-align: center;
-    line-height: 1.1;
-    letter-spacing: -1px;
-}
+  }
 
-.connection-status {
-    margin-bottom: 1.5rem;
-    padding: 12px 24px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 1rem;
-    width: 100%;
-    max-width: 320px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
+  .connection-status {
+    @apply mb-6 px-6 py-3 rounded-xl font-semibold text-base w-full max-w-80 uppercase tracking-wide text-center transition-all duration-300;
+  }
 
-.connected {
-    background: rgba(46, 204, 113, 0.2);
-    border: 2px solid #2ecc71;
-    color: #2ecc71;
-}
+  .connected {
+    @apply bg-green-500/20 border-2 border-green-500 text-green-500;
+  }
 
-.disconnected {
-    background: rgba(231, 76, 60, 0.2);
-    border: 2px solid #e74c3c;
-    color: #e74c3c;
-}
+  .disconnected {
+    @apply bg-red-500/20 border-2 border-red-500 text-red-500;
+  }
 
-.menu-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
-}
+  .menu-buttons {
+    @apply flex flex-col gap-4 w-full max-w-80 mx-auto;
+  }
 
-/* =================================
-   IMPROVED BUTTON STYLES
-   ================================= */
-
-.btn {
-    padding: 14px 28px;
-    font-size: 1rem;
-    font-weight: 600;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  /* =================================
+     BUTTON STYLES
+     ================================= */
+  .btn {
+    @apply px-7 py-3.5 text-base font-semibold border-none rounded-xl cursor-pointer transition-all duration-200 text-white uppercase tracking-wide no-underline inline-block w-full text-center min-h-12 relative overflow-hidden;
     background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    text-decoration: none;
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-    min-height: 48px;
-    position: relative;
-    overflow: hidden;
-}
+  }
 
-.btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
+  .btn::before {
+    @apply content-[''] absolute top-0 -left-full w-full h-full transition-all duration-500;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s;
-}
+  }
 
-.btn:hover::before {
-    left: 100%;
-}
+  .btn:hover::before {
+    @apply left-full;
+  }
 
-.btn:hover {
-    transform: translateY(-2px);
+  .btn:hover {
+    @apply -translate-y-0.5;
     box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-}
+  }
 
-.btn:active {
-    transform: translateY(0);
+  .btn:active {
+    @apply translate-y-0;
     box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
-}
+  }
 
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
     transform: none;
-}
+  }
 
-.btn-single-player {
+  .btn-single-player {
     background: linear-gradient(135deg, #e67e22, #d35400);
-}
+  }
 
-.btn-single-player:hover {
+  .btn-single-player:hover {
     box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
-}
+  }
 
-/* =================================
-   CONTROLS ACCORDION
-   ================================= */
+  /* =================================
+     CONTROLS ACCORDION
+     ================================= */
+  .controls-accordion {
+    @apply w-full max-w-80 mx-auto my-4;
+  }
 
-.controls-accordion {
-    width: 100%;
-    max-width: 320px;
-    margin: 1rem auto;
-}
-
-.controls-toggle {
+  .controls-toggle {
+    @apply border-none text-white px-7 py-3.5 text-base font-semibold rounded-xl cursor-pointer transition-all duration-200 w-full flex items-center justify-center gap-2.5 uppercase tracking-wide min-h-12;
     background: linear-gradient(135deg, #8e44ad, #7d3c98);
-    border: none;
-    color: white;
-    padding: 14px 28px;
-    font-size: 1rem;
-    font-weight: 600;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    min-height: 48px;
-}
+  }
 
-.controls-toggle:hover {
-    transform: translateY(-2px);
+  .controls-toggle:hover {
+    @apply -translate-y-0.5;
     box-shadow: 0 6px 20px rgba(142, 68, 173, 0.4);
-}
+  }
 
-.controls-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+  .controls-content {
+    @apply max-h-0 overflow-hidden transition-all duration-300 rounded-xl mt-2 backdrop-blur-lg;
     background: rgba(52, 73, 94, 0.9);
-    border-radius: 12px;
-    margin-top: 8px;
-    backdrop-filter: blur(10px);
-}
+  }
 
-.controls-content.expanded {
-    max-height: 500px;
-    padding: 20px;
-    border: 2px solid rgba(142, 68, 173, 0.3);
-}
+  .controls-content.expanded {
+    @apply max-h-[500px] p-5 border-2;
+    border-color: rgba(142, 68, 173, 0.3);
+  }
 
-.controls-section {
-    text-align: left;
-    margin-bottom: 16px;
-}
+  .controls-section {
+    @apply text-left mb-4;
+  }
 
-.controls-title {
-    color: #8e44ad;
-    font-weight: 700;
-    font-size: 1rem;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+  .controls-title {
+    @apply text-purple-500 font-bold text-base mb-2 flex items-center gap-2;
+  }
 
-.controls-list {
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.9);
-}
+  .controls-list {
+    @apply text-sm leading-relaxed text-white/90;
+  }
 
-.control-item {
-    display: flex;
-    justify-content: space-between;
-    margin: 8px 0;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
+  .control-item {
+    @apply flex justify-between my-2 py-1.5 border-b border-white/10;
+  }
 
-.control-key {
-    background: rgba(255, 255, 255, 0.15);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.8rem;
-    color: #ecf0f1;
-    border: 1px solid rgba(255,255,255,0.2);
-}
+  .control-key {
+    @apply bg-white/15 px-2.5 py-1 rounded-md font-semibold text-xs text-gray-100 border border-white/20;
+  }
 
-.toggle-icon {
-    transition: transform 0.3s ease;
-}
+  .toggle-icon {
+    @apply transition-transform duration-300;
+  }
 
-.toggle-icon.rotated {
-    transform: rotate(180deg);
-}
+  .toggle-icon.rotated {
+    @apply rotate-180;
+  }
 
-/* =================================
-   ROOM INFO STYLES
-   ================================= */
-
-.room-info {
+  /* =================================
+     ROOM INFO STYLES
+     ================================= */
+  .room-info {
+    @apply rounded-2xl p-8 mb-8 backdrop-blur-lg w-full max-w-96 mx-auto border-2;
     background: rgba(52, 73, 94, 0.9);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(10px);
-    width: 100%;
-    max-width: 400px;
-    margin-left: auto;
-    margin-right: auto;
-    border: 2px solid rgba(52, 152, 219, 0.3);
-}
+    border-color: rgba(52, 152, 219, 0.3);
+  }
 
-.room-id {
-    font-size: clamp(1.8rem, 4vw, 2.2rem);
-    font-weight: 700;
-    color: #f39c12;
-    margin-bottom: 1rem;
-    word-break: break-all;
+  .room-id {
+    @apply text-2xl md:text-3xl lg:text-4xl font-bold text-yellow-500 mb-4 break-all;
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
+  }
 
-.players-list {
-    list-style: none;
-    margin: 1rem 0;
-}
+  .players-list {
+    @apply list-none my-4;
+  }
 
-.players-list li {
-    padding: 12px 16px;
-    margin: 8px 0;
-    background: rgba(255,255,255,0.1);
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-}
+  .players-list li {
+    @apply px-4 py-3 my-2 bg-white/10 rounded-lg text-base transition-all duration-200;
+  }
 
-.players-list li:hover {
-    background: rgba(255,255,255,0.15);
-    transform: translateX(4px);
-}
+  .players-list li:hover {
+    @apply bg-white/15 translate-x-1;
+  }
 
-.players-list li.current-player {
-    background: rgba(241, 196, 15, 0.2);
-    border: 2px solid #f1c40f;
-    color: #f1c40f;
-    font-weight: 600;
-}
+  .players-list li.current-player {
+    @apply bg-yellow-500/20 border-2 border-yellow-400 text-yellow-400 font-semibold;
+  }
 
-/* =================================
-   CSS VARIABLES FOR CONSISTENT SIZING
-   ================================= */
+  /* =================================
+     GAME SCREEN LAYOUT
+     ================================= */
+  .game-container {
+    @apply flex flex-row justify-center items-start gap-5 p-2.5 min-h-screen box-border;
+  }
 
-:root {
-    /* ขนาด cell ที่สอดคล้องกันสำหรับทุกบอร์ด */
-    --main-cell-size: min(
-        calc((100vh - 120px) / 20), 
-        calc((100vw - 400px) / 12)
-    );
-    --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
-    --preview-cell-size: calc(var(--main-cell-size) * 0.25);
-}
+  .game-screen {
+    @apply flex w-screen h-screen gap-4 items-center justify-center p-2.5 box-border;
+  }
 
-/* =================================
-   GAME SCREEN LAYOUT - CONSISTENT PROPORTIONS
-   ================================= */
+  .boards-container {
+    @apply flex flex-col gap-5 items-center justify-center flex-1 h-full;
+  }
 
-.game-container {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 20px;
-    padding: 10px;
-    min-height: 100vh;
-    box-sizing: border-box;
-}
+  .main-player-area {
+    @apply flex flex-col items-center gap-2.5 w-full;
+  }
 
-.game-screen {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-    gap: 15px;
-    align-items: center;
-    justify-content: center;
-    padding: 10px;
-    box-sizing: border-box;
-}
-
-.boards-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    height: 100%;
-}
-
-.main-player-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-}
-
-/* =================================
-   STANDARD TETRIS BOARDS - CONSISTENT SIZING
-   ================================= */
-
-.tetris-board, .responsive-board, .game-board {
-    background: rgba(0, 0, 0, 0.9);
-    border: 3px solid;
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-    /* Standard Tetris proportions: 10 wide x 20 tall */
+  /* =================================
+     TETRIS BOARDS
+     ================================= */
+  .tetris-board,
+  .responsive-board,
+  .game-board {
+    @apply bg-black/90 border-4 rounded-lg overflow-hidden relative mx-auto;
     width: calc(var(--main-cell-size) * 10);
     height: calc(var(--main-cell-size) * 20);
     min-width: 250px;
     min-height: 500px;
     max-width: 400px;
     max-height: 800px;
-    margin: 0 auto;
-}
+  }
 
-/* Main player board - ใหญ่กว่า */
-.main-board, #my-board, .player-section .game-board {
-    border-color: #3498db;
+  .main-board,
+  #my-board,
+  .player-section .game-board {
+    @apply border-blue-500;
     box-shadow: 
-        0 0 20px rgba(52, 152, 219, 0.4),
-        inset 0 0 20px rgba(52, 152, 219, 0.1);
+      0 0 20px rgba(52, 152, 219, 0.4),
+      inset 0 0 20px rgba(52, 152, 219, 0.1);
     background: 
-        linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%),
-        repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent calc(var(--main-cell-size) - 1px),
-            rgba(52, 152, 219, 0.1) calc(var(--main-cell-size) - 1px),
-            rgba(52, 152, 219, 0.1) var(--main-cell-size)
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent 0px,
-            transparent calc(var(--main-cell-size) - 1px),
-            rgba(52, 152, 219, 0.1) calc(var(--main-cell-size) - 1px),
-            rgba(52, 152, 219, 0.1) var(--main-cell-size)
-        );
-}
+      linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent calc(var(--main-cell-size) - 1px),
+        rgba(52, 152, 219, 0.1) calc(var(--main-cell-size) - 1px),
+        rgba(52, 152, 219, 0.1) var(--main-cell-size)
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent calc(var(--main-cell-size) - 1px),
+        rgba(52, 152, 219, 0.1) calc(var(--main-cell-size) - 1px),
+        rgba(52, 152, 219, 0.1) var(--main-cell-size)
+      );
+  }
 
-/* Opponent board - เล็กกว่า แต่ยังคงสัดส่วน 10x20 */
-.opponent-board, #opponent-board, .opponent-section .game-board {
+  .opponent-board,
+  #opponent-board,
+  .opponent-section .game-board {
+    @apply border-red-500;
     width: calc(var(--opponent-cell-size) * 10);
     height: calc(var(--opponent-cell-size) * 20);
     min-width: 175px;
     min-height: 350px;
     max-width: 280px;
     max-height: 560px;
-    border-color: #e74c3c;
     box-shadow: 
-        0 0 15px rgba(231, 76, 60, 0.3),
-        inset 0 0 15px rgba(231, 76, 60, 0.1);
+      0 0 15px rgba(231, 76, 60, 0.3),
+      inset 0 0 15px rgba(231, 76, 60, 0.1);
     background: 
-        linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%),
-        repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent calc(var(--opponent-cell-size) - 1px),
-            rgba(231, 76, 60, 0.1) calc(var(--opponent-cell-size) - 1px),
-            rgba(231, 76, 60, 0.1) var(--opponent-cell-size)
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent 0px,
-            transparent calc(var(--opponent-cell-size) - 1px),
-            rgba(231, 76, 60, 0.1) calc(var(--opponent-cell-size) - 1px),
-            rgba(231, 76, 60, 0.1) var(--opponent-cell-size)
-        );
-}
+      linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent calc(var(--opponent-cell-size) - 1px),
+        rgba(231, 76, 60, 0.1) calc(var(--opponent-cell-size) - 1px),
+        rgba(231, 76, 60, 0.1) var(--opponent-cell-size)
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent calc(var(--opponent-cell-size) - 1px),
+        rgba(231, 76, 60, 0.1) calc(var(--opponent-cell-size) - 1px),
+        rgba(231, 76, 60, 0.1) var(--opponent-cell-size)
+      );
+  }
 
-/* =================================
-   TETRIS BLOCKS - CONSISTENT WITH JS SIZING
-   ================================= */
-
-.tetris-block {
-    position: absolute;
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 2px;
-    transition: all 0.1s ease;
-    box-sizing: border-box;
+  /* =================================
+     TETRIS BLOCKS
+     ================================= */
+  .tetris-block {
+    @apply absolute border border-white/30 rounded-sm transition-all duration-100 box-border;
     box-shadow: 
-        inset 0 0 0 1px rgba(255,255,255,0.2),
-        0 1px 3px rgba(0,0,0,0.5);
-    /* ขนาดจะถูกกำหนดจาก JS */
-}
+      inset 0 0 0 1px rgba(255,255,255,0.2),
+      0 1px 3px rgba(0,0,0,0.5);
+  }
 
-/* Small blocks for opponent board */
-.tetris-block-small {
-    position: absolute;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 1px;
-    transition: all 0.1s ease;
+  .tetris-block-small {
+    @apply absolute border border-white/20 rounded-sm transition-all duration-100;
     box-shadow: 
-        inset 0 0 0 1px rgba(255,255,255,0.1),
-        0 1px 2px rgba(0,0,0,0.3);
-}
+      inset 0 0 0 1px rgba(255,255,255,0.1),
+      0 1px 2px rgba(0,0,0,0.3);
+  }
 
-/* Standard Tetris colors with improved contrast */
-.block-i { 
+  /* Tetris Block Colors */
+  .block-i {
     background: linear-gradient(135deg, #00f5ff 0%, #00d4e6 100%);
     border-color: #00a8cc;
-}
-.block-o { 
+  }
+
+  .block-o {
     background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
     border-color: #cc8800;
-}
-.block-t { 
+  }
+
+  .block-t {
     background: linear-gradient(135deg, #a020f0 0%, #7a1fb8 100%);
     border-color: #5c1a87;
-}
-.block-s { 
+  }
+
+  .block-s {
     background: linear-gradient(135deg, #32cd32 0%, #228b22 100%);
     border-color: #1a661a;
-}
-.block-z { 
+  }
+
+  .block-z {
     background: linear-gradient(135deg, #ff4500 0%, #cc3300 100%);
     border-color: #992600;
-}
-.block-j { 
+  }
+
+  .block-j {
     background: linear-gradient(135deg, #0080ff 0%, #0066cc 100%);
     border-color: #004d99;
-}
-.block-l { 
+  }
+
+  .block-l {
     background: linear-gradient(135deg, #ff8c00 0%, #cc6600 100%);
     border-color: #994d00;
-}
+  }
 
-/* Ghost piece for better gameplay */
-.ghost-block {
-    opacity: 0.3;
-    border-style: dashed;
+  .ghost-block {
+    @apply opacity-30 border-dashed;
     background: transparent !important;
     border-color: rgba(255,255,255,0.5);
-}
+  }
 
-/* Current piece highlight */
-.current-piece {
+  .current-piece {
     border: 2px solid rgba(255,255,255,0.8) !important;
     box-shadow: 0 0 8px rgba(255,255,255,0.5) !important;
-}
+  }
 
-/* =================================
-   IMPROVED SIDE PANELS
-   ================================= */
+  /* =================================
+     SIDE PANELS
+     ================================= */
+  .player-info,
+  .left-panel,
+  .right-panel,
+  .player-section,
+  .opponent-section {
+    @apply flex-none w-45 flex flex-col gap-3 max-h-screen overflow-y-auto p-1.25;
+  }
 
-.player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-    flex: 0 0 auto;
-    width: 180px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-height: 100vh;
-    overflow-y: auto;
-    padding: 5px;
-}
-
-/* Improved info cards */
-.player-info-card, 
-.opponent-info-card, 
-.stats-card, 
-.opponent-stats-card, 
-.next-piece-container,
-.hold-piece-container,
-.stats {
-    padding: 16px;
+  .player-info-card,
+  .opponent-info-card,
+  .stats-card,
+  .opponent-stats-card,
+  .next-piece-container,
+  .hold-piece-container,
+  .stats {
+    @apply p-4 rounded-xl backdrop-blur-lg text-center w-full text-sm border-2 border-transparent transition-all duration-200 text-white font-mono;
     background: rgba(52, 73, 94, 0.9);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    text-align: center;
-    width: 100%;
-    font-size: 0.9rem;
-    border: 2px solid transparent;
-    transition: all 0.2s ease;
-    color: white;
-    font-family: monospace;
-}
+  }
 
-.player-info-card:hover,
-.stats-card:hover,
-.stats:hover {
-    border-color: rgba(52, 152, 219, 0.5);
-    transform: translateY(-2px);
-}
+  .player-info-card:hover,
+  .stats-card:hover,
+  .stats:hover {
+    @apply border-blue-500/50 -translate-y-0.5;
+  }
 
-.opponent-info-card:hover,
-.opponent-stats-card:hover {
-    border-color: rgba(231, 76, 60, 0.5);
-    transform: translateY(-2px);
-}
+  .opponent-info-card:hover,
+  .opponent-stats-card:hover {
+    @apply border-red-500/50 -translate-y-0.5;
+  }
 
-.next-piece-container:hover,
-.hold-piece-container:hover {
-    border-color: rgba(155, 89, 182, 0.5);
-    transform: translateY(-2px);
-}
+  .next-piece-container:hover,
+  .hold-piece-container:hover {
+    @apply border-purple-500/50 -translate-y-0.5;
+  }
 
-.player-label, .opponent-label, .next-piece-title, .hold-piece-title {
-    font-weight: 700;
-    margin-bottom: 8px;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+  .player-label,
+  .opponent-label,
+  .next-piece-title,
+  .hold-piece-title {
+    @apply font-bold mb-2 text-xs uppercase tracking-wide;
+  }
 
-.player-label {
-    color: #3498db;
-}
+  .player-label {
+    @apply text-blue-500;
+  }
 
-.opponent-label {
-    color: #e74c3c;
-}
+  .opponent-label {
+    @apply text-red-500;
+  }
 
-.next-piece-title, .hold-piece-title {
-    color: #9b59b6;
-}
+  .next-piece-title,
+  .hold-piece-title {
+    @apply text-purple-500;
+  }
 
-.player-name-display {
-    color: white;
-    font-size: 1rem;
-    font-weight: 600;
-}
+  .player-name-display {
+    @apply text-white text-base font-semibold;
+  }
 
-/* Stats headers */
-.stats h3 {
-    margin: 0 0 5px 0;
-    font-size: 14px;
-    color: #3498db;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+  .stats h3 {
+    @apply m-0 mb-1.25 text-sm text-blue-500 uppercase tracking-wide;
+  }
 
-.stats div {
-    margin: 5px 0;
-    font-size: 12px;
-}
+  .stats div {
+    @apply my-1.25 text-xs;
+  }
 
-/* Improved piece preview - ขนาดสอดคล้องกับบอร์ด */
-#next-piece-preview, .next-piece-preview,
-#hold-piece-preview, .hold-piece-preview {
+  /* =================================
+     PIECE PREVIEW
+     ================================= */
+  #next-piece-preview,
+  .next-piece-preview,
+  #hold-piece-preview,
+  .hold-piece-preview {
+    @apply bg-black/80 border-2 border-white/20 rounded-lg mx-auto relative transition-all duration-200;
     width: calc(var(--preview-cell-size) * 16);
     height: calc(var(--preview-cell-size) * 16);
     min-width: 60px;
     min-height: 60px;
     max-width: 100px;
     max-height: 100px;
-    background: rgba(0,0,0,0.8);
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    margin: 0 auto;
-    position: relative;
-    transition: all 0.2s ease;
-}
+  }
 
-#next-piece-preview:hover, .next-piece-preview:hover,
-#hold-piece-preview:hover, .hold-piece-preview:hover {
-    border-color: rgba(255,255,255,0.4);
-    transform: scale(1.05);
-}
+  #next-piece-preview:hover,
+  .next-piece-preview:hover,
+  #hold-piece-preview:hover,
+  .hold-piece-preview:hover {
+    @apply border-white/40 scale-105;
+  }
 
-/* =================================
-   IMPROVED STATS DISPLAY
-   ================================= */
+  /* =================================
+     STATS DISPLAY
+     ================================= */
+  .stat-row {
+    @apply flex justify-between my-1.5 text-sm items-center py-1 border-b border-white/10;
+  }
 
-.stat-row {
-    display: flex;
-    justify-content: space-between;
-    margin: 6px 0;
-    font-size: 0.85rem;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
+  .stat-row:last-child {
+    @apply border-b-0;
+  }
 
-.stat-row:last-child {
-    border-bottom: none;
-}
+  .stat-label {
+    @apply text-white/80 font-medium uppercase text-xs tracking-wide;
+  }
 
-.stat-label {
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
-}
+  .stat-value {
+    @apply text-white font-bold text-right text-sm;
+  }
 
-.stat-value {
-    color: white;
-    font-weight: 700;
-    text-align: right;
-    font-size: 0.9rem;
-}
-
-.level-display {
-    color: #f39c12;
+  .level-display {
+    @apply text-yellow-500;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
+  }
 
-.score-display {
-    color: #2ecc71;
+  .score-display {
+    @apply text-green-500;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
+  }
 
-.lines-display {
-    color: #e74c3c;
+  .lines-display {
+    @apply text-red-500;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
+  }
 
-.time-display {
-    color: #3498db;
+  .time-display {
+    @apply text-blue-500;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
+  }
 
-/* =================================
-   GAME OVER OVERLAY - IMPROVED
-   ================================= */
+  /* =================================
+     GAME OVER OVERLAY
+     ================================= */
+  .game-over-overlay {
+    @apply absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-10 backdrop-blur-sm rounded-md;
+  }
 
-.game-over-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    backdrop-filter: blur(5px);
-    border-radius: 5px;
-}
-
-.game-over-text {
-    font-size: clamp(1.5rem, 4vw, 2.5rem);
-    font-weight: 800;
-    color: #e74c3c;
+  .game-over-text {
+    @apply text-2xl md:text-3xl lg:text-4xl font-extrabold text-red-500 mb-4 uppercase tracking-widest;
     text-shadow: 0 0 10px rgba(231, 76, 60, 0.5), 2px 2px 4px rgba(0,0,0,0.8);
-    margin-bottom: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
+  }
 
-.final-score {
-    font-size: 1.2rem;
-    color: #3498db;
-    margin-bottom: 1.5rem;
-}
+  .final-score {
+    @apply text-xl text-blue-500 mb-6;
+  }
 
-/* =================================
-   ENHANCED MOBILE & CONTROL STYLES
-   ================================= */
-
-.mobile-controls, .controls {
-    display: none;
-    position: fixed;
-    bottom: 15px;
-    left: 50%;
-    transform: translateX(-50%);
+  /* =================================
+     MOBILE CONTROLS
+     ================================= */
+  .mobile-controls,
+  .controls {
+    @apply hidden fixed bottom-4 left-1/2 -translate-x-1/2 rounded-2xl p-4 backdrop-blur-lg z-50 border-2;
     background: rgba(52, 73, 94, 0.95);
-    border-radius: 16px;
-    padding: 16px;
-    backdrop-filter: blur(10px);
-    z-index: 100;
+    border-color: rgba(52, 152, 219, 0.3);
     width: clamp(280px, 85vw, 360px);
-    border: 2px solid rgba(52, 152, 219, 0.3);
-}
+  }
 
-.control-buttons, .control-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 10px;
-}
+  .control-buttons,
+  .control-grid {
+    @apply grid grid-cols-4 gap-2.5 mb-2.5;
+  }
 
-.control-btn, .control-button {
-    background: rgba(52, 152, 219, 0.8);
-    border: 2px solid rgba(52, 152, 219, 1);
-    border-radius: 10px;
-    padding: 12px;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.8rem;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+  .control-btn,
+  .control-button {
+    @apply bg-blue-500/80 border-2 border-blue-500 rounded-lg p-3 text-white font-semibold cursor-pointer transition-all duration-200 text-xs aspect-square flex items-center justify-center min-h-11 uppercase tracking-wide;
+  }
 
-.control-btn:hover, .control-button:hover {
-    background: rgba(52, 152, 219, 1);
-    transform: scale(1.05);
+  .control-btn:hover,
+  .control-button:hover {
+    @apply bg-blue-500 scale-105;
     box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
-}
+  }
 
-.control-btn:active, .control-button:active {
-    background: rgba(41, 128, 185, 1);
-    transform: scale(0.95);
+  .control-btn:active,
+  .control-button:active {
+    @apply bg-blue-600 scale-95;
     box-shadow: 0 2px 6px rgba(52, 152, 219, 0.6);
-}
+  }
 
-.control-instructions {
-    text-align: center;
-    font-size: 0.75rem;
-    color: rgba(255,255,255,0.8);
-    margin-top: 8px;
-    font-weight: 500;
+  .control-instructions {
+    @apply text-center text-xs text-white/80 mt-2 font-medium;
+  }
+
+  /* =================================
+     UTILITY CLASSES
+     ================================= */
+  .hidden {
+    @apply !hidden;
+  }
+
+  .visible {
+    @apply !block;
+  }
+
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .no-scroll {
+    @apply overflow-hidden h-screen;
+  }
+
+  /* Animation Classes */
+  .line-clearing {
+    animation: lineClear 0.3s ease-out;
+  }
+
+  .piece-dropped {
+    animation: pieceDrop 0.1s ease-out;
+  }
 }
 
 /* =================================
-   RESPONSIVE DESIGN - IMPROVED & CONSISTENT
+   RESPONSIVE BREAKPOINTS
    ================================= */
-
-/* Large Desktop */
-@media (min-width: 1400px) {
+@layer utilities {
+  /* Large Desktop */
+  @screen 2xl {
     :root {
-        --main-cell-size: min(calc((100vh - 120px) / 20), calc((100vw - 500px) / 12));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.25);
+      --main-cell-size: min(calc((100vh - 120px) / 20), calc((100vw - 500px) / 12));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.25);
     }
     
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        width: 220px;
+    .player-info,
+    .left-panel,
+    .right-panel,
+    .player-section,
+    .opponent-section {
+      @apply w-55;
     }
-}
+  }
 
-/* Standard Desktop */
-@media (max-width: 1399px) and (min-width: 1025px) {
+  /* Standard Desktop */
+  @media (max-width: 1399px) and (min-width: 1025px) {
     :root {
-        --main-cell-size: min(calc((100vh - 120px) / 20), calc((100vw - 400px) / 12));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.25);
-    }
-    
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        width: 180px;
+      --main-cell-size: min(calc((100vh - 120px) / 20), calc((100vw - 400px) / 12));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.7);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.25);
     }
     
     .game-container {
-        flex-direction: row;
-        justify-content: center;
-        gap: 30px;
+      @apply flex-row justify-center gap-8;
     }
     
     .controls {
-        margin-top: 20px;
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        gap: 8px;
-        max-width: 250px;
-        position: relative;
-        bottom: auto;
-        left: auto;
-        transform: none;
-        background: transparent;
-        border: none;
-        padding: 0;
+      @apply mt-5 grid grid-cols-3 grid-rows-2 gap-2 max-w-62 relative bottom-auto left-auto transform-none bg-transparent border-0 p-0;
     }
     
     .control-button {
-        height: 40px;
-        font-size: 14px;
+      @apply h-10 text-sm;
     }
-}
+  }
 
-/* Tablet Landscape */
-@media (max-width: 1024px) and (min-width: 769px) {
+  /* Tablet Landscape */
+  @media (max-width: 1024px) and (min-width: 769px) {
     :root {
-        --main-cell-size: min(calc((100vh - 140px) / 20), calc((100vw - 320px) / 12));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.65);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.2);
+      --main-cell-size: min(calc((100vh - 140px) / 20), calc((100vw - 320px) / 12));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.65);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.2);
     }
     
-    .game-screen, .game-container {
-        gap: 12px;
-        padding: 8px;
-        flex-direction: row;
-        justify-content: space-around;
+    .game-screen,
+    .game-container {
+      @apply gap-3 p-2 flex-row justify-around;
     }
     
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        width: 140px;
-        flex: 1;
-        max-width: 350px;
+    .player-info,
+    .left-panel,
+    .right-panel,
+    .player-section,
+    .opponent-section {
+      @apply w-35 flex-1 max-w-87.5;
     }
     
     .opponent-section {
-        flex: 0 0 auto;
+      @apply flex-none;
     }
     
     .mobile-controls {
-        display: block;
+      @apply block;
     }
     
-    .stats-card, .player-info-card, .opponent-info-card {
-        padding: 12px;
-        font-size: 0.8rem;
+    .stats-card,
+    .player-info-card,
+    .opponent-info-card {
+      @apply p-3 text-xs;
     }
     
     .stat-row {
-        font-size: 0.75rem;
-        margin: 4px 0;
+      @apply text-xs my-1;
     }
     
-    .next-piece-preview, .hold-piece-preview {
-        width: 50px;
-        height: 50px;
+    .next-piece-preview,
+    .hold-piece-preview {
+      @apply w-12.5 h-12.5;
     }
-}
+  }
 
-/* Tablet Portrait */
-@media (max-width: 768px) and (min-width: 481px) {
+  /* Tablet Portrait */
+  @media (max-width: 768px) and (min-width: 481px) {
     :root {
-        --main-cell-size: min(calc((100vh - 160px) / 20), calc((100vw - 40px) / 12));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.6);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.18);
+      --main-cell-size: min(calc((100vh - 160px) / 20), calc((100vw - 40px) / 12));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.6);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.18);
     }
     
-    .game-screen, .game-container {
-        flex-direction: column;
-        align-items: center;
-        gap: 15px;
-        padding: 10px;
-        height: auto;
-        min-height: 100vh;
+    .game-screen,
+    .game-container {
+      @apply flex-col items-center gap-4 p-2.5 h-auto min-h-screen;
     }
     
     .boards-container {
-        order: 2;
-        width: 100%;
-        max-width: 400px;
+      @apply order-2 w-full max-w-96;
     }
     
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        order: 1;
-        width: 100%;
-        max-width: 400px;
-        flex-direction: row;
-        justify-content: space-around;
-        gap: 8px;
-        flex-wrap: wrap;
+    .player-info,
+    .left-panel,
+    .right-panel,
+    .player-section,
+    .opponent-section {
+      @apply order-1 w-full max-w-96 flex-row justify-around gap-2 flex-wrap;
     }
     
     .opponent-section {
-        order: 3;
-        margin-top: 10px;
+      @apply order-3 mt-2.5;
     }
     
     .mobile-controls {
-        display: block;
-        position: fixed;
-        bottom: 10px;
-        width: clamp(320px, 90vw, 400px);
+      @apply block fixed bottom-2.5;
+      width: clamp(320px, 90vw, 400px);
     }
     
-    .stats-card, .player-info-card, .opponent-info-card,
-    .next-piece-container, .hold-piece-container {
-        flex: 1;
-        min-width: 120px;
-        padding: 10px;
-        font-size: 0.75rem;
+    .stats-card,
+    .player-info-card,
+    .opponent-info-card,
+    .next-piece-container,
+    .hold-piece-container {
+      @apply flex-1 min-w-30 p-2.5 text-xs;
     }
     
     .control-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+      @apply grid-cols-3 gap-2;
     }
     
     .control-btn {
-        padding: 10px;
-        font-size: 0.7rem;
-        min-height: 40px;
+      @apply p-2.5 text-xs min-h-10;
     }
-}
+  }
 
-/* Mobile Landscape */
-@media (max-width: 850px) and (max-height: 480px) and (orientation: landscape) {
+  /* Mobile Landscape */
+  @media (max-width: 850px) and (max-height: 480px) and (orientation: landscape) {
     :root {
-        --main-cell-size: min(calc((100vh - 100px) / 20), calc((100vw - 300px) / 12));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.55);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.16);
+      --main-cell-size: min(calc((100vh - 100px) / 20), calc((100vw - 300px) / 12));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.55);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.16);
     }
     
-    .game-screen, .game-container {
-        flex-direction: row;
-        gap: 8px;
-        padding: 5px;
-        height: 100vh;
-        overflow: hidden;
+    .game-screen,
+    .game-container {
+      @apply flex-row gap-2 p-1.25 h-screen overflow-hidden;
     }
     
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        width: 120px;
-        gap: 8px;
-        max-height: calc(100vh - 20px);
-        overflow-y: auto;
+    .player-info,
+    .left-panel,
+    .right-panel,
+    .player-section,
+    .opponent-section {
+      @apply w-30 gap-2 overflow-y-auto;
+      max-height: calc(100vh - 20px);
     }
     
-    .stats-card, .player-info-card, .opponent-info-card,
-    .next-piece-container, .hold-piece-container {
-        padding: 8px;
-        font-size: 0.7rem;
+    .stats-card,
+    .player-info-card,
+    .opponent-info-card,
+    .next-piece-container,
+    .hold-piece-container {
+      @apply p-2 text-xs;
     }
     
     .mobile-controls {
-        display: block;
-        bottom: 5px;
-        width: clamp(250px, 80vw, 320px);
-        padding: 12px;
+      @apply block bottom-1.25;
+      width: clamp(250px, 80vw, 320px);
+      @apply p-3;
     }
     
     .control-grid {
-        gap: 6px;
+      @apply gap-1.5;
     }
     
     .control-btn {
-        padding: 8px;
-        font-size: 0.65rem;
-        min-height: 36px;
+      @apply p-2 text-xs min-h-9;
     }
-}
+  }
 
-/* Mobile Portrait */
-@media (max-width: 480px) {
+  /* Mobile Portrait */
+  @screen max-sm {
     :root {
-        --main-cell-size: min(calc((100vh - 200px) / 20), calc((100vw - 20px) / 10));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.5);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.15);
+      --main-cell-size: min(calc((100vh - 200px) / 20), calc((100vw - 20px) / 10));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.5);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.15);
     }
     
     .container {
-        padding: 5px;
+      @apply p-1.25;
     }
     
-    .game-screen, .game-container {
-        flex-direction: column;
-        gap: 10px;
-        padding: 5px;
-        height: auto;
-        min-height: 100vh;
+    .game-screen,
+    .game-container {
+      @apply flex-col gap-2.5 p-1.25 h-auto min-h-screen;
     }
     
     .boards-container {
-        order: 2;
-        width: 100%;
-        align-items: center;
+      @apply order-2 w-full items-center;
     }
     
-    .main-board, .tetris-board {
-        max-width: calc(100vw - 20px);
-        max-height: calc((100vw - 20px) * 2);
+    .main-board,
+    .tetris-board {
+      max-width: calc(100vw - 20px);
+      max-height: calc((100vw - 20px) * 2);
     }
     
-    .player-info, .left-panel, .right-panel, .player-section, .opponent-section {
-        order: 1;
-        width: 100%;
-        flex-direction: row;
-        justify-content: space-between;
-        gap: 5px;
-        flex-wrap: wrap;
-        max-height: none;
-        overflow: visible;
+    .player-info,
+    .left-panel,
+    .right-panel,
+    .player-section,
+    .opponent-section {
+      @apply order-1 w-full flex-row justify-between gap-1.25 flex-wrap max-h-none overflow-visible;
     }
     
     .opponent-section {
-        order: 3;
-        justify-content: center;
+      @apply order-3 justify-center;
     }
     
-    .stats-card, .player-info-card, .opponent-info-card,
-    .next-piece-container, .hold-piece-container {
-        flex: 1;
-        min-width: 100px;
-        max-width: 150px;
-        padding: 8px;
-        font-size: 0.7rem;
-        margin: 2px;
+    .stats-card,
+    .player-info-card,
+    .opponent-info-card,
+    .next-piece-container,
+    .hold-piece-container {
+      @apply flex-1 min-w-25 max-w-37.5 p-2 text-xs m-0.5;
     }
     
     .stat-row {
-        font-size: 0.65rem;
-        margin: 2px 0;
+      @apply text-xs my-0.5;
     }
     
-    .next-piece-preview, .hold-piece-preview {
-        width: 40px;
-        height: 40px;
+    .next-piece-preview,
+    .hold-piece-preview {
+      @apply w-10 h-10;
     }
     
     .mobile-controls {
-        display: block;
-        position: fixed;
-        bottom: 5px;
-        width: calc(100vw - 20px);
-        max-width: 340px;
-        padding: 10px;
+      @apply block fixed bottom-1.25 p-2.5;
+      width: calc(100vw - 20px);
+      max-width: 340px;
     }
     
     .control-grid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 6px;
+      @apply grid-cols-4 gap-1.5;
     }
     
     .control-btn {
-        padding: 8px;
-        font-size: 0.6rem;
-        min-height: 36px;
-        border-radius: 8px;
+      @apply p-2 text-xs min-h-9 rounded-lg;
     }
     
     .control-instructions {
-        font-size: 0.65rem;
-        margin-top: 6px;
+      @apply text-xs mt-1.5;
     }
     
-    /* Menu adjustments for mobile */
     .menu-screen {
-        padding: 1rem;
-        gap: 1rem;
+      @apply gap-4 p-4;
     }
     
     .game-title {
-        font-size: clamp(2rem, 8vw, 3rem);
-        margin-bottom: 1rem;
+      @apply text-3xl font-bold mb-4;
+    }
+    
+    .menu-buttons {
+      @apply gap-3;
+    }
+    
+    .btn {
+      @apply text-sm p-3 min-h-10;
     }
     
     .room-info {
-        padding: 1rem;
-        margin-bottom: 1rem;
+      @apply p-4 max-w-80;
     }
     
     .room-id {
-        font-size: clamp(1.2rem, 6vw, 1.8rem);
+      @apply text-xl;
     }
-    
-    .controls-content.expanded {
-        padding: 15px;
-        max-height: 300px;
-    }
-}
+  }
 
-/* Ultra Small Mobile */
-@media (max-width: 320px) {
+  /* Very Small Mobile */
+  @media (max-width: 320px) {
     :root {
-        --main-cell-size: min(calc((100vh - 180px) / 20), calc((100vw - 10px) / 10));
-        --opponent-cell-size: calc(var(--main-cell-size) * 0.45);
-        --preview-cell-size: calc(var(--main-cell-size) * 0.12);
+      --main-cell-size: min(calc((100vh - 180px) / 20), calc(100vw / 10));
+      --opponent-cell-size: calc(var(--main-cell-size) * 0.45);
+      --preview-cell-size: calc(var(--main-cell-size) * 0.12);
     }
     
-    .game-title {
-        font-size: clamp(1.5rem, 10vw, 2.5rem);
-    }
-    
-    .btn, .controls-toggle {
-        padding: 12px 20px;
-        font-size: 0.9rem;
+    .stats-card,
+    .player-info-card,
+    .opponent-info-card,
+    .next-piece-container,
+    .hold-piece-container {
+      @apply min-w-20 p-1.5 text-xs;
     }
     
     .control-btn {
-        padding: 6px;
-        font-size: 0.55rem;
-        min-height: 32px;
-    }
-    
-    .stats-card, .player-info-card, .opponent-info-card,
-    .next-piece-container, .hold-piece-container {
-        padding: 6px;
-        font-size: 0.65rem;
-        min-width: 80px;
+      @apply p-1.5 text-xs min-h-8;
     }
     
     .mobile-controls {
-        padding: 8px;
+      @apply p-2;
     }
-    
-    .control-grid {
-        gap: 4px;
-    }
+  }
 }
 
 /* =================================
-   TOUCH DEVICE IMPROVEMENTS
+   ANIMATIONS (Tailwind Compatible)
    ================================= */
+@layer components {
+  .animate-fadeIn {
+    animation: fadeIn 0.4s ease-out;
+  }
 
-@media (hover: none) and (pointer: coarse) {
-    .btn, .control-btn, .controls-toggle {
-        min-height: 44px;
-        font-size: 1rem;
-    }
-    
-    .control-btn:hover {
-        transform: none;
-        box-shadow: none;
-    }
-    
-    .control-btn:active {
-        background: rgba(41, 128, 185, 0.9);
-        transform: scale(0.98);
-    }
-    
-    .mobile-controls {
-        display: block;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-    }
+  .animate-lineClear {
+    @apply animate-pulse;
+    animation: lineClear 0.3s ease-out;
+  }
+
+  .animate-pieceDrop {
+    animation: pieceDrop 0.1s ease-out;
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .animate-levelUp {
+    animation: levelUp 0.6s ease-in-out;
+  }
+
+  .animate-bounceIn {
+    animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-glowPulse {
+    animation: glowPulse 2s ease-in-out infinite alternate;
+  }
+
+  /* Loading Components */
+  .loading-spinner {
+    @apply w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto;
+  }
+  
+  .loading-text {
+    @apply text-white/80 text-sm mt-2 animate-pulse;
+  }
+  
+  /* Transition Utilities */
+  .transition-all-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  /* Glow Effects */
+  .glow-blue {
+    @apply shadow-lg;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .glow-red {
+    @apply shadow-lg;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+  }
+  
+  .glow-purple {
+    @apply shadow-lg;
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.4);
+  }
+  
+  /* Text Effects */
+  .text-glow {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+  
+  .text-glow-blue {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+  }
+  
+  .text-glow-red {
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+  }
+  
+  /* Custom Backdrop Blur */
+  .backdrop-blur-strong {
+    @apply backdrop-blur-xl;
+  }
+  
+  /* No Select/Tap Highlight */
+  .no-tap-highlight {
+    @apply select-none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Game Specific Effects */
+  .piece-highlight {
+    @apply border-2 border-white/80 shadow-lg;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  }
+  
+  .board-glow {
+    @apply shadow-xl;
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), inset 0 0 30px rgba(59, 130, 246, 0.1);
+  }
+  
+  .opponent-board-glow {
+    @apply shadow-xl;
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.3), inset 0 0 25px rgba(239, 68, 68, 0.1);
+  }
+  
+  /* Hover States */
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-1;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-200;
+  }
+  
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  }
+}
+
+/* Custom Keyframes (Keep minimal CSS for complex animations) */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lineClear {
+  0% { background-color: rgba(255, 255, 255, 0.8); transform: scaleY(1); }
+  50% { background-color: rgba(255, 255, 255, 1); transform: scaleY(1.1); }
+  100% { background-color: transparent; transform: scaleY(0); }
+}
+
+@keyframes pieceDrop {
+  0% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+@keyframes levelUp {
+  0% { transform: scale(1); color: #ffd700; }
+  50% { transform: scale(1.2); color: #fff; }
+  100% { transform: scale(1); color: #ffd700; }
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glowPulse {
+  from { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
+  to { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8); }
 }
 
 /* =================================
-   HIGH DPI DISPLAYS
+   ACCESSIBILITY & PREFERENCES
    ================================= */
+@layer utilities {
+  /* Reduced Motion Support */
+  .motion-reduce-friendly {
+    @apply transition-none;
+  }
+  
+  /* Focus Visible States */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800;
+  }
+  
+  /* Screen Reader Only */
+  .sr-only-focusable {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-slate-800 focus:text-white focus:rounded;
+  }
+}
 
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    .tetris-block, .tetris-block-small {
-        border-width: 0.5px;
-    }
-    
-    .game-board, .tetris-board, .responsive-board {
-        border-width: 2px;
-    }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-lineClear,
+  .animate-pieceDrop,
+  .animate-shake,
+  .animate-levelUp,
+  .animate-bounceIn,
+  .animate-slideUp,
+  .animate-glowPulse {
+    @apply animate-none;
+  }
+  
+  .transition-all-smooth,
+  .hover-lift,
+  .hover-scale {
+    @apply transition-none;
+  }
 }
 
 /* =================================
    PRINT STYLES
    ================================= */
-
 @media print {
-    .mobile-controls, .controls {
-        display: none !important;
-    }
-    
-    .game-screen {
-        background: white;
-        color: black;
-    }
-    
-    .tetris-board, .game-board {
-        border: 2px solid black;
-        background: white;
-    }
-}
-
-/* =================================
-   ACCESSIBILITY IMPROVEMENTS
-   ================================= */
-
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-    
-    .screen {
-        animation: none;
-    }
-    
-    .btn::before {
-        transition: none;
-    }
-}
-
-@media (prefers-color-scheme: light) {
-    body {
-        background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 50%, #ecf0f1 100%);
-        color: #2c3e50;
-    }
-    
-    .stats-card, .player-info-card, .opponent-info-card,
-    .next-piece-container, .hold-piece-container {
-        background: rgba(255, 255, 255, 0.9);
-        color: #2c3e50;
-        border-color: rgba(52, 152, 219, 0.3);
-    }
-}
-
-/* =================================
-   PERFORMANCE OPTIMIZATIONS
-   ================================= */
-
-.tetris-block, .tetris-block-small {
-    will-change: transform;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
-.game-board, .tetris-board {
-    contain: layout style paint;
-}
-
-.mobile-controls {
-    contain: layout style;
-}
-
-/* =================================
-   BROWSER SPECIFIC FIXES
-   ================================= */
-
-/* Safari specific */
-@supports (-webkit-appearance: none) {
-    .mobile-controls {
-        -webkit-backdrop-filter: blur(10px);
-    }
-    
-    .stats-card, .player-info-card, .opponent-info-card {
-        -webkit-backdrop-filter: blur(10px);
-    }
-}
-
-/* Firefox specific */
-@-moz-document url-prefix() {
-    .mobile-controls {
-        background: rgba(52, 73, 94, 0.98);
-    }
-}
-
-/* Edge specific */
-@supports (-ms-ime-align: auto) {
-    .control-grid {
-        display: -ms-grid;
-    }
-}
-
-/* =================================
-   UTILITY CLASSES
-   ================================= */
-
-.hidden {
-    display: none !important;
-}
-
-.visible {
-    display: block !important;
-}
-
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-.no-scroll {
-    overflow: hidden;
-    height: 100vh;
-}
-
-/* =================================
-   ANIMATION KEYFRAMES
-   ================================= */
-
-@keyframes slideInFromBottom {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-2px); }
-    75% { transform: translateX(2px); }
-}
-
-@keyframes glow {
-    0%, 100% {
-        box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
-    }
-    50% {
-        box-shadow: 0 0 20px rgba(52, 152, 219, 0.8);
-    }
-}
-
-/* Line clear animation */
-@keyframes lineClear {
-    0% { opacity: 1; }
-    50% { opacity: 0.3; background: white; }
-    100% { opacity: 0; }
-}
-
-.line-clearing {
-    animation: lineClear 0.3s ease-out;
-}
-
-/* Piece drop animation */
-@keyframes pieceDrop {
-    0% { transform: translateY(-10px); }
-    100% { transform: translateY(0); }
-}
-
-.piece-dropped {
-    animation: pieceDrop 0.1s ease-out;
+  .mobile-controls,
+  .controls,
+  .btn,
+  .control-btn {
+    @apply hidden;
+  }
+  
+  .game-screen,
+  .container {
+    @apply bg-white text-black;
+  }
+  
+  .tetris-board,
+  .opponent-board {
+    @apply border-black;
+  }
 }
