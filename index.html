@@ -120,14 +120,7 @@
                 <button id="btn-leave-room" class="btn">🚪 ออกจากห้อง</button>
             </div>
         </div>
-<!-- Center - Main Game Board -->
-                <div class="main-player-area">
-                    <div style="text-align: center; margin-bottom: 1rem;">
-                        <button style="background: rgba(0,255,255,0.2); border: 2px solid 
-#00ffff; border-radius: 20px; padding: 8px 20px; color: white; font-weight: bold; cursor: pointer;">⏸️ หยุดชั่วคราว</button>
-                    </div>
-                    <div id="my-board" class="tetris-board main-board"></div>
-                </div>
+        
         <!-- Game Screen - New Single Page Layout -->
         <div id="game-screen" class="screen">
             <div class="game-container">
@@ -160,6 +153,15 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Center - Main Game Board -->
+                <div class="main-player-area">
+                    <div style="text-align: center; margin-bottom: 1rem;">
+                        <button style="background: rgba(0,255,255,0.2); border: 2px solid #00ffff; border-radius: 20px; padding: 8px 20px; color: white; font-weight: bold; cursor: pointer;">⏸️ หยุดชั่วคราว</button>
+                    </div>
+                    <div id="my-board" class="tetris-board main-board"></div>
+                </div>
+                
                 <!-- Right Panel - Opponent -->
                 <div class="right-panel">
                     <div class="opponent-info-card">
@@ -221,13 +223,12 @@
         </div>
     </div>
 
-    // In your main HTML file:
-<script src="game-class.js"></script>
-<script>
-    // Initialize game when page loads
-    document.addEventListener('DOMContentLoaded', () => {
-        window.tetrisGame = new TetrisMultiplayer();
-    });
-</script>
+    <script src="game-class.js"></script>
+    <script>
+        // Initialize game when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.tetrisGame = new TetrisMultiplayer();
+        });
+    </script>
 </body>
 </html>
