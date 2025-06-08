@@ -623,15 +623,6 @@ body {
     flex: 1;
     height: 100%;
 }
-
-.main-player-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-}
-
 /* =================================
    STANDARD TETRIS BOARDS - CONSISTENT SIZING
    ================================= */
