@@ -515,6 +515,8 @@ function initTouchControls() {
     try {
         let touchStartX = 0;
         let touchStartY = 0;
+        let touchStartTime = 0;
+        const QUICK_TAP_THRESHOLD = 200; // 200ms สำหรับแยก tap กับ hold
         
         const gameBoard = document.getElementById('my-board');
         if (!gameBoard) return;
@@ -529,6 +531,7 @@ function initTouchControls() {
             if (e.touches && e.touches[0]) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
+                touchStartTime = Date.now(); // บันทึกเวลาที่เริ่มสัมผัส
             }
         });
         
@@ -538,28 +541,31 @@ function initTouchControls() {
             
             const touchEndX = e.changedTouches[0].clientX;
             const touchEndY = e.changedTouches[0].clientY;
+            const touchDuration = Date.now() - touchStartTime; // คำนวณระยะเวลาที่สัมผัส
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
             
             const minSwipeDistance = 30;
             
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                // Horizontal swipe
-                if (Math.abs(deltaX) > minSwipeDistance) {
-                    if (deltaX > 0) {
-                        sendGameInput('right');
-                    } else {
-                        sendGameInput('left');
-                    }
+            // ตรวจสอบ swipe ก่อน (การเลื่อนนิ้วระยะไกล)
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+                // Horizontal swipe - เลื่อนซ้าย/ขวา
+                if (deltaX > 0) {
+                    sendGameInput('right');
+                } else {
+                    sendGameInput('left');
                 }
+            } else if (Math.abs(deltaY) > minSwipeDistance && deltaY > 0) {
+                // Vertical swipe down - Soft drop (ลงช้าๆ)
+                sendGameInput('down');
             } else {
-                // Vertical swipe
-                if (Math.abs(deltaY) > minSwipeDistance) {
-                    if (deltaY > 0) {
-                        sendGameInput('drop');
-                    } else {
-                        sendGameInput('rotate');
-                    }
+                // ไม่ใช่ swipe = เป็น tap หรือ hold
+                if (touchDuration > QUICK_TAP_THRESHOLD) {
+                    // Hold นาน = Hard Drop (ปล่อยลงเลย)
+                    sendGameInput('drop');
+                } else {
+                    // Tap เร็ว = หมุนบล็อค
+                    sendGameInput('rotate');
                 }
             }
         });
