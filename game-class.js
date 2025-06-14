@@ -1,4 +1,4 @@
-// TwoBob Tactics - Tetris Multiplayer Game Class (Fixed)
+// TwoBob Tactics - Tetris Multiplayer Game Class (Enhanced Mobile Controls)
 class TetrisMultiplayer {
     constructor() {
         this.socket = null;
@@ -44,11 +44,23 @@ class TetrisMultiplayer {
         
         this.pieceTypes = Object.keys(this.pieces);
         
-        // Touch/swipe handling
+        // Enhanced Touch/swipe handling
         this.touchStartX = 0;
         this.touchStartY = 0;
+        this.touchStartTime = 0;
         this.lastMoveTime = 0;
         this.moveInterval = 500; // 500ms drop interval
+        this.lastTouchAction = 0; // Prevent rapid actions
+        this.touchActionDelay = 100; // 100ms between touch actions
+        
+        // Touch sensitivity settings
+        this.touchSettings = {
+            minSwipeDistance: 40,      // Minimum distance for swipe
+            maxTapDuration: 200,       // Maximum duration for tap (ms)
+            maxTapDistance: 20,        // Maximum distance for tap
+            rapidDropThreshold: 100,   // Threshold for rapid drop detection
+            swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
+        };
         
         // Viewport properties
         this.viewport = {
@@ -290,42 +302,89 @@ class TetrisMultiplayer {
             }
         });
 
-        // Touch controls for mobile
+        // Enhanced Touch controls for mobile
         const gameScreen = document.getElementById('game-screen');
         if (gameScreen) {
-            gameScreen.addEventListener('touchstart', this.handleTouchStart.bind(this));
-            gameScreen.addEventListener('touchmove', this.handleTouchMove.bind(this));
-            gameScreen.addEventListener('touchend', this.handleTouchEnd.bind(this));
+            // Prevent context menu on long press
+            gameScreen.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            gameScreen.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+            gameScreen.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+            gameScreen.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
         }
     }
 
     setupMobileControls() {
+        // Enhanced mobile control buttons
+        const controlsMapping = [
+            { action: 'rotate', icon: '↻' },    // Rotate
+            { action: 'hardDrop', icon: '⬇' },  // Hard drop
+            { action: 'left', icon: '←' },      // Move left
+            { action: 'right', icon: '→' },     // Move right
+            { action: 'softDrop', icon: '↓' },  // Soft drop
+            { action: 'hold', icon: '⏸' }       // Hold piece (future feature)
+        ];
+
         const buttons = document.querySelectorAll('.control-button');
         buttons.forEach((btn, index) => {
-            btn.addEventListener('click', () => {
-                if (!this.gameStarted || this.gameState.gameOver) return;
+            if (controlsMapping[index]) {
+                const mapping = controlsMapping[index];
+                btn.innerHTML = mapping.icon;
+                btn.setAttribute('data-action', mapping.action);
                 
-                switch(index) {
-                    case 0: this.rotatePiece(); break;        // ↶
-                    case 1: this.rotatePiece(); break;        // ↑
-                    case 2: this.hardDrop(); break;           // 💧
-                    case 3: this.movePiece(-1, 0); break;     // ←
-                    case 4: this.movePiece(0, 1); break;      // ↓
-                    case 5: this.movePiece(1, 0); break;      // →
-                }
-            });
+                // Prevent default touch behavior
+                btn.addEventListener('touchstart', (e) => e.preventDefault());
+                
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!this.gameStarted || this.gameState.gameOver) return;
+                    
+                    this.executeMobileAction(mapping.action);
+                });
+            }
         });
     }
 
-    handleTouchStart(e) {
-        if (e.touches && e.touches.length > 0) {
-            this.touchStartX = e.touches[0].clientX;
-            this.touchStartY = e.touches[0].clientY;
+    executeMobileAction(action) {
+        const now = Date.now();
+        if (now - this.lastTouchAction < this.touchActionDelay) return;
+        this.lastTouchAction = now;
+
+        switch(action) {
+            case 'rotate':
+                this.rotatePiece();
+                break;
+            case 'hardDrop':
+                this.hardDrop();
+                break;
+            case 'left':
+                this.movePiece(-1, 0);
+                break;
+            case 'right':
+                this.movePiece(1, 0);
+                break;
+            case 'softDrop':
+                this.movePiece(0, 1);
+                break;
+            case 'hold':
+                // Future feature: hold current piece
+                console.log('Hold feature not implemented yet');
+                break;
         }
     }
 
-    handleTouchMove(e) {
+    handleTouchStart(e) {
+        if (!this.gameStarted || this.gameState.gameOver) return;
+        if (e.touches && e.touches.length > 0) {
+            this.touchStartX = e.touches[0].clientX;
+            this.touchStartY = e.touches[0].clientY;
+            this.touchStartTime = Date.now();
+        }
         e.preventDefault();
+    }
+
+    handleTouchMove(e) {
+        e.preventDefault(); // Prevent scrolling during game
     }
 
     handleTouchEnd(e) {
@@ -334,26 +393,75 @@ class TetrisMultiplayer {
         
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
+        const touchEndTime = Date.now();
+        
         const deltaX = touchEndX - this.touchStartX;
         const deltaY = touchEndY - this.touchStartY;
-        const absX = Math.abs(deltaX);
-        const absY = Math.abs(deltaY);
+        const deltaTime = touchEndTime - this.touchStartTime;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // Prevent rapid consecutive actions
+        const now = Date.now();
+        if (now - this.lastTouchAction < this.touchActionDelay) {
+            e.preventDefault();
+            return;
+        }
 
-        if (absX > 30 || absY > 30) {
-            if (absX > absY) {
-                if (deltaX > 0) {
-                    this.movePiece(1, 0); // Right
+        // Check if it's a tap (short duration, small distance)
+        if (deltaTime <= this.touchSettings.maxTapDuration && 
+            distance <= this.touchSettings.maxTapDistance) {
+            // TAP = ROTATE
+            this.rotatePiece();
+            this.lastTouchAction = now;
+            console.log('Tap detected - Rotating piece');
+            e.preventDefault();
+            return;
+        }
+
+        // Check if it's a swipe (sufficient distance)
+        if (distance >= this.touchSettings.minSwipeDistance) {
+            const velocity = distance / deltaTime;
+            
+            if (velocity >= this.touchSettings.swipeVelocityThreshold) {
+                const absX = Math.abs(deltaX);
+                const absY = Math.abs(deltaY);
+
+                if (absX > absY) {
+                    // Horizontal swipe
+                    if (deltaX > 0) {
+                        // Swipe right
+                        this.movePiece(1, 0);
+                        console.log('Swipe right - Moving piece right');
+                    } else {
+                        // Swipe left
+                        this.movePiece(-1, 0);
+                        console.log('Swipe left - Moving piece left');
+                    }
                 } else {
-                    this.movePiece(-1, 0); // Left
+                    // Vertical swipe
+                    if (deltaY > 0) {
+                        // Swipe down
+                        if (velocity > 1.0) {
+                            // Fast swipe down = Hard drop
+                            this.hardDrop();
+                            console.log('Fast swipe down - Hard drop');
+                        } else {
+                            // Slow swipe down = Soft drop
+                            this.movePiece(0, 1);
+                            console.log('Slow swipe down - Soft drop');
+                        }
+                    } else {
+                        // Swipe up = Rotate (alternative to tap)
+                        this.rotatePiece();
+                        console.log('Swipe up - Rotating piece');
+                    }
                 }
-            } else {
-                if (deltaY > 0) {
-                    this.movePiece(0, 1); // Down
-                } else {
-                    this.rotatePiece(); // Up - rotate
-                }
+                
+                this.lastTouchAction = now;
             }
         }
+        
+        e.preventDefault();
     }
 
     handleKeyPress(key) {
@@ -461,14 +569,49 @@ class TetrisMultiplayer {
         if (this.isValidPosition(rotated, this.gameState.currentPiece.x, this.gameState.currentPiece.y)) {
             this.gameState.currentPiece.shape = rotated;
             this.updateBoard();
+            
+            // Visual feedback for rotation
+            this.showRotationFeedback();
+        }
+    }
+
+    showRotationFeedback() {
+        // Brief visual feedback when piece rotates
+        const boardEl = document.getElementById('my-board');
+        if (boardEl) {
+            boardEl.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
+            setTimeout(() => {
+                boardEl.style.boxShadow = '';
+            }, 100);
         }
     }
 
     hardDrop() {
         if (!this.gameState.currentPiece) return;
         
+        let dropDistance = 0;
         while (this.movePiece(0, 1)) {
-            // Keep dropping
+            dropDistance++;
+        }
+        
+        // Bonus points for hard drop
+        if (dropDistance > 0) {
+            this.gameState.score += dropDistance * 2;
+            this.updateStats();
+        }
+        
+        // Visual feedback for hard drop
+        this.showHardDropFeedback();
+    }
+
+    showHardDropFeedback() {
+        // Brief visual feedback when hard dropping
+        const boardEl = document.getElementById('my-board');
+        if (boardEl) {
+            boardEl.style.background = 'rgba(255,255,0,0.2)';
+            setTimeout(() => {
+                boardEl.style.background = 'rgba(0,0,0,0.8)';
+            }, 150);
         }
     }
 
@@ -533,6 +676,22 @@ class TetrisMultiplayer {
             this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
             this.moveInterval = Math.max(50, 500 - (this.gameState.level - 1) * 50);
             this.updateStats();
+            
+            // Visual feedback for line clear
+            this.showLineClearFeedback(linesCleared);
+        }
+    }
+
+    showLineClearFeedback(linesCleared) {
+        // Visual feedback when lines are cleared
+        const boardEl = document.getElementById('my-board');
+        if (boardEl) {
+            const colors = ['', '#00ff00', '#ffff00', '#ff8000', '#ff0000']; // 1-4 lines
+            const color = colors[Math.min(linesCleared, 4)] || '#ff0000';
+            boardEl.style.boxShadow = `0 0 20px ${color}`;
+            setTimeout(() => {
+                boardEl.style.boxShadow = '';
+            }, 300);
         }
     }
 
@@ -598,7 +757,6 @@ class TetrisMultiplayer {
         boardEl.style.border = '2px solid #333';
         boardEl.style.background = 'rgba(0,0,0,0.8)';
     }
-
     // ฟังก์ชันสร้าง game over overlay
     createGameOverOverlay() {
         const overlay = document.createElement('div');
