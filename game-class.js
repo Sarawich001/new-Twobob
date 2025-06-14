@@ -746,6 +746,22 @@ class TetrisMultiplayer {
         return block;
     }
 
+    // ฟังก์ชันสร้าง block สำหรับ next piece
+    createNextPieceBlock(x, y, size, color) {
+        const block = document.createElement('div');
+        block.className = 'next-piece-block';
+        block.style.position = 'absolute';
+        block.style.left = x * size + 'px';
+        block.style.top = y * size + 'px';
+        block.style.width = size + 'px';
+        block.style.height = size + 'px';
+        block.style.background = color;
+        block.style.border = '1px solid rgba(255,255,255,0.4)';
+        block.style.boxSizing = 'border-box';
+        block.style.borderRadius = '2px';
+        return block;
+    }
+
     // ฟังก์ชันกำหนดขนาด board
     setBoardDimensions(boardEl, blockSize) {
         const width = this.BOARD_WIDTH * blockSize;
