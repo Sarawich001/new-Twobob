@@ -761,7 +761,40 @@ class TetrisMultiplayer {
         block.style.borderRadius = '2px';
         return block;
     }
-
+    // เพิ่มฟังก์ชันนี้ใน TetrisMultiplayer class
+updateNextPiece() {
+    const nextPieceEl = document.getElementById('next-piece-display');
+    if (!nextPieceEl || !this.gameState.nextPiece) return;
+    
+    // กำหนดขนาดของ next piece container
+    const containerSize = Math.min(80, this.BLOCK_SIZE * 4);
+    const blockSize = Math.floor(containerSize / 4);
+    
+    nextPieceEl.style.width = containerSize + 'px';
+    nextPieceEl.style.height = containerSize + 'px';
+    nextPieceEl.style.position = 'relative';
+    nextPieceEl.innerHTML = '';
+    
+    const { shape, color } = this.gameState.nextPiece;
+    
+    // คำนวณตำแหน่งให้อยู่กึ่งกลาง
+    const offsetX = Math.floor((4 - shape[0].length) / 2);
+    const offsetY = Math.floor((4 - shape.length) / 2);
+    
+    for (let i = 0; i < shape.length; i++) {
+        for (let j = 0; j < shape[i].length; j++) {
+            if (shape[i][j]) {
+                const block = this.createNextPieceBlock(
+                    offsetX + j, 
+                    offsetY + i, 
+                    blockSize, 
+                    color
+                );
+                nextPieceEl.appendChild(block);
+            }
+        }
+    }
+}
     // ฟังก์ชันกำหนดขนาด board
     setBoardDimensions(boardEl, blockSize) {
         const width = this.BOARD_WIDTH * blockSize;
@@ -831,6 +864,7 @@ class TetrisMultiplayer {
         if (this.gameState.gameOver) {
             const overlay = this.createGameOverOverlay();
             boardEl.appendChild(overlay);
+             this.updateNextPiece();
         }
     }
 
