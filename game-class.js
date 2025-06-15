@@ -798,8 +798,8 @@ updateNextPiece() {
     nextPieceEl.style.width = containerSize + 'px';
     nextPieceEl.style.height = containerSize + 'px';
     nextPieceEl.style.position = 'relative';
-    nextPieceEl.style.background = 'rgba(0,0,0,0.3)';
-    nextPieceEl.style.border = '1px solid #666';
+    nextPieceEl.style.background = 'transparent';
+    nextPieceEl.style.border = 'none';
     nextPieceEl.innerHTML = '';
     
     const { shape, color } = this.gameState.nextPiece;
