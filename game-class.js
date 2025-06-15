@@ -514,7 +514,7 @@ class TetrisMultiplayer {
         this.setupGameLayout();
         this.updateBoard();
         this.updateStats();
-        this.updateNextPiece(); // เพิ่มบรรทัดนี้
+        this.updateNextPiece();
         this.gameLoop();
     }
 
@@ -700,9 +700,6 @@ class TetrisMultiplayer {
         this.gameState.currentPiece = this.gameState.nextPiece;
         this.gameState.nextPiece = this.generatePiece();
         
-        // อัพเดท next piece display
-        this.updateNextPiece();
-        
         if (!this.isValidPosition(this.gameState.currentPiece.shape, 
                                   this.gameState.currentPiece.x, 
                                   this.gameState.currentPiece.y)) {
@@ -765,57 +762,89 @@ class TetrisMultiplayer {
         block.style.borderRadius = '2px';
         return block;
     }
-
-    // ฟังก์ชันอัพเดท Next Piece Display - แก้ไขแล้ว
-// ต่อจากฟังก์ชัน updateNextPiece() ที่ขาดหายไป
-    updateNextPiece() {
-        const nextPieceEl = document.getElementById('next-piece-display');
-        if (!nextPieceEl || !this.gameState.nextPiece) return;
-        
-        // Clear previous display
-        nextPieceEl.innerHTML = '';
-        
-        const { shape, color } = this.gameState.nextPiece;
-        const blockSize = this.viewport.isMobile ? 12 : 16;
-        
-        // Calculate centering offset
-        const offsetX = Math.floor((4 - shape[0].length) / 2);
-        const offsetY = Math.floor((4 - shape.length) / 2);
-        
-        for (let i = 0; i < shape.length; i++) {
-            for (let j = 0; j < shape[i].length; j++) {
-                if (shape[i][j]) {
-                    const block = this.createNextPieceBlock(
-                        j + offsetX, 
-                        i + offsetY, 
-                        blockSize, 
-                        color
-                    );
-                    nextPieceEl.appendChild(block);
-                }
+    // เพิ่มฟังก์ชันนี้ใน TetrisMultiplayer class
+updateNextPiece() {
+    const nextPieceEl = document.getElementById('next-piece-display');
+    if (!nextPieceEl || !this.gameState.nextPiece) return;
+    
+    // ขนาดที่ปรับได้ตามหน้าจอ
+    const containerSize = this.viewport.isMobile ? 
+        Math.min(60, this.BLOCK_SIZE * 3) : 
+        Math.min(80, this.BLOCK_SIZE * 4);
+    const blockSize = Math.floor(containerSize / 4);
+    
+    nextPieceEl.style.width = containerSize + 'px';
+    nextPieceEl.style.height = containerSize + 'px';
+    nextPieceEl.style.position = 'relative';
+    nextPieceEl.innerHTML = '';
+    
+    const { shape, color } = this.gameState.nextPiece;
+    
+    // คำนวณตำแหน่งให้อยู่กึ่งกลาง
+    const offsetX = Math.floor((4 - shape[0].length) / 2);
+    const offsetY = Math.floor((4 - shape.length) / 2);
+    
+    for (let i = 0; i < shape.length; i++) {
+        for (let j = 0; j < shape[i].length; j++) {
+            if (shape[i][j]) {
+                const block = this.createNextPieceBlock(
+                    offsetX + j, 
+                    offsetY + i, 
+                    blockSize, 
+                    color
+                );
+                nextPieceEl.appendChild(block);
             }
         }
     }
+}
+    // ฟังก์ชันกำหนดขนาด board
+    setBoardDimensions(boardEl, blockSize) {
+        const width = this.BOARD_WIDTH * blockSize;
+        const height = this.BOARD_HEIGHT * blockSize;
+        
+        boardEl.style.width = width + 'px';
+        boardEl.style.height = height + 'px';
+        boardEl.style.position = 'relative';
+        boardEl.style.border = '2px solid #333';
+        boardEl.style.background = 'rgba(0,0,0,0.8)';
+    }
+    // ฟังก์ชันสร้าง game over overlay
+    createGameOverOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'game-over-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(0,0,0,0.8)';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.color = '#fff';
+        overlay.style.fontSize = Math.max(16, this.BLOCK_SIZE * 0.8) + 'px';
+        overlay.style.fontWeight = 'bold';
+        overlay.style.textAlign = 'center';
+        overlay.innerHTML = '<div class="game-over-text">GAME OVER</div>';
+        return overlay;
+    }
 
+    // Update MY board (main board)
     updateBoard() {
         const boardEl = document.getElementById('my-board');
         if (!boardEl) return;
         
-        // Clear previous display
+        // ปรับขนาดของ board container
+        this.setBoardDimensions(boardEl, this.BLOCK_SIZE);
+        
         boardEl.innerHTML = '';
         
-        // Set board dimensions
-        boardEl.style.width = (this.BOARD_WIDTH * this.BLOCK_SIZE) + 'px';
-        boardEl.style.height = (this.BOARD_HEIGHT * this.BLOCK_SIZE) + 'px';
-        boardEl.style.position = 'relative';
-        boardEl.style.background = 'rgba(0,0,0,0.8)';
-        boardEl.style.border = '2px solid #444';
-        
-        // Draw placed pieces
-        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-            for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                if (this.gameState.board[y][x]) {
-                    const block = this.createBlock(x, y, this.BLOCK_SIZE, this.gameState.board[y][x]);
+        // Draw placed blocks
+        for (let i = 0; i < this.BOARD_HEIGHT; i++) {
+            for (let j = 0; j < this.BOARD_WIDTH; j++) {
+                if (this.gameState.board[i][j]) {
+                    const block = this.createBlock(j, i, this.BLOCK_SIZE, this.gameState.board[i][j]);
                     boardEl.appendChild(block);
                 }
             }
@@ -826,228 +855,166 @@ class TetrisMultiplayer {
             const { shape, x, y, color } = this.gameState.currentPiece;
             for (let i = 0; i < shape.length; i++) {
                 for (let j = 0; j < shape[i].length; j++) {
-                    if (shape[i][j] && y + i >= 0) {
+                    if (shape[i][j]) {
                         const block = this.createBlock(x + j, y + i, this.BLOCK_SIZE, color, true);
                         boardEl.appendChild(block);
                     }
                 }
             }
         }
+        
+        // Show game over overlay
+        if (this.gameState.gameOver) {
+            const overlay = this.createGameOverOverlay();
+            boardEl.appendChild(overlay);
+             this.updateNextPiece();
+        }
     }
 
-    updateStats() {
-        const scoreEl = document.getElementById('my-score');
-        const linesEl = document.getElementById('my-lines');
-        const levelEl = document.getElementById('my-level');
-        
-        if (scoreEl) scoreEl.textContent = this.gameState.score.toLocaleString();
-        if (linesEl) linesEl.textContent = this.gameState.lines;
-        if (levelEl) levelEl.textContent = this.gameState.level;
+    // Update opponent board (smaller board)
+updateOpponentBoard(data) {
+    console.log('Updating opponent board with data:', data); // จาก V2
+    
+    // ใช้ spread operator จาก V1 เพื่อความปลอดภัย + การอัพเดทแบบ V2
+    this.opponentState = { 
+        ...this.opponentState, 
+        board: data.board || this.opponentState.board || [],
+        score: data.score !== undefined ? data.score : this.opponentState.score || 0,
+        lines: data.lines !== undefined ? data.lines : this.opponentState.lines || 0,
+        level: data.level !== undefined ? data.level : this.opponentState.level || 1
+    };
+    
+    const opponentBoardEl = document.getElementById('opponent-board');
+    if (!opponentBoardEl) {
+        console.warn('Opponent board element not found');
+        return;
     }
-
-    updateOpponentBoard(data) {
-        this.opponentState = { ...this.opponentState, ...data };
-        
-        const opponentBoardEl = document.getElementById('opponent-board');
-        if (!opponentBoardEl) return;
-        
-        // Clear previous display
-        opponentBoardEl.innerHTML = '';
-        
-        // Set smaller board dimensions for opponent
-        opponentBoardEl.style.width = (this.BOARD_WIDTH * this.SMALL_BLOCK_SIZE) + 'px';
-        opponentBoardEl.style.height = (this.BOARD_HEIGHT * this.SMALL_BLOCK_SIZE) + 'px';
-        opponentBoardEl.style.position = 'relative';
-        opponentBoardEl.style.background = 'rgba(0,0,0,0.6)';
-        opponentBoardEl.style.border = '1px solid #666';
-        
-        // Draw opponent's board
-        if (data.board) {
-            for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-                for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                    if (data.board[y] && data.board[y][x]) {
-                        const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, data.board[y][x]);
+    
+    // Clear previous display
+    opponentBoardEl.innerHTML = '';
+    
+    // Set board dimensions (รวมวิธีจาก V1 + V2)
+    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE); // จาก V2
+    opponentBoardEl.style.position = 'relative';
+    opponentBoardEl.style.background = 'rgba(0,0,0,0.6)';
+    opponentBoardEl.style.border = '1px solid #666';
+    
+    // Draw opponent's board with enhanced safety checks
+    const board = this.opponentState.board;
+    if (board && Array.isArray(board)) {
+        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                if (board[y] && board[y][x] && typeof board[y][x] !== 'undefined') {
+                    const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, board[y][x]);
+                    if (block) {
                         opponentBoardEl.appendChild(block);
                     }
                 }
             }
         }
-        
-        // Update opponent stats
-        const opponentScoreEl = document.getElementById('opponent-score');
-        const opponentLinesEl = document.getElementById('opponent-lines');
-        const opponentLevelEl = document.getElementById('opponent-level');
-        
-        if (opponentScoreEl && data.score !== undefined) {
-            opponentScoreEl.textContent = data.score.toLocaleString();
-        }
-        if (opponentLinesEl && data.lines !== undefined) {
-            opponentLinesEl.textContent = data.lines;
-        }
-        if (opponentLevelEl && data.level !== undefined) {
-            opponentLevelEl.textContent = data.level;
-        }
     }
+    
+    // Update stats
+    this.updateOpponentStats();
+}
+
+updateStats() {
+    const updates = [
+        { id: 'my-score', value: this.gameState.score, format: 'number' },
+        { id: 'my-lines', value: this.gameState.lines, format: 'plain' },
+        { id: 'my-level', value: this.gameState.level, format: 'plain' }
+    ];
+    
+    updates.forEach(({ id, value, format }) => {
+        const element = document.getElementById(id);
+        if (element && value !== undefined) {
+            element.textContent = format === 'number' ? value.toLocaleString() : value;
+        }
+    });
+}
+
+updateOpponentStats() {
+    const updates = [
+        { id: 'opponent-score', value: this.opponentState.score, format: 'number' },
+        { id: 'opponent-lines', value: this.opponentState.lines, format: 'plain' },
+        { id: 'opponent-level', value: this.opponentState.level, format: 'plain' }
+    ];
+    
+    updates.forEach(({ id, value, format }) => {
+        const element = document.getElementById(id);
+        if (element && value !== undefined) {
+            element.textContent = format === 'number' ? value.toLocaleString() : value;
+        }
+    });
+}
 
     showScreen(screenId) {
-        // Hide all screens
-        const screens = ['menu-screen', 'create-room-screen', 'join-room-screen', 
-                        'waiting-screen', 'game-screen', 'game-over-screen', 'connection-screen'];
-        
-        screens.forEach(id => {
-            const screen = document.getElementById(id);
-            if (screen) {
-                screen.style.display = 'none';
-            }
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.style.display = 'none';
         });
-        
-        // Show target screen
         const targetScreen = document.getElementById(screenId);
         if (targetScreen) {
-            targetScreen.style.display = 'flex';
-        }
-        
-        // Special handling for menu screen
-        if (screenId === 'menu-screen') {
-            const createBtn = document.getElementById('btn-create-room');
-            const joinBtn = document.getElementById('btn-join-room');
-            
-            if (createBtn) {
-                createBtn.addEventListener('click', () => this.showScreen('create-room-screen'));
-            }
-            if (joinBtn) {
-                joinBtn.addEventListener('click', () => this.showScreen('join-room-screen'));
-            }
+            targetScreen.style.display = 'block';
         }
     }
 
     showWaitingScreen() {
-        this.showScreen('waiting-screen');
-        
-        // Display room ID
         const roomIdDisplay = document.getElementById('room-id-display');
         if (roomIdDisplay) {
             roomIdDisplay.textContent = this.roomId;
         }
+        this.showScreen('waiting-screen');
         
-        // Display player name
-        const waitingPlayerName = document.getElementById('waiting-player-name');
-        if (waitingPlayerName) {
-            waitingPlayerName.textContent = this.playerName;
+        const btnReady = document.getElementById('btn-ready');
+        if (btnReady) {
+            btnReady.disabled = false;
         }
     }
 
     updatePlayersDisplay(players) {
-        const playersListEl = document.getElementById('players-list');
-        if (!playersListEl) return;
+        const playersList = document.getElementById('players-list');
+        if (!playersList) return;
         
-        playersListEl.innerHTML = '';
-        players.forEach(player => {
-            const playerEl = document.createElement('div');
-            playerEl.className = 'player-item';
-            
-            const statusIcon = player.ready ? '✅' : '⏳';
-            const isMe = player.id === this.playerId ? ' (คุณ)' : '';
-            
-            playerEl.innerHTML = `
-                <span>${statusIcon} ${player.name}${isMe}</span>
-            `;
-            
-            playersListEl.appendChild(playerEl);
+        playersList.innerHTML = '';
+        
+        players.forEach((player, index) => {
+            const li = document.createElement('li');
+            li.textContent = `${player.name}`;
+            if (player.id === this.playerId) {
+                li.classList.add('current-player');
+                li.textContent += ' (คุณ)';
+            }
+            playersList.appendChild(li);
         });
     }
 
     updateReadyStatus(players) {
-        const readyCount = players.filter(p => p.ready).length;
-        const totalPlayers = players.length;
-        
-        const readyStatusEl = document.getElementById('ready-status');
-        if (readyStatusEl) {
-            readyStatusEl.textContent = `ผู้เล่นพร้อม: ${readyCount}/${totalPlayers}`;
-        }
-        
-        // Update ready button state
-        const btnReady = document.getElementById('btn-ready');
-        const myPlayer = players.find(p => p.id === this.playerId);
-        
-        if (btnReady && myPlayer) {
-            if (myPlayer.ready) {
-                btnReady.textContent = 'ยกเลิกความพร้อม';
-                btnReady.className = 'btn btn-secondary';
-            } else {
-                btnReady.textContent = 'พร้อม';
-                btnReady.className = 'btn btn-primary';
+        players.forEach((player, index) => {
+            const indicator = document.getElementById(`ready-indicator-${index + 1}`);
+            if (indicator) {
+                indicator.textContent = `${player.name}: ${player.ready ? '✅ พร้อม' : '⏳ รอ...'}`;
             }
-        }
+        });
     }
-
     endGame(data) {
         this.gameStarted = false;
         this.gameState.gameOver = true;
         
+        const winnerMsg = document.getElementById('winner-message');
+        if (winnerMsg) {
+            winnerMsg.textContent = data.winner === this.playerId ? '🎉 คุณชนะ!' : '😢 คุณแพ้';
+        }
+        
+        const finalScoreP1 = document.getElementById('final-score-p1');
+        const finalScoreP2 = document.getElementById('final-score-p2');
+        if (finalScoreP1) finalScoreP1.textContent = data.scores.player1 || 0;
+        if (finalScoreP2) finalScoreP2.textContent = data.scores.player2 || 0;
+        
         this.showScreen('game-over-screen');
-        
-        // Display game results
-        const resultEl = document.getElementById('game-result');
-        const myScoreEl = document.getElementById('final-my-score');
-        const opponentScoreEl = document.getElementById('final-opponent-score');
-        
-        if (resultEl) {
-            if (data.winner === this.playerId) {
-                resultEl.textContent = '🎉 คุณชนะ!';
-                resultEl.className = 'game-result winner';
-            } else {
-                resultEl.textContent = '😔 คุณแพ้';
-                resultEl.className = 'game-result loser';
-            }
-        }
-        
-        if (myScoreEl) {
-            myScoreEl.textContent = `${this.playerName}: ${this.gameState.score.toLocaleString()}`;
-        }
-        
-        if (opponentScoreEl) {
-            opponentScoreEl.textContent = `${this.opponentName}: ${this.opponentState.score.toLocaleString()}`;
-        }
-    }
-
-    // Utility functions
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'error' ? '#ff4444' : '#4444ff'};
-            color: white;
-            padding: 15px 20px;
-            border-radius: 5px;
-            z-index: 10000;
-            font-weight: bold;
-            max-width: 300px;
-            word-wrap: break-word;
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
-
-    // Initialize the game when DOM is loaded
-    static init() {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                new TetrisMultiplayer();
-            });
-        } else {
-            new TetrisMultiplayer();
-        }
     }
 }
 
-// Auto-initialize when script loads
-TetrisMultiplayer.init();
+// Export for use in other files
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TetrisMultiplayer;
+}
