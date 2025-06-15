@@ -660,28 +660,31 @@ class TetrisMultiplayer {
         }
     }
 
-    clearLines() {
-        let linesCleared = 0;
-        for (let i = this.BOARD_HEIGHT - 1; i >= 0; i--) {
-            if (this.gameState.board[i].every(cell => cell !== 0)) {
-                this.gameState.board.splice(i, 1);
-                this.gameState.board.unshift(Array(this.BOARD_WIDTH).fill(0));
-                linesCleared++;
-                i++; // Check same line again
-            }
-        }
-        
-        if (linesCleared > 0) {
-            this.gameState.lines += linesCleared;
-            this.gameState.score += linesCleared * 100 * this.gameState.level;
-            this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
-            this.moveInterval = Math.max(50, 500 - (this.gameState.level - 1) * 50);
-            this.updateStats();
-            
-            // Visual feedback for line clear
-            this.showLineClearFeedback(linesCleared);
+clearLines() {
+    let linesCleared = 0;
+    for (let i = this.BOARD_HEIGHT - 1; i >= 0; i--) {
+        if (this.gameState.board[i].every(cell => cell !== 0)) {
+            this.gameState.board.splice(i, 1);
+            this.gameState.board.unshift(Array(this.BOARD_WIDTH).fill(0));
+            linesCleared++;
+            i++; // Check same line again
         }
     }
+    
+    if (linesCleared > 0) {
+        this.gameState.lines += linesCleared;
+        this.gameState.score += linesCleared * 100 * this.gameState.level;
+        this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
+        this.moveInterval = Math.max(50, 500 - (this.gameState.level - 1) * 50);
+        this.updateStats();
+        
+        // Visual feedback for line clear
+        this.showLineClearFeedback(linesCleared);
+        
+        // อัพเดท next piece หลังจาก clear lines
+        this.updateNextPiece();
+    }
+}
 
     showLineClearFeedback(linesCleared) {
         // Visual feedback when lines are cleared
@@ -700,6 +703,8 @@ class TetrisMultiplayer {
         this.gameState.currentPiece = this.gameState.nextPiece;
         this.gameState.nextPiece = this.generatePiece();
         
+        this.updateNextPiece();
+        
         if (!this.isValidPosition(this.gameState.currentPiece.shape, 
                                   this.gameState.currentPiece.x, 
                                   this.gameState.currentPiece.y)) {
@@ -711,7 +716,14 @@ class TetrisMultiplayer {
             });
         }
     }
-
+    // เพิ่มการ debug - ฟังก์ชันช่วยตรวจสอบ DOM
+checkNextPieceElement() {
+    const element = document.getElementById('next-piece-display');
+    console.log('Next piece element:', element);
+    console.log('Element parent:', element ? element.parentNode : 'No parent');
+    console.log('Element visible:', element ? window.getComputedStyle(element).display : 'No element');
+    return element;
+}
     sendGameUpdate() {
         if (this.socket) {
             this.socket.emit('gameUpdate', {
@@ -765,7 +777,17 @@ class TetrisMultiplayer {
     // เพิ่มฟังก์ชันนี้ใน TetrisMultiplayer class
 updateNextPiece() {
     const nextPieceEl = document.getElementById('next-piece-display');
-    if (!nextPieceEl || !this.gameState.nextPiece) return;
+    if (!nextPieceEl) {
+        console.warn('Next piece display element not found');
+        return;
+    }
+    
+    if (!this.gameState.nextPiece) {
+        console.warn('No next piece available');
+        return;
+    }
+    
+    console.log('Updating next piece:', this.gameState.nextPiece.type); // Debug log
     
     // ขนาดที่ปรับได้ตามหน้าจอ
     const containerSize = this.viewport.isMobile ? 
@@ -776,6 +798,8 @@ updateNextPiece() {
     nextPieceEl.style.width = containerSize + 'px';
     nextPieceEl.style.height = containerSize + 'px';
     nextPieceEl.style.position = 'relative';
+    nextPieceEl.style.background = 'rgba(0,0,0,0.3)';
+    nextPieceEl.style.border = '1px solid #666';
     nextPieceEl.innerHTML = '';
     
     const { shape, color } = this.gameState.nextPiece;
@@ -797,6 +821,8 @@ updateNextPiece() {
             }
         }
     }
+    
+    console.log(`Next piece updated: ${shape.length}x${shape[0].length} blocks`); // Debug log
 }
     // ฟังก์ชันกำหนดขนาด board
     setBoardDimensions(boardEl, blockSize) {
@@ -831,45 +857,47 @@ updateNextPiece() {
     }
 
     // Update MY board (main board)
-    updateBoard() {
-        const boardEl = document.getElementById('my-board');
-        if (!boardEl) return;
-        
-        // ปรับขนาดของ board container
-        this.setBoardDimensions(boardEl, this.BLOCK_SIZE);
-        
-        boardEl.innerHTML = '';
-        
-        // Draw placed blocks
-        for (let i = 0; i < this.BOARD_HEIGHT; i++) {
-            for (let j = 0; j < this.BOARD_WIDTH; j++) {
-                if (this.gameState.board[i][j]) {
-                    const block = this.createBlock(j, i, this.BLOCK_SIZE, this.gameState.board[i][j]);
+updateBoard() {
+    const boardEl = document.getElementById('my-board');
+    if (!boardEl) return;
+    
+    // ปรับขนาดของ board container
+    this.setBoardDimensions(boardEl, this.BLOCK_SIZE);
+    
+    boardEl.innerHTML = '';
+    
+    // Draw placed blocks
+    for (let i = 0; i < this.BOARD_HEIGHT; i++) {
+        for (let j = 0; j < this.BOARD_WIDTH; j++) {
+            if (this.gameState.board[i][j]) {
+                const block = this.createBlock(j, i, this.BLOCK_SIZE, this.gameState.board[i][j]);
+                boardEl.appendChild(block);
+            }
+        }
+    }
+    
+    // Draw current piece
+    if (this.gameState.currentPiece) {
+        const { shape, x, y, color } = this.gameState.currentPiece;
+        for (let i = 0; i < shape.length; i++) {
+            for (let j = 0; j < shape[i].length; j++) {
+                if (shape[i][j]) {
+                    const block = this.createBlock(x + j, y + i, this.BLOCK_SIZE, color, true);
                     boardEl.appendChild(block);
                 }
             }
         }
-        
-        // Draw current piece
-        if (this.gameState.currentPiece) {
-            const { shape, x, y, color } = this.gameState.currentPiece;
-            for (let i = 0; i < shape.length; i++) {
-                for (let j = 0; j < shape[i].length; j++) {
-                    if (shape[i][j]) {
-                        const block = this.createBlock(x + j, y + i, this.BLOCK_SIZE, color, true);
-                        boardEl.appendChild(block);
-                    }
-                }
-            }
-        }
-        
-        // Show game over overlay
-        if (this.gameState.gameOver) {
-            const overlay = this.createGameOverOverlay();
-            boardEl.appendChild(overlay);
-             this.updateNextPiece();
-        }
     }
+    
+    // Show game over overlay
+    if (this.gameState.gameOver) {
+        const overlay = this.createGameOverOverlay();
+        boardEl.appendChild(overlay);
+    }
+    
+    // อัพเดท next piece ทุกครั้งที่อัพเดท board
+    this.updateNextPiece();
+}
 
     // Update opponent board (smaller board)
 updateOpponentBoard(data) {
