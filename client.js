@@ -868,3 +868,299 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
+
+// เพิ่มใน client-side JavaScript (ไฟล์ HTML หรือ JS ของเกม Tetris)
+
+// ตัวแปรสำหรับเก็บข้อมูลผู้เล่น
+let currentPlayer = {
+    name: '',
+    score: 0,
+    lines: 0,
+    level: 1
+};
+
+// Function สำหรับเริ่มเกม - ให้ผู้เล่นใส่ชื่อ
+function startGame() {
+    const playerName = prompt('กรุณาใส่ชื่อของคุณ:');
+    if (!playerName || playerName.trim() === '') {
+        alert('กรุณาใส่ชื่อก่อนเริ่มเกม');
+        return;
+    }
+    
+    currentPlayer.name = playerName.trim();
+    currentPlayer.score = 0;
+    currentPlayer.lines = 0;
+    currentPlayer.level = 1;
+    
+    // เริ่มเกม Tetris ของคุณ
+    initTetrisGame();
+}
+
+// Function ที่เรียกเมื่อเกมจบ
+function gameOver() {
+    // ส่งคะแนนไปบันทึกที่ server
+    saveScore();
+    
+    // แสดงผลลัพธ์
+    showGameOverScreen();
+}
+
+// Function สำหรับบันทึกคะแนนอัตโนมัติ
+async function saveScore() {
+    try {
+        // Method 1: ใช้ Socket.IO (ถ้ามี)
+        if (typeof socket !== 'undefined' && socket.connected) {
+            socket.emit('singlePlayerGameOver', {
+                playerName: currentPlayer.name,
+                score: currentPlayer.score,
+                lines: currentPlayer.lines,
+                level: currentPlayer.level
+            });
+            
+            // รับผลลัพธ์
+            socket.on('scoreRecorded', (result) => {
+                if (result.success) {
+                    if (result.isHighScore) {
+                        showHighScoreMessage(result.rank);
+                    } else {
+                        showScoreSavedMessage();
+                    }
+                } else {
+                    console.error('Failed to save score:', result.message);
+                }
+            });
+        } 
+        // Method 2: ใช้ HTTP API
+        else {
+            const response = await fetch('/api/save-score', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerName: currentPlayer.name,
+                    score: currentPlayer.score,
+                    lines: currentPlayer.lines,
+                    level: currentPlayer.level,
+                    gameMode: 'single'
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                if (result.isHighScore) {
+                    showHighScoreMessage(result.rank);
+                } else {
+                    showScoreSavedMessage();
+                }
+            } else {
+                console.error('Failed to save score:', result.message);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error saving score:', error);
+        // แม้บันทึกไม่ได้ก็ไม่ให้ขัดขวางการเล่น
+    }
+}
+
+// Function อัพเดทคะแนนระหว่างเล่น
+function updateScore(newScore, newLines, newLevel) {
+    currentPlayer.score = newScore;
+    currentPlayer.lines = newLines;
+    currentPlayer.level = newLevel;
+    
+    // อัพเดท UI
+    document.getElementById('score').textContent = newScore;
+    document.getElementById('lines').textContent = newLines;
+    document.getElementById('level').textContent = newLevel;
+}
+
+// Function แสดงข้อความสถิติใหม่
+function showHighScoreMessage(rank) {
+    const message = `🎉 ยินดีด้วย! คุณทำสถิติใหม่!\nอันดับที่ ${rank} ในตารางคะแนน`;
+    
+    // สร้าง popup หรือ modal
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        z-index: 1000;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    `;
+    popup.innerHTML = `
+        <h2>🏆 สถิติใหม่!</h2>
+        <p>อันดับที่ ${rank}</p>
+        <p>คะแนน: ${currentPlayer.score.toLocaleString()}</p>
+        <button onclick="this.parentElement.remove()" style="
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        ">ปิด</button>
+    `;
+    
+    document.body.appendChild(popup);
+    
+    // ลบ popup อัตโนมัติหลัง 5 วินาที
+    setTimeout(() => {
+        if (popup.parentElement) {
+            popup.remove();
+        }
+    }, 5000);
+}
+
+// Function แสดงข้อความบันทึกคะแนนสำเร็จ
+function showScoreSavedMessage() {
+    const message = document.createElement('div');
+    message.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #4CAF50;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        z-index: 1000;
+    `;
+    message.textContent = '✅ บันทึกคะแนนแล้ว';
+    
+    document.body.appendChild(message);
+    
+    setTimeout(() => {
+        message.remove();
+    }, 3000);
+}
+
+// Function แสดงหน้า Game Over
+function showGameOverScreen() {
+    const gameOverScreen = document.createElement('div');
+    gameOverScreen.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+    `;
+    
+    gameOverScreen.innerHTML = `
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+        ">
+            <h2>Game Over</h2>
+            <p><strong>ผู้เล่น:</strong> ${currentPlayer.name}</p>
+            <p><strong>คะแนน:</strong> ${currentPlayer.score.toLocaleString()}</p>
+            <p><strong>เส้น:</strong> ${currentPlayer.lines}</p>
+            <p><strong>ระดับ:</strong> ${currentPlayer.level}</p>
+            <button onclick="location.reload()" style="
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin: 10px;
+            ">เล่นใหม่</button>
+            <button onclick="showLeaderboard()" style="
+                background: #2196F3;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin: 10px;
+            ">ดูอันดับ</button>
+        </div>
+    `;
+    
+    document.body.appendChild(gameOverScreen);
+}
+
+// Function แสดงตารางคะแนน
+async function showLeaderboard() {
+    try {
+        const response = await fetch('/api/leaderboard?limit=10');
+        const data = await response.json();
+        
+        if (data.success) {
+            let leaderboardHTML = '<h3>🏆 ตารางคะแนน</h3><table style="width:100%; border-collapse: collapse;">';
+            leaderboardHTML += '<tr><th>อันดับ</th><th>ชื่อ</th><th>คะแนน</th><th>เส้น</th></tr>';
+            
+            data.data.forEach(entry => {
+                leaderboardHTML += `<tr>
+                    <td style="padding:5px; border:1px solid #ddd; text-align:center;">${entry.rank}</td>
+                    <td style="padding:5px; border:1px solid #ddd;">${entry.playerName}</td>
+                    <td style="padding:5px; border:1px solid #ddd; text-align:right;">${entry.score.toLocaleString()}</td>
+                    <td style="padding:5px; border:1px solid #ddd; text-align:center;">${entry.lines}</td>
+                </tr>`;
+            });
+            
+            leaderboardHTML += '</table>';
+            
+            const leaderboardPopup = document.createElement('div');
+            leaderboardPopup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                z-index: 1001;
+                max-width: 500px;
+                max-height: 80vh;
+                overflow-y: auto;
+            `;
+            
+            leaderboardPopup.innerHTML = leaderboardHTML + `
+                <button onclick="this.parentElement.remove()" style="
+                    background: #f44336;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    margin-top: 15px;
+                ">ปิด</button>
+            `;
+            
+            document.body.appendChild(leaderboardPopup);
+        }
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        alert('ไม่สามารถโหลดตารางคะแนนได้');
+    }
+}
+
+// เริ่มต้น
+window.addEventListener('load', function() {
+    // ถ้ามี Socket.IO
+    if (typeof io !== 'undefined') {
+        window.socket = io();
+    }
+    
+    console.log('Auto score system ready!');
+});
