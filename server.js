@@ -37,7 +37,7 @@ app.use(express.static(__dirname, {
 
 // MongoDB Configuration
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const DB_NAME = 'tetrisgame';
+const DB_NAME = 'twobob_leaderboard';
 let db;
 
 // เชื่อมต่อ MongoDB
