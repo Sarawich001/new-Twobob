@@ -36,7 +36,7 @@ app.use(express.static(__dirname, {
 }));
 
 // MongoDB Configuration
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'tetrisgame';
 let db;
 
