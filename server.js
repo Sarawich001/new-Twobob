@@ -1,11 +1,8 @@
-// TwoBob Tactics - Tetris Multiplayer Server with MongoDB Leaderboard
+// TwoBob Tactics - Tetris Multiplayer Server
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const { MongoClient, ObjectId } = require('mongodb');
-const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
@@ -16,11 +13,7 @@ const io = socketIo(server, {
     }
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Serve static files จาก root directory
+// แก้ไข: Serve static files จาก root directory แทน public folder
 app.use(express.static(__dirname, {
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.js')) {
@@ -35,34 +28,12 @@ app.use(express.static(__dirname, {
     }
 }));
 
-// MongoDB Configuration
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const DB_NAME = 'twobob_leaderboard';
-let db;
+// Serve main HTML file
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-// เชื่อมต่อ MongoDB
-async function connectToMongoDB() {
-    try {
-        const client = new MongoClient(MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        
-        await client.connect();
-        db = client.db(DB_NAME);
-        console.log('✅ Connected to MongoDB successfully!');
-        
-        // สร้าง indexes สำหรับ performance
-        await db.collection('scores').createIndex({ score: -1 });
-        await db.collection('scores').createIndex({ date: -1 });
-        
-    } catch (error) {
-        console.error('❌ MongoDB connection failed:', error);
-        console.log('⚠️  Server will continue without MongoDB features');
-    }
-}
-
-// Game Room Class
+// Game state management (ไม่เปลี่ยนแปลง)
 class GameRoom {
     constructor(id) {
         this.id = id;
@@ -209,7 +180,7 @@ const playerRooms = new Map();
 
 // Utility functions
 function generateRoomId() {
-    return Math.floor(10000 + Math.random() * 90000).toString();
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 function cleanupEmptyRooms() {
@@ -226,313 +197,7 @@ function cleanupEmptyRooms() {
 
 setInterval(cleanupEmptyRooms, 5 * 60 * 1000);
 
-// ===========================================
-// MongoDB API Routes สำหรับ Leaderboard
-// ===========================================
-
-// GET - ดึงข้อมูล leaderboard
-app.get('/api/leaderboard', async (req, res) => {
-    try {
-        if (!db) {
-            return res.status(503).json({
-                success: false,
-                message: 'Database not available'
-            });
-        }
-
-        const limit = parseInt(req.query.limit) || 10;
-        const gameMode = req.query.mode || 'all'; // 'single', 'multiplayer', 'all'
-        
-        let filter = {};
-        if (gameMode !== 'all') {
-            filter.gameMode = gameMode;
-        }
-        
-        const leaderboard = await db.collection('scores')
-            .find(filter)
-            .sort({ score: -1, date: -1 })
-            .limit(limit)
-            .toArray();
-        
-        // เพิ่มอันดับให้กับข้อมูล
-        const rankedLeaderboard = leaderboard.map((entry, index) => ({
-            ...entry,
-            rank: index + 1
-        }));
-        
-        res.json({
-            success: true,
-            data: rankedLeaderboard,
-            total: rankedLeaderboard.length
-        });
-        
-    } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        res.status(500).json({
-            success: false,
-            message: 'ไม่สามารถดึงข้อมูลอันดับได้',
-            error: error.message
-        });
-    }
-});
-
-// POST - บันทึกคะแนนใหม่
-app.post('/api/scores', async (req, res) => {
-    try {
-        if (!db) {
-            return res.status(503).json({
-                success: false,
-                message: 'Database not available'
-            });
-        }
-
-        const { playerName, score, lines, level, gameMode } = req.body;
-        
-        // Validation
-        if (!playerName || score === undefined || !gameMode) {
-            return res.status(400).json({
-                success: false,
-                message: 'ข้อมูลไม่ครบถ้วน (playerName, score, gameMode จำเป็น)'
-            });
-        }
-        
-        if (score < 0 || lines < 0 || level < 1) {
-            return res.status(400).json({
-                success: false,
-                message: 'ข้อมูลไม่ถูกต้อง'
-            });
-        }
-        
-        if (playerName.length > 20) {
-            return res.status(400).json({
-                success: false,
-                message: 'ชื่อผู้เล่นยาวเกิน 20 ตัวอักษร'
-            });
-        }
-        
-        // สร้าง score document
-        const scoreDocument = {
-            playerName: playerName.trim(),
-            score: parseInt(score),
-            lines: parseInt(lines) || 0,
-            level: parseInt(level) || 1,
-            gameMode: gameMode,
-            date: new Date(),
-            createdAt: new Date()
-        };
-        
-        // บันทึกลง database
-        const result = await db.collection('scores').insertOne(scoreDocument);
-        
-        // ตรวจสอบว่าเป็น high score ไหม
-        const topScores = await db.collection('scores')
-            .find({ gameMode: gameMode })
-            .sort({ score: -1 })
-            .limit(10)
-            .toArray();
-        
-        const isHighScore = topScores.some(entry => 
-            entry._id.toString() === result.insertedId.toString()
-        );
-        
-        res.status(201).json({
-            success: true,
-            message: 'บันทึกคะแนนสำเร็จ!',
-            data: {
-                id: result.insertedId,
-                isHighScore: isHighScore,
-                rank: isHighScore ? topScores.findIndex(entry => 
-                    entry._id.toString() === result.insertedId.toString()
-                ) + 1 : null
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error saving score:', error);
-        res.status(500).json({
-            success: false,
-            message: 'ไม่สามารถบันทึกคะแนนได้',
-            error: error.message
-        });
-    }
-});
-
-// GET - ดึงข้อมูลสถิติผู้เล่น
-app.get('/api/player/:playerName/stats', async (req, res) => {
-    try {
-        if (!db) {
-            return res.status(503).json({
-                success: false,
-                message: 'Database not available'
-            });
-        }
-
-        const { playerName } = req.params;
-        
-        const stats = await db.collection('scores').aggregate([
-            { $match: { playerName: playerName } },
-            {
-                $group: {
-                    _id: '$playerName',
-                    totalGames: { $sum: 1 },
-                    highestScore: { $max: '$score' },
-                    averageScore: { $avg: '$score' },
-                    totalLines: { $sum: '$lines' },
-                    lastPlayed: { $max: '$date' }
-                }
-            }
-        ]).toArray();
-        
-        if (stats.length === 0) {
-            return res.json({
-                success: true,
-                data: null,
-                message: 'ไม่พบข้อมูลผู้เล่น'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: stats[0]
-        });
-        
-    } catch (error) {
-        console.error('Error fetching player stats:', error);
-        res.status(500).json({
-            success: false,
-            message: 'ไม่สามารถดึงข้อมูลสถิติได้',
-            error: error.message
-        });
-    }
-});
-
-// DELETE - ลบข้อมูลคะแนน (สำหรับ admin)
-app.delete('/api/scores/:id', async (req, res) => {
-    try {
-        if (!db) {
-            return res.status(503).json({
-                success: false,
-                message: 'Database not available'
-            });
-        }
-
-        const { id } = req.params;
-        
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID ไม่ถูกต้อง'
-            });
-        }
-        
-        const result = await db.collection('scores').deleteOne({
-            _id: new ObjectId(id)
-        });
-        
-        if (result.deletedCount === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบข้อมูลที่ต้องการลบ'
-            });
-        }
-        
-        res.json({
-            success: true,
-            message: 'ลบข้อมูลสำเร็จ'
-        });
-        
-    } catch (error) {
-        console.error('Error deleting score:', error);
-        res.status(500).json({
-            success: false,
-            message: 'ไม่สามารถลบข้อมูลได้',
-            error: error.message
-        });
-    }
-});
-
-// GET - ดึงข้อมูลสถิติทั้งหมด
-app.get('/api/stats', async (req, res) => {
-    try {
-        const roomsData = Array.from(rooms.values()).map(room => ({
-            id: room.id,
-            players: room.players.length,
-            gameStarted: room.gameStarted,
-            createdAt: room.createdAt
-        }));
-
-        let dbStats = {
-            totalGames: 0,
-            totalPlayers: 0,
-            highestScore: 0,
-            averageScore: 0,
-            totalLines: 0
-        };
-
-        // ดึงข้อมูลจาก MongoDB ถ้าเชื่อมต่อได้
-        if (db) {
-            try {
-                const stats = await db.collection('scores').aggregate([
-                    {
-                        $group: {
-                            _id: null,
-                            totalGames: { $sum: 1 },
-                            totalPlayers: { $addToSet: '$playerName' },
-                            highestScore: { $max: '$score' },
-                            averageScore: { $avg: '$score' },
-                            totalLines: { $sum: '$lines' }
-                        }
-                    },
-                    {
-                        $project: {
-                            _id: 0,
-                            totalGames: 1,
-                            totalPlayers: { $size: '$totalPlayers' },
-                            highestScore: 1,
-                            averageScore: { $round: ['$averageScore', 2] },
-                            totalLines: 1
-                        }
-                    }
-                ]).toArray();
-                
-                if (stats.length > 0) {
-                    dbStats = stats[0];
-                }
-            } catch (error) {
-                console.error('Error fetching database stats:', error);
-            }
-        }
-        
-        res.json({
-            success: true,
-            data: {
-                // Server stats
-                server: {
-                    totalRooms: rooms.size,
-                    activePlayers: playerRooms.size,
-                    rooms: roomsData
-                },
-                // Database stats
-                database: dbStats,
-                // Combined
-                mongodbAvailable: !!db
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error fetching stats:', error);
-        res.status(500).json({
-            success: false,
-            message: 'ไม่สามารถดึงข้อมูลสถิติได้',
-            error: error.message
-        });
-    }
-});
-
-// ===========================================
-// Socket.IO Connection Handling
-// ===========================================
-
+// Socket.IO connection handling (ไม่เปลี่ยนแปลง)
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
@@ -666,31 +331,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('gameOver', async (data) => {
+    socket.on('gameOver', (data) => {
         try {
             const room = rooms.get(data.roomId);
             if (!room) return;
 
             room.setPlayerGameOver(data.playerId, data.score);
-            
-            // บันทึกคะแนนลง Database (ถ้าเชื่อมต่อได้)
-            if (db && data.playerName && data.score !== undefined) {
-                try {
-                    await db.collection('scores').insertOne({
-                        playerName: data.playerName,
-                        score: parseInt(data.score),
-                        lines: parseInt(data.lines) || 0,
-                        level: parseInt(data.level) || 1,
-                        gameMode: 'multiplayer',
-                        roomId: data.roomId,
-                        date: new Date(),
-                        createdAt: new Date()
-                    });
-                    console.log(`Score saved for ${data.playerName}: ${data.score}`);
-                } catch (error) {
-                    console.error('Error saving score to database:', error);
-                }
-            }
             
             const gameResult = room.getWinner();
             if (gameResult) {
@@ -757,68 +403,45 @@ io.on('connection', (socket) => {
     }
 });
 
-// ===========================================
-// Static Routes
-// ===========================================
-
-// Serve main HTML file
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        server: {
-            rooms: rooms.size,
-            players: playerRooms.size
-        },
-        mongodb: db ? 'connected' : 'disconnected'
+        rooms: rooms.size,
+        players: playerRooms.size
+    });
+});
+
+// API endpoint to get server stats
+app.get('/api/stats', (req, res) => {
+    const roomsData = Array.from(rooms.values()).map(room => ({
+        id: room.id,
+        players: room.players.length,
+        gameStarted: room.gameStarted,
+        createdAt: room.createdAt
+    }));
+
+    res.json({
+        totalRooms: rooms.size,
+        totalPlayers: playerRooms.size,
+        rooms: roomsData
     });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Express error:', err);
-    res.status(500).json({ 
-        success: false,
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์'
-    });
+    res.status(500).json({ error: 'Internal server error' });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'ไม่พบหน้าที่ต้องการ'
-    });
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 TwoBob Tactics server running on port ${PORT}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🎮 Game server ready for multiplayer Tetris!`);
 });
-
-// ===========================================
-// Server Startup
-// ===========================================
-
-async function startServer() {
-    try {
-        // เชื่อมต่อ MongoDB (ไม่บังคับ - server จะทำงานได้แม้ไม่มี MongoDB)
-        await connectToMongoDB();
-        
-        const PORT = process.env.PORT || 3000;
-        server.listen(PORT, () => {
-            console.log(`🚀 TwoBob Tactics server running on port ${PORT}`);
-            console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`🎮 Game server ready for multiplayer Tetris!`);
-            console.log(`📊 Leaderboard API: ${db ? 'Available' : 'Unavailable (MongoDB not connected)'}`);
-            console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-        });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-        process.exit(1);
-    }
-}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
@@ -836,6 +459,3 @@ process.on('SIGINT', () => {
         process.exit(0);
     });
 });
-
-// Start the server
-startServer();
