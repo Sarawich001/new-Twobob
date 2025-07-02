@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
     <div class="container">
@@ -438,10 +438,12 @@
 
     <div id="notificationContainer" class="notification-container"></div>
 
-    <script src="client.js"></script>
-    <script src="game-class.js"></script>
-    <script src="dashboard.js"></script>
+    <!-- Load JavaScript files in proper order -->
     <script>
+        // Initialize variables to prevent errors
+        let tetrisGame;
+        let dashboardManager;
+
         // Utility function to show screens
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(screen => {
@@ -452,27 +454,62 @@
 
         // Dashboard navigation
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize game
-            if (typeof TetrisMultiplayer !== 'undefined') {
-                window.tetrisGame = new TetrisMultiplayer();
-            }
+            console.log('DOM loaded, initializing...');
+            
+            // Check if required files are loaded
+            const checkAndInit = () => {
+                // Initialize TetrisMultiplayer if available
+                if (typeof TetrisMultiplayer !== 'undefined') {
+                    console.log('TetrisMultiplayer loaded');
+                    tetrisGame = new TetrisMultiplayer();
+                } else {
+                    console.warn('TetrisMultiplayer not loaded yet');
+                }
+
+                // Initialize Dashboard if available
+                if (typeof DashboardManager !== 'undefined') {
+                    console.log('DashboardManager loaded');
+                    dashboardManager = new DashboardManager();
+                } else {
+                    console.warn('DashboardManager not loaded yet');
+                }
+            };
+
+            // Initial check
+            checkAndInit();
+
+            // Retry after a short delay if not loaded
+            setTimeout(() => {
+                if (!tetrisGame || !dashboardManager) {
+                    checkAndInit();
+                }
+            }, 1000);
 
             // Dashboard button event
-            document.getElementById('btn-dashboard').addEventListener('click', () => {
-                showScreen('dashboard-screen');
-            });
+            const dashboardBtn = document.getElementById('btn-dashboard');
+            if (dashboardBtn) {
+                dashboardBtn.addEventListener('click', () => {
+                    showScreen('dashboard-screen');
+                    if (dashboardManager && typeof dashboardManager.init === 'function') {
+                        dashboardManager.init();
+                    }
+                });
+            }
 
             // Back to menu button
-            document.getElementById('btn-back-to-menu').addEventListener('click', () => {
-                showScreen('menu-screen');
-            });
+            const backBtn = document.getElementById('btn-back-to-menu');
+            if (backBtn) {
+                backBtn.addEventListener('click', () => {
+                    showScreen('menu-screen');
+                });
+            }
 
             // Controls toggle
             const controlsToggle = document.getElementById('controls-toggle');
             const controlsContent = document.getElementById('controls-content');
             const toggleIcon = document.getElementById('toggle-icon');
 
-            if (controlsToggle) {
+            if (controlsToggle && controlsContent && toggleIcon) {
                 controlsToggle.addEventListener('click', () => {
                     const isExpanded = controlsContent.classList.contains('expanded');
                     
@@ -487,5 +524,10 @@
             }
         });
     </script>
+
+    <!-- Load external scripts after DOM setup -->
+    <script src="client.js" onerror="console.error('Failed to load client.js')"></script>
+    <script src="game-class.js" onerror="console.error('Failed to load game-class.js')"></script>
+    <script src="dashboard.js" onerror="console.error('Failed to load dashboard.js')"></script>
 </body>
 </html>
