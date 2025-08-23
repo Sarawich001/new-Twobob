@@ -9,125 +9,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
-        /* Enhanced Waiting Screen Styles */
-        .room-header {
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .room-id {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #ffd700;
-        }
-
-        .copy-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            padding: 8px 10px;
-            color: #fff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .copy-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
-        }
-
-        .copy-notification {
-            position: absolute;
-            top: -40px;
-            right: 0;
-            background: #4ade80;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            display: none;
-            animation: slideDown 0.3s ease;
-        }
-
-        @keyframes slideDown {
-            from { transform: translateY(-10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        /* Enhanced Ready Indicators */
-        .ready-indicators {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .ready-indicator {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 15px;
-            transition: all 0.3s ease;
-        }
-
-        .ready-indicator.player-ready {
-            background: rgba(34, 197, 94, 0.1);
-            border-color: #22c55e;
-        }
-
-        .player-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .player-info {
-            flex: 1;
-        }
-
-        .player-name {
-            font-weight: bold;
-            color: #fff;
-            margin-bottom: 4px;
-        }
-
-        .player-status.waiting {
-            color: #94a3b8;
-            animation: pulse 2s infinite;
-        }
-
-        .player-status.ready {
-            color: #22c55e;
-            font-weight: bold;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Share Section */
+        /* Share Section Styles */
         .share-section {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
             padding: 15px;
             margin: 20px 0;
+            text-align: center;
         }
 
         .share-title {
-            text-align: center;
             margin-bottom: 12px;
             color: #94a3b8;
             font-size: 0.9rem;
@@ -137,6 +28,7 @@
             display: flex;
             gap: 10px;
             justify-content: center;
+            flex-wrap: wrap;
         }
 
         .share-btn {
@@ -148,6 +40,10 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .share-btn:hover {
@@ -155,7 +51,23 @@
             transform: scale(1.05);
         }
 
-        /* QR Modal */
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        /* QR Modal Styles */
         .qr-modal {
             position: fixed;
             top: 0;
@@ -175,6 +87,7 @@
             border-radius: 16px;
             text-align: center;
             color: white;
+            max-width: 300px;
         }
 
         .qr-content img {
@@ -182,23 +95,17 @@
             border-radius: 8px;
         }
 
-        /* Enhanced Ready Button */
-        .ready-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .qr-content h3 {
+            margin-bottom: 15px;
+            color: #ffd700;
         }
 
-        .ready-btn:not(:disabled) {
-            background: linear-gradient(45deg, #22c55e, #16a34a);
-            animation: glow 2s infinite alternate;
+        .qr-content p {
+            margin: 10px 0;
+            color: #94a3b8;
         }
 
-        @keyframes glow {
-            from { box-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
-            to { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); }
-        }
-
-        /* Notifications */
+        /* Notification Styles */
         .notification {
             position: fixed;
             top: 20px;
@@ -222,6 +129,17 @@
         @keyframes slideIn {
             from { transform: translateX(100%); }
             to { transform: translateX(0); }
+        }
+
+        .room-id {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -275,35 +193,20 @@
         <!-- Waiting Screen -->
         <div id="waiting-screen" class="screen">
             <div class="room-info">
-                <div class="room-header">
-                    <div class="room-id">
-                        ห้อง: <span id="room-id-display">-</span>
-                        <button id="btn-copy-room" class="copy-btn" title="คัดลอกรหัสห้อง">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                    <div id="copy-notification" class="copy-notification">✅ คัดลอกแล้ว!</div>
+                <div class="room-id">
+                    ห้อง: <span id="room-id-display">-</span>
+                    <button id="btn-copy-room" class="copy-btn" title="คัดลอกรหัสห้อง">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
-
+                
                 <h3>ผู้เล่นในห้อง:</h3>
                 <ul id="players-list" class="players-list">
                 </ul>
                 
-                <div id="ready-indicators" class="ready-indicators">
-                    <div id="ready-indicator-1" class="ready-indicator">
-                        <div class="player-avatar">👤</div>
-                        <div class="player-info">
-                            <div class="player-name">Player 1</div>
-                            <div class="player-status waiting">รอ...</div>
-                        </div>
-                    </div>
-                    <div id="ready-indicator-2" class="ready-indicator">
-                        <div class="player-avatar">👤</div>
-                        <div class="player-info">
-                            <div class="player-name">Player 2</div>
-                            <div class="player-status waiting">รอ...</div>
-                        </div>
-                    </div>
+                <div id="ready-indicators">
+                    <div id="ready-indicator-1">Player 1: รอ...</div>
+                    <div id="ready-indicator-2">Player 2: รอ...</div>
                 </div>
 
                 <!-- Share Options -->
@@ -316,12 +219,15 @@
                         <button id="btn-share-qr" class="share-btn">
                             <i class="fas fa-qrcode"></i> QR Code
                         </button>
+                        <button id="btn-share-line" class="share-btn">
+                            <i class="fab fa-line"></i> LINE
+                        </button>
                     </div>
                 </div>
             </div>
             
             <div class="menu-buttons">
-                <button id="btn-ready" class="btn ready-btn" disabled>🎮 พร้อมเล่น</button>
+                <button id="btn-ready" class="btn" disabled>🎮 พร้อมเล่น</button>
                 <button id="btn-leave-room" class="btn">🚪 ออกจากห้อง</button>
             </div>
         </div>
@@ -443,11 +349,7 @@
             const roomId = document.getElementById('room-id-display').textContent;
             if (roomId && roomId !== '-') {
                 navigator.clipboard.writeText(roomId).then(() => {
-                    const notification = document.getElementById('copy-notification');
-                    notification.style.display = 'block';
-                    setTimeout(() => {
-                        notification.style.display = 'none';
-                    }, 2000);
+                    showNotification('คัดลอกรหัสห้องแล้ว!', 'success');
                 });
             }
         }
@@ -457,11 +359,12 @@
             const roomId = document.getElementById('room-id-display').textContent;
             if (roomId && roomId !== '-') {
                 const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+                const shareText = `มาเล่นเทตริสกันเถอะ! รหัสห้อง: ${roomId}\n${shareUrl}`;
                 
                 if (navigator.share) {
                     navigator.share({
                         title: 'เข้าร่วมเกม TwoBob Tactics',
-                        text: `มาเล่นเทตริสกันเถอะ! รหัสห้อง: ${roomId}`,
+                        text: shareText,
                         url: shareUrl
                     });
                 } else {
@@ -484,47 +387,34 @@
                 modal.className = 'qr-modal';
                 modal.innerHTML = `
                     <div class="qr-content">
-                        <h3>สแกน QR Code เพื่อเข้าร่วมห้อง</h3>
-                        <img src="${qrUrl}" alt="QR Code">
-                        <p>รหัสห้อง: ${roomId}</p>
-                        <button onclick="this.parentElement.parentElement.remove()" class="btn">ปิด</button>
+                        <h3>📱 สแกน QR Code เพื่อเข้าร่วมห้อง</h3>
+                        <img src="${qrUrl}" alt="QR Code" style="max-width: 200px;">
+                        <p>รหัสห้อง: <strong>${roomId}</strong></p>
+                        <p style="font-size: 0.8rem;">หรือใช้ลิงก์: ${shareUrl}</p>
+                        <button onclick="this.parentElement.parentElement.remove()" class="btn" style="margin-top: 15px;">ปิด</button>
                     </div>
                 `;
+                
+                // Close modal when clicking outside
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+                
                 document.body.appendChild(modal);
             }
         }
 
-        // Update player progress bar
-        function updateProgress(readyCount, totalCount) {
-            // Remove progress bar functionality since we removed it from HTML
-        }
-
-        // Update ready indicator with animation
-        function updateReadyIndicator(playerId, playerName, isReady) {
-            const indicator = document.getElementById(`ready-indicator-${playerId}`);
-            const playerNameEl = indicator.querySelector('.player-name');
-            const statusEl = indicator.querySelector('.player-status');
-            
-            playerNameEl.textContent = playerName;
-            
-            if (isReady) {
-                statusEl.textContent = 'พร้อม!';
-                statusEl.className = 'player-status ready';
-                indicator.classList.add('player-ready');
-            } else {
-                statusEl.textContent = 'รอ...';
-                statusEl.className = 'player-status waiting';
-                indicator.classList.remove('player-ready');
+        // Share to LINE
+        function shareToLINE() {
+            const roomId = document.getElementById('room-id-display').textContent;
+            if (roomId && roomId !== '-') {
+                const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+                const shareText = `มาเล่นเทตริสกันเถอะ! รหัสห้อง: ${roomId}`;
+                const lineUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+                window.open(lineUrl, '_blank');
             }
-        }
-
-        // Remove chat functionality since we removed it
-        function sendChatMessage() {
-            // Removed
-        }
-
-        function addChatMessage(sender, message) {
-            // Removed
         }
 
         // Notification function
@@ -533,7 +423,12 @@
             notification.className = `notification ${type}`;
             notification.textContent = message;
             
-            document.getElementById('notificationContainer').appendChild(notification);
+            const container = document.getElementById('notificationContainer');
+            if (container) {
+                container.appendChild(notification);
+            } else {
+                document.body.appendChild(notification);
+            }
             
             setTimeout(() => notification.remove(), 3000);
         }
@@ -544,19 +439,19 @@
                 window.tetrisGame = new TetrisMultiplayer();
             }
 
-            // Event listeners for new features
+            // Event listeners for share features
             document.getElementById('btn-copy-room')?.addEventListener('click', copyRoomId);
             document.getElementById('btn-share-link')?.addEventListener('click', shareRoomLink);
             document.getElementById('btn-share-qr')?.addEventListener('click', showQRCode);
+            document.getElementById('btn-share-line')?.addEventListener('click', shareToLINE);
             
-            // Remove chat event listeners since we removed chat functionality
-
-            // Check for room parameter in URL
+            // Check for room parameter in URL for auto-join
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
             if (roomParam) {
                 document.getElementById('join-room-id').value = roomParam;
                 showScreen('join-room-screen');
+                showNotification('พบรหัสห้องในลิงก์ กรุณากรอกชื่อผู้เล่น', 'info');
             }
         });
     </script>
