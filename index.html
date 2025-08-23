@@ -21,9 +21,269 @@
             <div class="menu-buttons">
                 <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
                 <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
+                <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
+                <button id="btn-dashboard" class="btn dashboard-btn">📊 Dashboard</button>
             </div>
             
-          
+            <!-- Controls Accordion -->
+            <div class="controls-accordion">
+                <button id="controls-toggle" class="controls-toggle">
+                    🎮 วิธีเล่น
+                    <span id="toggle-icon" class="toggle-icon">▼</span>
+                </button>
+                <div id="controls-content" class="controls-content">
+                    <div class="controls-section">
+                        <div class="controls-title">
+                            💻 คอมพิวเตอร์
+                        </div>
+                        <div class="controls-list">
+                            <div class="control-item">
+                                <span>เลื่อนซ้าย-ขวา</span>
+                                <span class="control-key">← →</span>
+                            </div>
+                            <div class="control-item">
+                                <span>หมุนชิ้นส่วน</span>
+                                <span class="control-key">↑</span>
+                            </div>
+                            <div class="control-item">
+                                <span>เร่งความเร็ว</span>
+                                <span class="control-key">↓</span>
+                            </div>
+                            <div class="control-item">
+                                <span>ดรอปทันที</span>
+                                <span class="control-key">Space</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="controls-section">
+                        <div class="controls-title">
+                            📱 มือถือ
+                        </div>
+                        <div class="controls-list">
+                            <div style="margin-bottom: 8px;">• ใช้ปุ่มควบคุมด้านล่าง</div>
+                            <div style="margin-bottom: 8px;">• Swipe ซ้าย-ขวา: เลื่อน</div>
+                            <div style="margin-bottom: 8px;">• Swipe ขึ้น: หมุน</div>
+                            <div>• Swipe ลง: ดรอป</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard-screen" class="screen dashboard-screen">
+            <div class="dashboard-header">
+                <h1><i class="fas fa-chart-line"></i> TwoBob Tactics Dashboard</h1>
+                <div class="dashboard-nav">
+                    <button class="nav-btn active" data-tab="leaderboard">
+                        <i class="fas fa-trophy"></i> อันดับคะแนน
+                    </button>
+                    <button class="nav-btn" data-tab="stats">
+                        <i class="fas fa-chart-bar"></i> สถิติ
+                    </button>
+                    <button class="nav-btn" data-tab="server">
+                        <i class="fas fa-server"></i> เซิร์ฟเวอร์
+                    </button>
+                </div>
+                <div class="dashboard-controls">
+                    <div class="refresh-info">
+                        <span>อัปเดตล่าสุด: <span id="lastRefresh">-</span></span>
+                        <label class="auto-refresh-toggle">
+                            <input type="checkbox" id="autoRefreshToggle" checked>
+                            <span>รีเฟรชอัตโนมัติ</span>
+                        </label>
+                    </div>
+                    <button id="btn-back-to-menu" class="btn btn-back">
+                        <i class="fas fa-home"></i> กลับเมนู
+                    </button>
+                </div>
+            </div>
+
+            <div id="errorDisplay" class="error-display"></div>
+
+            <!-- Leaderboard Tab -->
+            <div id="leaderboard" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-trophy"></i> อันดับคะแนนสูงสุด</h2>
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>ค้นหาผู้เล่น:</label>
+                            <input type="text" id="playerSearch" placeholder="ชื่อผู้เล่น...">
+                        </div>
+                        <div class="filter-group">
+                            <label>โหมดเกม:</label>
+                            <select id="gameModeFilter">
+                                <option value="all">ทั้งหมด</option>
+                                <option value="single">เดี่ยว</option>
+                                <option value="multiplayer">แบบคู่</option>
+                            </select>
+                        </div>
+                        <button class="refresh-btn" data-refresh="leaderboard">
+                            <i class="fas fa-sync-alt"></i> รีเฟรช
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-summary">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalScores">0</div>
+                        <div class="stat-label">คะแนนทั้งหมด</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="highestScore">0</div>
+                        <div class="stat-label">คะแนนสูงสุด</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="averageScore">0</div>
+                        <div class="stat-label">คะแนนเฉลี่ย</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>อันดับ</th>
+                                <th>ชื่อผู้เล่น</th>
+                                <th>คะแนน</th>
+                                <th>เส้น</th>
+                                <th>เลเวล</th>
+                                <th>โหมด</th>
+                                <th>วันที่</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody">
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Stats Tab -->
+            <div id="stats" class="tab-content" style="display: none;">
+                <div class="content-header">
+                    <h2><i class="fas fa-chart-bar"></i> สถิติระบบ</h2>
+                    <button class="refresh-btn" data-refresh="stats">
+                        <i class="fas fa-sync-alt"></i> รีเฟรช
+                    </button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stats-section">
+                        <h3><i class="fas fa-gamepad"></i> สถิติเกม</h3>
+                        <div class="stats-cards">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalGames">0</div>
+                                <div class="stat-label">เกมทั้งหมด</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalPlayersCount">0</div>
+                                <div class="stat-label">ผู้เล่นทั้งหมด</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="globalHighScore">0</div>
+                                <div class="stat-label">คะแนนสูงสุดโลก</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="globalAvgScore">0</div>
+                                <div class="stat-label">คะแนนเฉลี่ยโลก</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalLinesCleared">0</div>
+                                <div class="stat-label">เส้นที่ลบทั้งหมด</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-section">
+                        <h3><i class="fas fa-users"></i> ห้องที่ใช้งานอยู่</h3>
+                        <div class="stats-cards">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalRooms">0</div>
+                                <div class="stat-label">ห้องทั้งหมด</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="activePlayers">0</div>
+                                <div class="stat-label">ผู้เล่นออนไลน์</div>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="active-rooms-table">
+                                <thead>
+                                    <tr>
+                                        <th>รหัสห้อง</th>
+                                        <th>ผู้เล่น</th>
+                                        <th>สถานะ</th>
+                                        <th>สร้างเมื่อ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeRoomsBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server Tab -->
+            <div id="server" class="tab-content" style="display: none;">
+                <div class="content-header">
+                    <h2><i class="fas fa-server"></i> สถานะเซิร์ฟเวอร์</h2>
+                    <button class="refresh-btn" data-refresh="server">
+                        <i class="fas fa-sync-alt"></i> รีเฟรช
+                    </button>
+                </div>
+
+                <div class="server-status">
+                    <div class="status-card">
+                        <h3><i class="fas fa-heartbeat"></i> สถานะระบบ</h3>
+                        <div class="status-info">
+                            <div class="status-item">
+                                <span>เซิร์ฟเวอร์:</span>
+                                <span class="badge badge-success" id="serverStatus">ออนไลน์</span>
+                            </div>
+                            <div class="status-item">
+                                <span>ฐานข้อมูล:</span>
+                                <span class="badge badge-success" id="dbStatus">เชื่อมต่อแล้ว</span>
+                            </div>
+                            <div class="status-item">
+                                <span>MongoDB:</span>
+                                <span class="badge badge-success" id="mongoStatus">เชื่อมต่อ</span>
+                            </div>
+                            <div class="status-item">
+                                <span>ตรวจสอบล่าสุด:</span>
+                                <span id="lastHealthCheck">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="status-card">
+                        <h3><i class="fas fa-info-circle"></i> ข้อมูลระบบ</h3>
+                        <div class="system-info">
+                            <div class="info-item">
+                                <span>ห้องทั้งหมด:</span>
+                                <span id="systemRooms">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span>ผู้เล่นออนไลน์:</span>
+                                <span id="systemPlayers">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Connection Screen -->
         <div id="connection-screen" class="screen">
             <h2>⚠️ การเชื่อมต่อขาดหาย</h2>
@@ -229,5 +489,3 @@
     </script>
 </body>
 </html>
-
-
