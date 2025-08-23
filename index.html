@@ -21,85 +21,9 @@
             <div class="menu-buttons">
                 <button id="btn-create-room" class="btn">🏠 สร้างห้อง</button>
                 <button id="btn-join-room" class="btn">🚪 เข้าร่วมห้อง</button>
-                <a href="single-player.html" class="btn btn-single-player">🎯 เล่นคนเดียว</a>
-                <button id="btn-dashboard" class="btn dashboard-btn">📊 Dashboard</button>
             </div>
             
-            <!-- Controls Accordion -->
-            <div class="controls-accordion">
-                <button id="controls-toggle" class="controls-toggle">
-                    🎮 วิธีเล่น
-                    <span id="toggle-icon" class="toggle-icon">▼</span>
-                </button>
-                <div id="controls-content" class="controls-content">
-                    <div class="controls-section">
-                        <div class="controls-title">
-                            💻 คอมพิวเตอร์
-                        </div>
-                        <div class="controls-list">
-                            <div class="control-item">
-                                <span>เลื่อนซ้าย-ขวา</span>
-                                <span class="control-key">← →</span>
-                            </div>
-                            <div class="control-item">
-                                <span>หมุนชิ้นส่วน</span>
-                                <span class="control-key">↑</span>
-                            </div>
-                            <div class="control-item">
-                                <span>เร่งความเร็ว</span>
-                                <span class="control-key">↓</span>
-                            </div>
-                            <div class="control-item">
-                                <span>ดรอปทันที</span>
-                                <span class="control-key">Space</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="controls-section">
-                        <div class="controls-title">
-                            📱 มือถือ
-                        </div>
-                        <div class="controls-list">
-                            <div style="margin-bottom: 8px;">• ใช้ปุ่มควบคุมด้านล่าง</div>
-                            <div style="margin-bottom: 8px;">• Swipe ซ้าย-ขวา: เลื่อน</div>
-                            <div style="margin-bottom: 8px;">• Swipe ขึ้น: หมุน</div>
-                            <div>• Swipe ลง: ดรอป</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Dashboard Screen -->
-        <div id="dashboard-screen" class="screen dashboard-screen">
-            <div class="dashboard-header">
-                <h1><i class="fas fa-chart-line"></i> TwoBob Tactics Dashboard</h1>
-                <div class="dashboard-nav">
-                    <button class="nav-btn active" data-tab="leaderboard">
-                        <i class="fas fa-trophy"></i> อันดับคะแนน
-                    </button>
-                    <button class="nav-btn" data-tab="stats">
-                        <i class="fas fa-chart-bar"></i> สถิติ
-                    </button>
-                    <button class="nav-btn" data-tab="server">
-                        <i class="fas fa-server"></i> เซิร์ฟเวอร์
-                    </button>
-                </div>
-                <div class="dashboard-controls">
-                    <div class="refresh-info">
-                        <span>อัปเดตล่าสุด: <span id="lastRefresh">-</span></span>
-                        <label class="auto-refresh-toggle">
-                            <input type="checkbox" id="autoRefreshToggle" checked>
-                            <span>รีเฟรชอัตโนมัติ</span>
-                        </label>
-                    </div>
-                    <button id="btn-back-to-menu" class="btn btn-back">
-                        <i class="fas fa-home"></i> กลับเมนู
-                    </button>
-                </div>
-            </div>
-
-            <div id="errorDisplay" class="error-display"></div>
+            
 
             <!-- Leaderboard Tab -->
             <div id="leaderboard" class="tab-content">
@@ -489,3 +413,4 @@
     </script>
 </body>
 </html>
+
