@@ -2,84 +2,94 @@
 // =========================================
 
 // Global Variables
-let socket;
-let gameState = {
-    currentPlayer: null,
-    room: null,
-    isReady: false,
-    inGame: false
+let socket; // ตัวแปรสำหรับจัดการการเชื่อมต่อ Socket.IO กับเซิร์ฟเวอร์
+let gameState = { // สถานะปัจจุบันของเกมและผู้เล่น
+    currentPlayer: null, // ข้อมูลของผู้เล่นปัจจุบัน
+    room: null, // รหัสห้องที่ผู้เล่นอยู่
+    isReady: false, // สถานะว่าผู้เล่นพร้อมเล่นหรือไม่
+    inGame: false // สถานะว่าเกมกำลังดำเนินอยู่หรือไม่
 };
 
 // =========================================
 // Socket Connection Management
 // =========================================
 
+// ฟังก์ชันสำหรับเริ่มต้นการเชื่อมต่อ Socket
 function initSocket() {
     socket = io();
     
-    // Connection Events
+    // เหตุการณ์เมื่อเชื่อมต่อกับเซิร์ฟเวอร์สำเร็จ
     socket.on('connect', () => {
         console.log('Connected to server');
-        updateConnectionStatus(true);
-        enableButtons();
+        updateConnectionStatus(true); // อัปเดตสถานะการเชื่อมต่อบน UI
+        enableButtons(); // เปิดใช้งานปุ่มต่างๆ
     });
 
+    // เหตุการณ์เมื่อการเชื่อมต่อกับเซิร์ฟเวอร์ขาดหาย
     socket.on('disconnect', () => {
         console.log('Disconnected from server');
-        updateConnectionStatus(false);
-        disableButtons();
-        showScreen('connection-screen');
+        updateConnectionStatus(false); // อัปเดตสถานะการเชื่อมต่อบน UI
+        disableButtons(); // ปิดใช้งานปุ่มต่างๆ
+        showScreen('connection-screen'); // แสดงหน้าจอแจ้งเตือนการเชื่อมต่อขาดหาย
     });
 
     // Room Events
     socket.on('room-created', (data) => {
         gameState.room = data.roomId;
         gameState.currentPlayer = data.player;
-        showScreen('waiting-screen');
-        updateRoomDisplay();
+        showScreen('waiting-screen'); // แสดงหน้าจอรอผู้เล่น
+        updateRoomDisplay(); // อัปเดต UI ด้วยรหัสห้อง
     });
 
+    // เหตุการณ์เมื่อเข้าร่วมห้องสำเร็จ
     socket.on('room-joined', (data) => {
         gameState.room = data.roomId;
         gameState.currentPlayer = data.player;
-        showScreen('waiting-screen');
-        updateRoomDisplay();
+        showScreen('waiting-screen'); // แสดงหน้าจอรอผู้เล่น
+        updateRoomDisplay(); // อัปเดต UI ด้วยรหัสห้อง
     });
 
+    // เหตุการณ์เมื่อห้องเต็ม
     socket.on('room-full', () => {
         alert('ห้องเต็มแล้ว!');
-        showScreen('menu-screen');
+        showScreen('menu-screen'); // กลับไปหน้าเมนู
     });
 
+    // เหตุการณ์เมื่อไม่พบห้อง
     socket.on('room-not-found', () => {
         alert('ไม่พบห้องดังกล่าว!');
-        showScreen('menu-screen');
+        showScreen('menu-screen'); // กลับไปหน้าเมนู
     });
 
+    // เหตุการณ์เมื่อรายชื่อผู้เล่นในห้องมีการอัปเดต
     socket.on('players-updated', (players) => {
-        updatePlayersList(players);
+        updatePlayersList(players); // อัปเดตรายชื่อผู้เล่นบนหน้าจอรอ
     });
-
+    // เหตุการณ์เมื่อผู้เล่นคนอื่นเปลี่ยนสถานะพร้อมเล่น
     socket.on('player-ready', (data) => {
-        updateReadyStatus(data);
+        updateReadyStatus(data); // อัปเดตสถานะพร้อมเล่นบนหน้าจอรอ
     });
 
     // Game Events
+    // เหตุการณ์เมื่อเกมเริ่มต้น
     socket.on('game-start', (data) => {
         gameState.inGame = true;
-        showScreen('game-screen');
-        initGame(data);
+        showScreen('game-screen'); // เปลี่ยนไปหน้าจอเกม
+        initGame(data); // เริ่มต้นการตั้งค่าเกม
     });
 
+    // เหตุการณ์เมื่อสถานะเกมมีการอัปเดตจากเซิร์ฟเวอร์
     socket.on('game-state', (data) => {
-        updateGameDisplay(data);
+        updateGameDisplay(data); // อัปเดตกระดานและสถิติเกม
     });
 
+    // เหตุการณ์เมื่อเกมจบ
     socket.on('game-over', (data) => {
         gameState.inGame = false;
-        showGameOver(data);
+        showGameOver(data); // แสดงหน้าจอเกมโอเวอร์
     });
 
+    // เหตุการณ์เมื่อมีข้อผิดพลาดจากเซิร์ฟเวอร์
     socket.on('error', (message) => {
         console.error('Socket error:', message);
         alert('Error: ' + message);
@@ -90,12 +100,15 @@ function initSocket() {
 // UI Management Functions (with null checks)
 // =========================================
 
+// ฟังก์ชันสำหรับเปลี่ยนหน้าจอที่แสดงผล
 function showScreen(screenId) {
     try {
+        // ซ่อนทุกหน้าจอ
         document.querySelectorAll('.screen').forEach(screen => {
             screen.style.display = 'none';
         });
         
+        // แสดงหน้าจอที่ระบุ
         const targetScreen = document.getElementById(screenId);
         if (targetScreen) {
             targetScreen.style.display = 'block';
@@ -107,6 +120,7 @@ function showScreen(screenId) {
     }
 }
 
+// ฟังก์ชันสำหรับอัปเดตสถานะการเชื่อมต่อบนหน้า UI
 function updateConnectionStatus(connected) {
     try {
         const statusElement = document.getElementById('connection-status');
@@ -123,7 +137,7 @@ function updateConnectionStatus(connected) {
         console.error('Error updating connection status:', error);
     }
 }
-
+// ฟังก์ชันสำหรับเปิดใช้งานปุ่มสร้างและเข้าร่วมห้อง
 function enableButtons() {
     try {
         const createBtn = document.getElementById('btn-create-room');
@@ -135,7 +149,7 @@ function enableButtons() {
         console.error('Error enabling buttons:', error);
     }
 }
-
+// ฟังก์ชันสำหรับปิดใช้งานปุ่มสร้างและเข้าร่วมห้อง
 function disableButtons() {
     try {
         const createBtn = document.getElementById('btn-create-room');
@@ -151,7 +165,7 @@ function disableButtons() {
 // =========================================
 // Room Management Functions (with null checks)
 // =========================================
-
+// ฟังก์ชันสำหรับอัปเดตการแสดงรหัสห้อง
 function updateRoomDisplay() {
     try {
         const roomDisplay = document.getElementById('room-id-display');
@@ -162,7 +176,7 @@ function updateRoomDisplay() {
         console.error('Error updating room display:', error);
     }
 }
-
+// ฟังก์ชันสำหรับอัปเดตรายชื่อผู้เล่นในห้อง
 function updatePlayersList(players) {
     try {
         const playersList = document.getElementById('players-list');
@@ -181,7 +195,7 @@ function updatePlayersList(players) {
             });
         }
 
-        // Enable ready button if we have a name
+       // เปิดใช้งานปุ่มพร้อมเล่นเมื่อมีชื่อผู้เล่นแล้ว
         const readyBtn = document.getElementById('btn-ready');
         if (readyBtn) {
             readyBtn.disabled = false;
@@ -190,7 +204,7 @@ function updatePlayersList(players) {
         console.error('Error updating players list:', error);
     }
 }
-
+// ฟังก์ชันสำหรับอัปเดตสถานะพร้อมเล่นของผู้เล่นทั้งสองคน
 function updateReadyStatus(data) {
     try {
         const indicator1 = document.getElementById('ready-indicator-1');
@@ -210,10 +224,10 @@ function updateReadyStatus(data) {
 // =========================================
 // Game Functions (with error handling)
 // =========================================
-
+// ฟังก์ชันสำหรับตั้งค่าเริ่มต้นเมื่อเกมเริ่ม
 function initGame(gameData) {
     try {
-        // Initialize game boards
+        // สร้างกระดานเกมสำหรับผู้เล่นทั้งสองคน
         initGameBoard('my-board', 20, 10);
         initGameBoard('opponent-board', 20, 10);
         
@@ -231,13 +245,13 @@ function initGame(gameData) {
         // Reset scores
         resetGameStats();
         
-        // Initialize game controls
+        // ตั้งค่าการควบคุมเกม
         initGameControls();
     } catch (error) {
         console.error('Error initializing game:', error);
     }
 }
-
+// ฟังก์ชันสำหรับวาดกระดานเกมเปล่า
 function initGameBoard(boardId, rows, cols) {
     try {
         const board = document.getElementById(boardId);
@@ -249,7 +263,7 @@ function initGameBoard(boardId, rows, cols) {
         board.innerHTML = '';
         board.style.position = 'relative';
         
-        // Create grid background
+        // สร้างตารางสำหรับพื้นหลังกระดาน
         const cellSize = boardId === 'my-board' ? 32 : 16;
         
         for (let r = 0; r < rows; r++) {
@@ -270,7 +284,7 @@ function initGameBoard(boardId, rows, cols) {
         console.error('Error initializing game board:', error);
     }
 }
-
+// ฟังก์ชันสำหรับรีเซ็ตสถิติเกมทั้งหมดกลับเป็นค่าเริ่มต้น
 function resetGameStats() {
     try {
         const elements = {
@@ -292,10 +306,10 @@ function resetGameStats() {
         console.error('Error resetting game stats:', error);
     }
 }
-
+// ฟังก์ชันสำหรับอัปเดตการแสดงผลของเกมทั้งหมด
 function updateGameDisplay(gameData) {
     try {
-        // Update scores and stats
+        // อัปเดตคะแนนและสถิติของผู้เล่น
         if (gameData.players && gameState.currentPlayer) {
             const myData = gameData.players[gameState.currentPlayer.id];
             const opponentData = Object.values(gameData.players).find(p => p.id !== gameState.currentPlayer.id);
@@ -323,7 +337,7 @@ function updateGameDisplay(gameData) {
             }
         }
         
-        // Update game boards if board data is provided
+        // อัปเดตกระดานเกมของผู้เล่นทั้งสองคน
         if (gameData.boards && gameState.currentPlayer) {
             updateBoard('my-board', gameData.boards[gameState.currentPlayer.id]);
             const opponentId = Object.keys(gameData.boards).find(id => id !== gameState.currentPlayer.id);
@@ -332,7 +346,7 @@ function updateGameDisplay(gameData) {
             }
         }
         
-        // Update next piece if provided
+        // อัปเดตการแสดงผลของชิ้นส่วนต่อไป
         if (gameData.nextPieces && gameState.currentPlayer && gameData.nextPieces[gameState.currentPlayer.id]) {
             updateNextPiece(gameData.nextPieces[gameState.currentPlayer.id]);
         }
@@ -340,7 +354,7 @@ function updateGameDisplay(gameData) {
         console.error('Error updating game display:', error);
     }
 }
-
+// ฟังก์ชันสำหรับวาดบล็อกบนกระดาน
 function updateBoard(boardId, boardData) {
     try {
         if (!boardData) return;
@@ -350,11 +364,11 @@ function updateBoard(boardId, boardData) {
         
         const cellSize = boardId === 'my-board' ? 32 : 16;
         
-        // Clear existing game pieces (keep grid cells)
+        // ลบชิ้นส่วนเกมที่มีอยู่เดิม (ยกเว้นเซลล์พื้นหลัง)
         const gamePieces = board.querySelectorAll('.tetris-block:not(.grid-cell)');
         gamePieces.forEach(piece => piece.remove());
         
-        // Draw board state
+        // วาดสถานะของบล็อกที่วางอยู่แล้ว
         if (boardData.grid && Array.isArray(boardData.grid)) {
             boardData.grid.forEach((row, r) => {
                 if (Array.isArray(row)) {
@@ -374,7 +388,7 @@ function updateBoard(boardId, boardData) {
             });
         }
         
-        // Draw current piece if it exists
+        // วาดชิ้นส่วนปัจจุบันที่กำลังเคลื่อนที่อยู่
         if (boardData.currentPiece) {
             drawCurrentPiece(boardId, boardData.currentPiece, cellSize);
         }
@@ -382,7 +396,7 @@ function updateBoard(boardId, boardData) {
         console.error('Error updating board:', error);
     }
 }
-
+// ฟังก์ชันสำหรับวาดชิ้นส่วนปัจจุบันที่กำลังเคลื่อนที่
 function drawCurrentPiece(boardId, pieceData, cellSize) {
     try {
         const board = document.getElementById(boardId);
@@ -413,7 +427,7 @@ function drawCurrentPiece(boardId, pieceData, cellSize) {
         console.error('Error drawing current piece:', error);
     }
 }
-
+// ฟังก์ชันสำหรับอัปเดตการแสดงผลของชิ้นส่วนต่อไป
 function updateNextPiece(nextPieceData) {
     try {
         const nextPieceContainer = document.getElementById('next-piece-preview');
@@ -445,7 +459,7 @@ function updateNextPiece(nextPieceData) {
         console.error('Error updating next piece:', error);
     }
 }
-
+// ฟังก์ชันสำหรับแสดงหน้าจอเกมโอเวอร์
 function showGameOver(data) {
     try {
         const winnerMessage = document.getElementById('winner-message');
@@ -477,16 +491,16 @@ function showGameOver(data) {
 // =========================================
 // Game Controls (with error handling)
 // =========================================
-
+// ฟังก์ชันสำหรับตั้งค่าการควบคุมเกมทั้งหมด
 function initGameControls() {
     try {
-        // Remove existing event listeners first
+        // ลบ event listener ที่เคยมีอยู่เพื่อป้องกันการซ้ำซ้อน
         document.removeEventListener('keydown', handleKeyPress);
         
-        // Keyboard controls
+        // ตั้งค่าการควบคุมด้วยคีย์บอร์ด
         document.addEventListener('keydown', handleKeyPress);
         
-        // Mobile controls
+        // ตั้งค่าการควบคุมด้วยปุ่มบนหน้าจอสำหรับมือถือ
         const buttons = {
             'btn-left': 'left',
             'btn-right': 'right',
@@ -497,20 +511,20 @@ function initGameControls() {
         Object.entries(buttons).forEach(([btnId, action]) => {
             const btn = document.getElementById(btnId);
             if (btn) {
-                // Remove existing listeners
+                // ลบและสร้างปุ่มใหม่เพื่อล้าง event listener เดิม
                 btn.replaceWith(btn.cloneNode(true));
                 const newBtn = document.getElementById(btnId);
                 newBtn.addEventListener('click', () => sendGameInput(action));
             }
         });
         
-        // Touch controls for swipe
+        // ตั้งค่าการควบคุมด้วยการสัมผัส (swipe)
         initTouchControls();
     } catch (error) {
         console.error('Error initializing game controls:', error);
     }
 }
-
+// ฟังก์ชันสำหรับตั้งค่าการควบคุมด้วยการสัมผัส (Touch/Swipe)
 function initTouchControls() {
     try {
         let touchStartX = 0;
@@ -521,7 +535,7 @@ function initTouchControls() {
         const gameBoard = document.getElementById('my-board');
         if (!gameBoard) return;
         
-        // Remove existing listeners
+        // ลบและสร้างกระดานใหม่เพื่อล้าง event listener เดิม
         const newBoard = gameBoard.cloneNode(true);
         gameBoard.parentNode.replaceChild(newBoard, gameBoard);
         const freshBoard = document.getElementById('my-board');
@@ -573,7 +587,7 @@ function initTouchControls() {
         console.error('Error initializing touch controls:', error);
     }
 }
-
+// ฟังก์ชันสำหรับจัดการการกดปุ่มบนคีย์บอร์ด
 function handleKeyPress(event) {
     try {
         if (!gameState.inGame) return;
@@ -608,7 +622,7 @@ function handleKeyPress(event) {
         console.error('Error handling key press:', error);
     }
 }
-
+// ฟังก์ชันสำหรับส่งคำสั่งการเล่นเกมไปยังเซิร์ฟเวอร์
 function sendGameInput(action) {
     try {
         if (socket && gameState.inGame) {
@@ -618,7 +632,7 @@ function sendGameInput(action) {
         console.error('Error sending game input:', error);
     }
 }
-
+// ฟังก์ชันสำหรับส่งคำสั่งหยุดเกมชั่วคราวไปยังเซิร์ฟเวอร์
 function togglePause() {
     try {
         if (socket && gameState.inGame) {
@@ -632,7 +646,7 @@ function togglePause() {
 // =========================================
 // UI Controls (with error handling)
 // =========================================
-
+// ฟังก์ชันสำหรับตั้งค่าเมนูยืดหด (Accordion)
 function initControlsAccordion() {
     try {
         const toggleBtn = document.getElementById('controls-toggle');
@@ -660,7 +674,7 @@ function initControlsAccordion() {
 // =========================================
 // Event Listeners Setup (with error handling)
 // =========================================
-
+// ฟังก์ชันสำหรับตั้งค่า Event Listener ทั้งหมดของหน้าเว็บ
 function setupEventListeners() {
     try {
         // Menu buttons
@@ -679,7 +693,7 @@ function setupEventListeners() {
             });
         }
 
-        // Room creation
+        // ปุ่มสร้างห้อง
         const confirmCreateBtn = document.getElementById('btn-confirm-create');
         if (confirmCreateBtn) {
             confirmCreateBtn.addEventListener('click', () => {
@@ -696,7 +710,7 @@ function setupEventListeners() {
             });
         }
 
-        // Room joining
+        // ปุ่มเข้าร่วมห้อง
         const confirmJoinBtn = document.getElementById('btn-confirm-join');
         if (confirmJoinBtn) {
             confirmJoinBtn.addEventListener('click', () => {
@@ -753,27 +767,27 @@ function setupEventListeners() {
             });
         }
 
-        // Input validation
+        // ตั้งค่าการตรวจสอบข้อมูลที่ป้อนเข้ามา
         setupInputValidation();
     } catch (error) {
         console.error('Error setting up event listeners:', error);
     }
 }
-
+// ฟังก์ชันสำหรับตรวจสอบและกรองข้อมูลที่ผู้ใช้ป้อนเข้ามา
 function setupInputValidation() {
     try {
-        // Allow only alphanumeric and Thai characters for player names
+        // อนุญาตเฉพาะตัวอักษรและตัวเลขสำหรับชื่อผู้เล่น
         const playerNameInputs = document.querySelectorAll('#create-player-name, #join-player-name');
         playerNameInputs.forEach(input => {
             if (input) {
                 input.addEventListener('input', (e) => {
-                    // Allow Thai characters, English letters, numbers, and spaces
+                     // อนุญาตตัวอักษรไทย, อังกฤษ, ตัวเลข, และช่องว่าง
                     e.target.value = e.target.value.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s]/g, '');
                 });
             }
         });
 
-        // Allow only alphanumeric for room ID
+        // อนุญาตเฉพาะตัวอักษรและตัวเลขสำหรับรหัสห้อง
         const roomIdInput = document.getElementById('join-room-id');
         if (roomIdInput) {
             roomIdInput.addEventListener('input', (e) => {
@@ -781,7 +795,7 @@ function setupInputValidation() {
             });
         }
 
-        // Enter key handling
+        // จัดการเหตุการณ์ Enter
         const createNameInput = document.getElementById('create-player-name');
         const joinRoomInput = document.getElementById('join-room-id');
         
@@ -810,21 +824,21 @@ function setupInputValidation() {
 // =========================================
 // Initialization (with error handling)
 // =========================================
-
+// ฟังก์ชันเริ่มต้นการทำงานทั้งหมดของ Client
 function init() {
     try {
         console.log('Initializing TwoBob Tactics Client...');
         
-        // Initialize socket connection
+         // เริ่มต้นการเชื่อมต่อ Socket
         initSocket();
         
-        // Setup all event listeners
+        // ตั้งค่า Event Listener ทั้งหมด
         setupEventListeners();
         
-        // Initialize controls accordion
+        // เริ่มต้นเมนูยืดหด (Accordion)
         initControlsAccordion();
         
-        // Show initial screen
+        // แสดงหน้าจอแรก
         showScreen('menu-screen');
         
         console.log('TwoBob Tactics Client initialized successfully');
@@ -834,7 +848,7 @@ function init() {
     }
 }
 
-// Initialize when DOM is loaded
+// เริ่มต้นโปรแกรมเมื่อ DOM โหลดเสร็จสิ้น
 document.addEventListener('DOMContentLoaded', () => {
     try {
         init();
@@ -843,7 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Export functions for testing (if running in Node.js environment)
+// ส่งออกฟังก์ชันสำหรับการทดสอบ (ถ้าใช้ใน Node.js)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         showScreen,
@@ -853,7 +867,7 @@ if (typeof module !== 'undefined' && module.exports) {
     };
 }
 
-// Global error handler
+// ตัวจัดการข้อผิดพลาดส่วนกลาง
 window.addEventListener('error', (event) => {
     console.error('Global JavaScript error:', event.error);
     console.error('Error details:', {
@@ -864,7 +878,8 @@ window.addEventListener('error', (event) => {
     });
 });
 
-// Handle unhandled promise rejections
+// จัดการข้อผิดพลาดจาก Promise ที่ไม่มีตัวจัดการ
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
