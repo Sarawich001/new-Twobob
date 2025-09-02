@@ -624,11 +624,20 @@ body {
     height: 100%;
 }
 .main-player-area {
+    flex: 2; /* ให้กระดานหลักใช้พื้นที่ 2 ส่วน */
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    width: 100%;
+    height: 100%;
+}
+.opponent-player-area {
+    flex: 1; /* ให้กระดานคู่แข่งใช้พื้นที่ 1 ส่วน */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
 }
 /* =================================
    STANDARD TETRIS BOARDS - CONSISTENT SIZING
@@ -643,10 +652,6 @@ body {
     /* Standard Tetris proportions: 10 wide x 20 tall */
     width: calc(var(--main-cell-size) * 10);
     height: calc(var(--main-cell-size) * 20);
-    min-width: 250px;
-    min-height: 500px;
-    max-width: 400px;
-    max-height: 800px;
     margin: 0 auto;
 }
 
@@ -678,10 +683,6 @@ body {
 .opponent-board, #opponent-board, .opponent-section .game-board {
     width: calc(var(--opponent-cell-size) * 10);
     height: calc(var(--opponent-cell-size) * 20);
-    min-width: 175px;
-    min-height: 350px;
-    max-width: 280px;
-    max-height: 560px;
     border-color: #e74c3c;
     box-shadow: 
         0 0 15px rgba(231, 76, 60, 0.3),
