@@ -898,15 +898,11 @@ updateBoard() {
     // อัพเดท next piece ทุกครั้งที่อัพเดท board
     this.updateNextPiece();
 }
-// อัปเดตกระดานของฝ่ายตรงข้าม (ปรับให้พอดีจอไม่ต้องเลื่อน)
+// Update opponent board (smaller board)
 updateOpponentBoard(data) {
-    const opponentBoardEl = document.getElementById('opponent-board');
-    if (!opponentBoardEl) {
-        console.warn('ไม่พบองค์ประกอบกระดานของฝ่ายตรงข้าม');
-        return;
-    }
-    
-    // อัปเดตสถานะของฝ่ายตรงข้าม
+    console.log('Updating opponent board with data:', data); 
+
+    // ใช้ข้อมูลจาก data ที่ได้รับมา
     this.opponentState = { 
         ...this.opponentState, 
         board: data.board || this.opponentState.board || [],
@@ -915,63 +911,33 @@ updateOpponentBoard(data) {
         level: data.level !== undefined ? data.level : this.opponentState.level || 1
     };
     
-    // ** แก้ไขหลัก: คำนวณขนาดจากความสูงของหน้าจอ **
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    
-    // หาพื้นที่ที่เหลือสำหรับบอร์ดขวา (หักส่วนหัวและส่วนล่าง)
-    const headerHeight = 100; // ประมาณความสูงส่วนหัว
-    const footerHeight = 100; // ประมาณความสูงส่วนล่าง
-    const statsHeight = 120; // ความสูงของ score, lines, level ด้านล่าง
-    const availableHeight = viewportHeight - headerHeight - footerHeight - statsHeight;
-    
-    // คำนวณขนาดบล็อกที่เหมาะสม
-    const maxBoardHeight = Math.min(availableHeight * 0.8, 500); // จำกัดความสูงสูงสุด
-    const maxBoardWidth = Math.min(viewportWidth * 0.2, 200); // จำกัดความกว้าง 20% ของจอ
-    
-    // คำนวณขนาดบล็อกจากข้อจำกัดทั้งสองแกน
-    const blockSizeFromHeight = maxBoardHeight / this.BOARD_HEIGHT;
-    const blockSizeFromWidth = maxBoardWidth / this.BOARD_WIDTH;
-    
-    // เลือกขนาดที่เล็กกว่าแต่ไม่เล็กเกิน 4px
-    this.SMALL_BLOCK_SIZE = Math.max(
-        Math.min(blockSizeFromHeight, blockSizeFromWidth),
-        4
-    );
-    
-    // กำหนดขนาดกระดานจริง
-    const actualBoardWidth = this.BOARD_WIDTH * this.SMALL_BLOCK_SIZE;
-    const actualBoardHeight = this.BOARD_HEIGHT * this.SMALL_BLOCK_SIZE;
-    
-    // ตั้งค่าสไตล์กระดาน
-    opponentBoardEl.style.width = actualBoardWidth + 'px';
-    opponentBoardEl.style.height = actualBoardHeight + 'px';
-    opponentBoardEl.style.position = 'relative';
-    opponentBoardEl.style.border = '2px solid #ff4444';
-    opponentBoardEl.style.backgroundColor = '#000';
-    opponentBoardEl.style.margin = '10px auto';
-    opponentBoardEl.style.overflow = 'hidden';
-    
-    // เพิ่มการปรับแต่งคอนเทนเนอร์หลัก (ถ้ามี)
-    const opponentContainer = opponentBoardEl.closest('.opponent-container, .opponent-section');
-    if (opponentContainer) {
-        opponentContainer.style.maxHeight = (actualBoardHeight + statsHeight + 50) + 'px';
-        opponentContainer.style.overflow = 'visible';
-        opponentContainer.style.display = 'flex';
-        opponentContainer.style.flexDirection = 'column';
-        opponentContainer.style.justifyContent = 'flex-start';
+    const opponentBoardEl = document.getElementById('opponent-board');
+    if (!opponentBoardEl) {
+        console.warn('Opponent board element not found');
+        return;
     }
     
-    // ล้างและวาดกระดานใหม่
+    // ตั้งค่าขนาดและสไตล์ของบอร์ดให้เหมาะสม
+    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE);
+    opponentBoardEl.style.position = 'relative';
+    opponentBoardEl.style.background = 'rgba(0,0,0,0.6)';
+    opponentBoardEl.style.border = '1px solid #666';
+    opponentBoardEl.style.overflow = 'hidden'; // ป้องกันบล็อกล้นขอบ
+
+    // ล้างบล็อกเดิมทั้งหมด
     opponentBoardEl.innerHTML = '';
     
+    // วาดบล็อกของฝ่ายตรงข้ามใหม่ทั้งหมด
     const board = this.opponentState.board;
     if (board && Array.isArray(board)) {
         for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-            if (board[y] && Array.isArray(board[y])) {
-                for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                    if (board[y][x] && board[y][x] !== 0) {
-                        const block = this.createOptimizedBlock(x, y, board[y][x]);
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                // ตรวจสอบข้อมูลก่อนวาด
+                if (board[y] && board[y][x]) {
+                    const color = board[y][x];
+                    // บล็อกที่มีสี (ไม่ใช่ 0) ถึงจะถูกวาด
+                    if (color !== 0) {
+                        const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, color);
                         if (block) {
                             opponentBoardEl.appendChild(block);
                         }
@@ -981,104 +947,8 @@ updateOpponentBoard(data) {
         }
     }
     
+    // อัปเดตสถิติของฝ่ายตรงข้าม
     this.updateOpponentStats();
-    
-    // เพิ่มการแสดงขนาดสำหรับ debug (ลบได้หากไม่ต้องการ)
-    console.log(`บอร์ดขวา: ${actualBoardWidth}x${actualBoardHeight}px, บล็อก: ${this.SMALL_BLOCK_SIZE}px`);
-}
-
-// ฟังก์ชันสร้างบล็อกที่เหมาะสมกับขนาดเล็ก
-createOptimizedBlock(x, y, colorValue) {
-    const block = document.createElement('div');
-    
-    // ตำแหน่งและขนาด
-    block.style.position = 'absolute';
-    block.style.left = (x * this.SMALL_BLOCK_SIZE) + 'px';
-    block.style.top = (y * this.SMALL_BLOCK_SIZE) + 'px';
-    block.style.width = this.SMALL_BLOCK_SIZE + 'px';
-    block.style.height = this.SMALL_BLOCK_SIZE + 'px';
-    
-    // สีที่เหมาะสมกับขนาดเล็ก (ใช้สีเข้มกว่าเพื่อมองเห็นชัด)
-    const colors = {
-        1: '#FF3333', // แดงเข้ม
-        2: '#33FF33', // เขียวเข้ม
-        3: '#3333FF', // น้ำเงินเข้ม
-        4: '#FFFF33', // เหลืองเข้ม
-        5: '#FF33FF', // ม่วงเข้ม
-        6: '#33FFFF', // ฟ้าเข้ม
-        7: '#FF9933'  // ส้มเข้ม
-    };
-    
-    block.style.backgroundColor = colors[colorValue] || '#FFFFFF';
-    
-    // ปรับการแสดงขอบตามขนาด
-    if (this.SMALL_BLOCK_SIZE >= 8) {
-        block.style.border = '1px solid #222';
-    } else {
-        block.style.border = 'none'; // ไม่แสดงขอบถ้าเล็กเกินไป
-    }
-    
-    block.style.boxSizing = 'border-box';
-    
-    return block;
-}
-
-// ฟังก์ชันปรับขนาดอัตโนมัติเมื่อหน้าจอเปลี่ยนขนาด
-initResponsiveOpponentBoard() {
-    // เรียกใช้เมื่อหน้าจอเปลี่ยนขนาด
-    let resizeTimeout;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            if (this.opponentState) {
-                this.updateOpponentBoard(this.opponentState);
-            }
-        }, 250);
-    });
-    
-    // เรียกใช้เมื่อเปิดหน้าใหม่
-    window.addEventListener('load', () => {
-        if (this.opponentState) {
-            this.updateOpponentBoard(this.opponentState);
-        }
-    });
-}
-
-// CSS สำหรับปรับแต่งเพิ่มเติม (เรียกใช้ในไฟล์ CSS หรือเพิ่มใน <style>)
-addResponsiveCSS() {
-    const style = document.createElement('style');
-    style.textContent = `
-        .opponent-section {
-            max-height: 90vh !important;
-            overflow: visible !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-start !important;
-        }
-        
-        #opponent-board {
-            flex-shrink: 0 !important;
-        }
-        
-        .opponent-stats {
-            flex-shrink: 0 !important;
-            margin-top: 10px !important;
-        }
-        
-        @media (max-height: 600px) {
-            .opponent-section {
-                max-height: 95vh !important;
-            }
-        }
-        
-        @media (max-height: 500px) {
-            #opponent-board {
-                transform: scale(0.8) !important;
-                transform-origin: center top !important;
-            }
-        }
-    `;
-    document.head.appendChild(style);
 }
 
 updateStats() {
