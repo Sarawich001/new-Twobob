@@ -921,8 +921,8 @@ updateOpponentBoard(data) {
     const containerHeight = opponentBoardEl.offsetHeight;
 
     // คำนวณขนาดบล็อกเล็ก (SMALL_BLOCK_SIZE) ที่เหมาะสมที่สุด
-    // เราจะอิงจากขนาดที่เล็กกว่าเพื่อรับประกันว่ามันจะพอดีเป๊ะ
-    // อัตราส่วนของกระดานคือ 10:20 (หรือ 1:2)
+    // โดยพิจารณาจากขนาดที่เล็กกว่าระหว่างความกว้างและความสูง เพื่อให้บอร์ดพอดีกับพื้นที่
+    // อัตราส่วนของกระดาน Tetris คือ 10:20 (หรือ 1:2)
     const blockSizeFromWidth = Math.floor(containerWidth / this.BOARD_WIDTH);
     const blockSizeFromHeight = Math.floor(containerHeight / this.BOARD_HEIGHT);
     
