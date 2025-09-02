@@ -899,11 +899,15 @@ updateBoard() {
     this.updateNextPiece();
 }
 
-// Update opponent board (smaller board)
+// อัปเดตกระดานของฝ่ายตรงข้าม (กระดานขนาดเล็ก)
 updateOpponentBoard(data) {
-    console.log('Updating opponent board with data:', data); 
+    const opponentBoardEl = document.getElementById('opponent-board');
+    if (!opponentBoardEl) {
+        console.warn('ไม่พบองค์ประกอบกระดานของฝ่ายตรงข้าม');
+        return;
+    }
 
-    // ใช้ข้อมูลจาก data ที่ได้รับมา
+    // อัปเดตสถานะของฝ่ายตรงข้ามด้วยข้อมูลที่ได้รับมา
     this.opponentState = { 
         ...this.opponentState, 
         board: data.board || this.opponentState.board || [],
@@ -912,43 +916,37 @@ updateOpponentBoard(data) {
         level: data.level !== undefined ? data.level : this.opponentState.level || 1
     };
     
-    const opponentBoardEl = document.getElementById('opponent-board');
-    if (!opponentBoardEl) {
-        console.warn('Opponent board element not found');
-        return;
-    }
-    
-    // ตั้งค่าขนาดและสไตล์ของบอร์ดให้เหมาะสม
-    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE);
-    opponentBoardEl.style.position = 'relative';
-    opponentBoardEl.style.background = 'rgba(0,0,0,0.6)';
-    opponentBoardEl.style.border = '1px solid #666';
-    opponentBoardEl.style.overflow = 'hidden'; // ป้องกันบล็อกล้นขอบ
+    // คำนวณขนาดของกล่องที่บรรจุกระดานของฝ่ายตรงข้าม
+    const containerWidth = opponentBoardEl.offsetWidth;
+    const containerHeight = opponentBoardEl.offsetHeight;
 
-    // ล้างบล็อกเดิมทั้งหมด
+    // คำนวณขนาดบล็อกเล็ก (SMALL_BLOCK_SIZE) ที่เหมาะสมที่สุด
+    // เราจะอิงจากขนาดที่เล็กกว่าเพื่อรับประกันว่ามันจะพอดีเป๊ะ
+    // อัตราส่วนของกระดานคือ 10:20 (หรือ 1:2)
+    const blockSizeFromWidth = Math.floor(containerWidth / this.BOARD_WIDTH);
+    const blockSizeFromHeight = Math.floor(containerHeight / this.BOARD_HEIGHT);
+    
+    // เลือกขนาดที่เล็กกว่าเพื่อป้องกันไม่ให้ล้นขอบ
+    this.SMALL_BLOCK_SIZE = Math.min(blockSizeFromWidth, blockSizeFromHeight);
+
+    // กำหนดขนาดกระดานด้วยขนาดบล็อกที่คำนวณใหม่
+    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE);
+    
+    // ล้างกระดานและวาดใหม่
     opponentBoardEl.innerHTML = '';
     
-    // วาดบล็อกของฝ่ายตรงข้ามใหม่ทั้งหมด
     const board = this.opponentState.board;
     if (board && Array.isArray(board)) {
         for (let y = 0; y < this.BOARD_HEIGHT; y++) {
             for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                // ตรวจสอบข้อมูลก่อนวาด
-                if (board[y] && board[y][x]) {
-                    const color = board[y][x];
-                    // บล็อกที่มีสี (ไม่ใช่ 0) ถึงจะถูกวาด
-                    if (color !== 0) {
-                        const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, color);
-                        if (block) {
-                            opponentBoardEl.appendChild(block);
-                        }
-                    }
+                if (board[y] && board[y][x] && board[y][x] !== 0) {
+                    const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, board[y][x]);
+                    opponentBoardEl.appendChild(block);
                 }
             }
         }
     }
     
-    // อัปเดตสถิติของฝ่ายตรงข้าม
     this.updateOpponentStats();
 }
 
