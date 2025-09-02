@@ -906,7 +906,7 @@ updateOpponentBoard(data) {
         console.warn('ไม่พบองค์ประกอบกระดานของฝ่ายตรงข้าม');
         return;
     }
-
+    
     // อัปเดตสถานะของฝ่ายตรงข้ามด้วยข้อมูลที่ได้รับมา
     this.opponentState = { 
         ...this.opponentState, 
@@ -916,37 +916,105 @@ updateOpponentBoard(data) {
         level: data.level !== undefined ? data.level : this.opponentState.level || 1
     };
     
-    // ** นี่คือจุดแก้ไขสำคัญ: ใช้ getBoundingClientRect() เพื่อหาขนาดที่แท้จริงของคอนเทนเนอร์ **
+    // ** แก้ไขหลัก: ใช้ขนาดคงที่หรือสัดส่วนที่เหมาะสม **
     const containerRect = opponentBoardEl.getBoundingClientRect();
-    const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
+    const containerWidth = containerRect.width || opponentBoardEl.offsetWidth;
+    const containerHeight = containerRect.height || opponentBoardEl.offsetHeight;
     
-    // คำนวณขนาดบล็อกเล็ก (SMALL_BLOCK_SIZE) ที่เหมาะสมที่สุด
-    const blockSizeFromWidth = containerWidth / this.BOARD_WIDTH;
-    const blockSizeFromHeight = containerHeight / this.BOARD_HEIGHT;
+    // หากไม่มีขนาด ใช้ขนาดเริ่มต้น
+    if (containerWidth <= 0 || containerHeight <= 0) {
+        // กำหนดขนาดเริ่มต้นสำหรับกระดานฝ่ายตรงข้าม
+        opponentBoardEl.style.width = '200px';
+        opponentBoardEl.style.height = '400px';
+        this.SMALL_BLOCK_SIZE = 10; // ขนาดบล็อกเล็ก
+    } else {
+        // คำนวณขนาดบล็อกจากขนาดคอนเทนเนอร์ โดยเหลือพื้นที่ขอบ
+        const availableWidth = containerWidth - 4; // เหลือพื้นที่สำหรับขอบ
+        const availableHeight = containerHeight - 4;
+        
+        const blockSizeFromWidth = availableWidth / this.BOARD_WIDTH;
+        const blockSizeFromHeight = availableHeight / this.BOARD_HEIGHT;
+        
+        // เลือกขนาดที่เล็กกว่า แต่ไม่เล็กเกินไป
+        this.SMALL_BLOCK_SIZE = Math.max(
+            Math.min(blockSizeFromWidth, blockSizeFromHeight),
+            3 // ขนาดบล็อกขั้นต่ำ
+        );
+    }
     
-    // เลือกขนาดที่เล็กกว่าเพื่อป้องกันไม่ให้ล้นขอบ
-    this.SMALL_BLOCK_SIZE = Math.min(blockSizeFromWidth, blockSizeFromHeight);
-
-    // กำหนดขนาดกระดานด้วยขนาดบล็อกที่คำนวณใหม่
-    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE);
+    // กำหนดขนาดกระดานให้ชัดเจน
+    const boardWidth = this.BOARD_WIDTH * this.SMALL_BLOCK_SIZE;
+    const boardHeight = this.BOARD_HEIGHT * this.SMALL_BLOCK_SIZE;
+    
+    opponentBoardEl.style.width = boardWidth + 'px';
+    opponentBoardEl.style.height = boardHeight + 'px';
+    opponentBoardEl.style.position = 'relative';
+    opponentBoardEl.style.border = '1px solid #333';
+    opponentBoardEl.style.backgroundColor = '#000';
     
     // ล้างกระดานและวาดใหม่
     opponentBoardEl.innerHTML = '';
     
     const board = this.opponentState.board;
     if (board && Array.isArray(board)) {
+        // วาดเฉพาะส่วนที่มีบล็อก (ไม่วาดช่องว่าง)
         for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-            for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                if (board[y] && board[y][x] && board[y][x] !== 0) {
-                    const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, board[y][x]);
-                    opponentBoardEl.appendChild(block);
+            if (board[y] && Array.isArray(board[y])) {
+                for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                    if (board[y][x] && board[y][x] !== 0) {
+                        const block = this.createSmallBlock(x, y, board[y][x]);
+                        if (block) {
+                            opponentBoardEl.appendChild(block);
+                        }
+                    }
                 }
             }
         }
     }
     
     this.updateOpponentStats();
+}
+
+// ฟังก์ชันสร้างบล็อกเล็กสำหรับกระดานฝ่ายตรงข้าม
+createSmallBlock(x, y, colorValue) {
+    const block = document.createElement('div');
+    
+    // กำหนดตำแหน่ง
+    block.style.position = 'absolute';
+    block.style.left = (x * this.SMALL_BLOCK_SIZE) + 'px';
+    block.style.top = (y * this.SMALL_BLOCK_SIZE) + 'px';
+    block.style.width = this.SMALL_BLOCK_SIZE + 'px';
+    block.style.height = this.SMALL_BLOCK_SIZE + 'px';
+    
+    // กำหนดสี (แปลงจากค่าสีเป็นสีจริง)
+    const colors = {
+        1: '#FF0000', // แดง
+        2: '#00FF00', // เขียว
+        3: '#0000FF', // น้ำเงิน
+        4: '#FFFF00', // เหลือง
+        5: '#FF00FF', // ม่วง
+        6: '#00FFFF', // ฟ้า
+        7: '#FFA500'  // ส้ม
+    };
+    
+    block.style.backgroundColor = colors[colorValue] || '#FFFFFF';
+    block.style.border = '1px solid #333';
+    block.style.boxSizing = 'border-box';
+    
+    return block;
+}
+
+// ฟังก์ชันเสริม: กำหนดขนาดกระดาน (สำหรับใช้ร่วม)
+setBoardDimensions(boardElement, blockSize) {
+    if (!boardElement || !blockSize) return;
+    
+    const width = this.BOARD_WIDTH * blockSize;
+    const height = this.BOARD_HEIGHT * blockSize;
+    
+    boardElement.style.width = width + 'px';
+    boardElement.style.height = height + 'px';
+    boardElement.style.position = 'relative';
+    boardElement.style.overflow = 'hidden';
 }
 
 updateStats() {
