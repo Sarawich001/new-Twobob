@@ -916,15 +916,14 @@ updateOpponentBoard(data) {
         level: data.level !== undefined ? data.level : this.opponentState.level || 1
     };
     
-    // คำนวณขนาดของกล่องที่บรรจุกระดานของฝ่ายตรงข้าม
-    const containerWidth = opponentBoardEl.offsetWidth;
-    const containerHeight = opponentBoardEl.offsetHeight;
-
+    // ** นี่คือจุดแก้ไขสำคัญ: ใช้ getBoundingClientRect() เพื่อหาขนาดที่แท้จริงของคอนเทนเนอร์ **
+    const containerRect = opponentBoardEl.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
     // คำนวณขนาดบล็อกเล็ก (SMALL_BLOCK_SIZE) ที่เหมาะสมที่สุด
-    // โดยพิจารณาจากขนาดที่เล็กกว่าระหว่างความกว้างและความสูง เพื่อให้บอร์ดพอดีกับพื้นที่
-    // อัตราส่วนของกระดาน Tetris คือ 10:20 (หรือ 1:2)
-    const blockSizeFromWidth = Math.floor(containerWidth / this.BOARD_WIDTH);
-    const blockSizeFromHeight = Math.floor(containerHeight / this.BOARD_HEIGHT);
+    const blockSizeFromWidth = containerWidth / this.BOARD_WIDTH;
+    const blockSizeFromHeight = containerHeight / this.BOARD_HEIGHT;
     
     // เลือกขนาดที่เล็กกว่าเพื่อป้องกันไม่ให้ล้นขอบ
     this.SMALL_BLOCK_SIZE = Math.min(blockSizeFromWidth, blockSizeFromHeight);
