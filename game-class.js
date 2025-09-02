@@ -899,11 +899,11 @@ updateBoard() {
     this.updateNextPiece();
 }
 
-    // Update opponent board (smaller board)
+// Update opponent board (smaller board)
 updateOpponentBoard(data) {
-    console.log('Updating opponent board with data:', data); // จาก V2
-    
-    // ใช้ spread operator จาก V1 เพื่อความปลอดภัย + การอัพเดทแบบ V2
+    console.log('Updating opponent board with data:', data); 
+
+    // ใช้ข้อมูลจาก data ที่ได้รับมา
     this.opponentState = { 
         ...this.opponentState, 
         board: data.board || this.opponentState.board || [],
@@ -918,31 +918,37 @@ updateOpponentBoard(data) {
         return;
     }
     
-    // Clear previous display
-    opponentBoardEl.innerHTML = '';
-    
-    // Set board dimensions (รวมวิธีจาก V1 + V2)
-    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE); // จาก V2
+    // ตั้งค่าขนาดและสไตล์ของบอร์ดให้เหมาะสม
+    this.setBoardDimensions(opponentBoardEl, this.SMALL_BLOCK_SIZE);
     opponentBoardEl.style.position = 'relative';
     opponentBoardEl.style.background = 'rgba(0,0,0,0.6)';
     opponentBoardEl.style.border = '1px solid #666';
+    opponentBoardEl.style.overflow = 'hidden'; // ป้องกันบล็อกล้นขอบ
+
+    // ล้างบล็อกเดิมทั้งหมด
+    opponentBoardEl.innerHTML = '';
     
-    // Draw opponent's board with enhanced safety checks
+    // วาดบล็อกของฝ่ายตรงข้ามใหม่ทั้งหมด
     const board = this.opponentState.board;
     if (board && Array.isArray(board)) {
         for (let y = 0; y < this.BOARD_HEIGHT; y++) {
             for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                if (board[y] && board[y][x] && typeof board[y][x] !== 'undefined') {
-                    const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, board[y][x]);
-                    if (block) {
-                        opponentBoardEl.appendChild(block);
+                // ตรวจสอบข้อมูลก่อนวาด
+                if (board[y] && board[y][x]) {
+                    const color = board[y][x];
+                    // บล็อกที่มีสี (ไม่ใช่ 0) ถึงจะถูกวาด
+                    if (color !== 0) {
+                        const block = this.createBlock(x, y, this.SMALL_BLOCK_SIZE, color);
+                        if (block) {
+                            opponentBoardEl.appendChild(block);
+                        }
                     }
                 }
             }
         }
     }
     
-    // Update stats
+    // อัปเดตสถิติของฝ่ายตรงข้าม
     this.updateOpponentStats();
 }
 
