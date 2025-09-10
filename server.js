@@ -138,51 +138,22 @@ class GameRoom {
 
 // แก้ไข getWinner method
 getWinner() {
-    const player1 = this.players.find(p => p.id === 1);
-    const player2 = this.players.find(p => p.id === 2);
-    
-    if (player1 && player2) {
-        if (player1.gameOver && !player2.gameOver) {
-            return { 
-                winner: 2, 
-                finalScores: { 
-                    [player1.id]: player1.score, 
-                    [player2.id]: player2.score 
-                },
-                players: {
-                    [player1.id]: { id: player1.id, name: player1.name },
-                    [player2.id]: { id: player2.id, name: player2.name }
-                }
-            };
-        } else if (player2.gameOver && !player1.gameOver) {
-            return { 
-                winner: 1, 
-                finalScores: { 
-                    [player1.id]: player1.score, 
-                    [player2.id]: player2.score 
-                },
-                players: {
-                    [player1.id]: { id: player1.id, name: player1.name },
-                    [player2.id]: { id: player2.id, name: player2.name }
-                }
-            };
-        } else if (player1.gameOver && player2.gameOver) {
-            const winner = player1.score >= player2.score ? 1 : 2;
-            return { 
-                winner: winner, 
-                finalScores: { 
-                    [player1.id]: player1.score, 
-                    [player2.id]: player2.score 
-                },
-                players: {
-                    [player1.id]: { id: player1.id, name: player1.name },
-                    [player2.id]: { id: player2.id, name: player2.name }
-                }
-            };
+        const player1 = this.players.find(p => p.id === 1);
+        const player2 = this.players.find(p => p.id === 2);
+        
+        if (player1 && player2) {
+            if (player1.gameOver && !player2.gameOver) {
+                return { winner: 2, scores: { player1: player1.score, player2: player2.score } };
+            } else if (player2.gameOver && !player1.gameOver) {
+                return { winner: 1, scores: { player1: player1.score, player2: player2.score } };
+            } else if (player1.gameOver && player2.gameOver) {
+                const winner = player1.score >= player2.score ? 1 : 2;
+                return { winner: winner, scores: { player1: player1.score, player2: player2.score } };
+            }
         }
+        
+        return null;
     }
-    
-    return null;
 }
     resetForNewGame() {
         this.gameStarted = false;
@@ -489,4 +460,5 @@ process.on('SIGINT', () => {
         process.exit(0);
     });
 });
+
 
