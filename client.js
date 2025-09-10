@@ -322,6 +322,7 @@ function updateGameDisplay(gameData) {
                 if (myScore) myScore.textContent = myData.score || 0;
                 if (myLines) myLines.textContent = myData.lines || 0;
                 if (myLevel) myLevel.textContent = myData.level || 1;
+                
             }
             
             if (opponentData) {
@@ -460,11 +461,14 @@ function updateNextPiece(nextPieceData) {
     }
 }
 // ฟังก์ชันสำหรับแสดงหน้าจอเกมโอเวอร์
+// ฟังก์ชันสำหรับแสดงหน้าจอเกมโอเวอร์ (แก้ไขแล้ว)
 function showGameOver(data) {
     try {
         const winnerMessage = document.getElementById('winner-message');
         const finalScoreP1 = document.getElementById('final-score-p1');
         const finalScoreP2 = document.getElementById('final-score-p2');
+        const finalNameP1 = document.getElementById('final-name-p1'); // เพิ่มการอ้างอิง element สำหรับชื่อ
+        const finalNameP2 = document.getElementById('final-name-p2'); // เพิ่มการอ้างอิง element สำหรับชื่อ
         
         if (winnerMessage) {
             if (gameState.currentPlayer && data.winner === gameState.currentPlayer.id) {
@@ -476,10 +480,30 @@ function showGameOver(data) {
             }
         }
         
-        if (data.finalScores && finalScoreP1 && finalScoreP2) {
-            const scores = Object.values(data.finalScores);
-            finalScoreP1.textContent = scores[0] || 0;
-            finalScoreP2.textContent = scores[1] || 0;
+        // แก้ไขส่วนการแสดงคะแนนและชื่อผู้เล่น
+        if (data.finalScores && data.players) {
+            // หาข้อมูลผู้เล่นปัจจุบันและคู่แข่ง
+            const currentPlayerId = gameState.currentPlayer.id;
+            const opponentId = Object.keys(data.players).find(id => id !== currentPlayerId);
+            
+            const currentPlayerData = data.players[currentPlayerId];
+            const opponentData = data.players[opponentId];
+            
+            // อัปเดตชื่อและคะแนนของผู้เล่นปัจจุบัน
+            if (finalNameP1) {
+                finalNameP1.textContent = currentPlayerData ? currentPlayerData.name : 'คุณ';
+            }
+            if (finalScoreP1) {
+                finalScoreP1.textContent = data.finalScores[currentPlayerId] || 0;
+            }
+            
+            // อัปเดตชื่อและคะแนนของคู่แข่ง
+            if (finalNameP2) {
+                finalNameP2.textContent = opponentData ? opponentData.name : 'ฝ่ายตรงข้าม';
+            }
+            if (finalScoreP2) {
+                finalScoreP2.textContent = data.finalScores[opponentId] || 0;
+            }
         }
         
         showScreen('game-over-screen');
@@ -882,4 +906,5 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
 
