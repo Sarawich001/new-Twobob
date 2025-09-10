@@ -1,4 +1,4 @@
-// TwoBob Tactics - Tetris Multiplayer Server (FIXED)
+// TwoBob Tactics - Tetris Multiplayer Server
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -13,7 +13,7 @@ const io = socketIo(server, {
     }
 });
 
-// Serve static files จาก root directory
+// แก้ไข: Serve static files จาก root directory แทน public folder
 app.use(express.static(__dirname, {
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.js')) {
@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Game state management - FIXED CLASS
+// Game state management (ไม่เปลี่ยนแปลง)
 class GameRoom {
     constructor(id) {
         this.id = id;
@@ -136,7 +136,6 @@ class GameRoom {
         }
     }
 
-    // FIXED: getWinner method ใน class
     getWinner() {
         const player1 = this.players.find(p => p.id === 1);
         const player2 = this.players.find(p => p.id === 2);
@@ -155,7 +154,6 @@ class GameRoom {
         return null;
     }
 
-    // FIXED: resetForNewGame method ใน class
     resetForNewGame() {
         this.gameStarted = false;
         this.readyCount = 0;
@@ -174,7 +172,7 @@ class GameRoom {
     isFull() {
         return this.players.length >= 2;
     }
-} // FIXED: เพิ่ม closing brace
+}
 
 // Room management
 const rooms = new Map();
@@ -182,7 +180,8 @@ const playerRooms = new Map();
 
 // Utility functions
 function generateRoomId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // เปลี่ยนเป็นตัวเลข 5 ตัว (10000-99999)
+    return Math.floor(10000 + Math.random() * 90000).toString();
 }
 
 function cleanupEmptyRooms() {
@@ -199,12 +198,11 @@ function cleanupEmptyRooms() {
 
 setInterval(cleanupEmptyRooms, 5 * 60 * 1000);
 
-// Socket.IO connection handling - FIXED EVENT NAMES
+// Socket.IO connection handling (ไม่เปลี่ยนแปลง)
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
-    // FIXED: เปลี่ยนจาก 'createRoom' เป็น 'create-room'
-    socket.on('create-room', (data) => {
+    socket.on('createRoom', (data) => {
         try {
             const roomId = generateRoomId();
             const room = new GameRoom(roomId);
@@ -215,39 +213,41 @@ io.on('connection', (socket) => {
                 playerRooms.set(socket.id, roomId);
                 socket.join(roomId);
                 
-                socket.emit('room-created', {
+                socket.emit('roomCreated', {
                     roomId: roomId,
-                    player: { id: result.playerId, name: data.playerName }
+                    playerId: result.playerId
                 });
 
-                io.to(roomId).emit('players-updated', room.players);
+                io.to(roomId).emit('roomUpdate', {
+                    players: room.players,
+                    gameStarted: room.gameStarted
+                });
 
                 console.log(`Room created: ${roomId} by ${data.playerName}`);
             } else {
-                socket.emit('error', result.message);
+                socket.emit('roomError', { message: result.message });
             }
         } catch (error) {
             console.error('Error creating room:', error);
-            socket.emit('error', 'เกิดข้อผิดพลาดในการสร้างห้อง');
+            socket.emit('roomError', { message: 'เกิดข้อผิดพลาดในการสร้างห้อง' });
         }
     });
 
-    // FIXED: เปลี่ยนจาก 'joinRoom' เป็น 'join-room'
-    socket.on('join-room', (data) => {
+    socket.on('joinRoom', (data) => {
         try {
             const room = rooms.get(data.roomId);
             if (!room) {
-                socket.emit('room-not-found');
+                socket.emit('roomError', { message: 'ไม่พบห้องที่ระบุ' });
                 return;
             }
 
             if (room.isFull()) {
-                socket.emit('room-full');
+                socket.emit('roomError', { message: 'ห้องเต็มแล้ว' });
                 return;
             }
 
             if (room.gameStarted) {
-                socket.emit('error', 'เกมเริ่มแล้ว');
+                socket.emit('roomError', { message: 'เกมเริ่มแล้ว' });
                 return;
             }
 
@@ -256,50 +256,48 @@ io.on('connection', (socket) => {
                 playerRooms.set(socket.id, data.roomId);
                 socket.join(data.roomId);
                 
-                socket.emit('room-joined', {
+                socket.emit('roomJoined', {
                     roomId: data.roomId,
-                    player: { id: result.playerId, name: data.playerName }
+                    playerId: result.playerId
                 });
 
-                io.to(data.roomId).emit('players-updated', room.players);
+                io.to(data.roomId).emit('roomUpdate', {
+                    players: room.players,
+                    gameStarted: room.gameStarted
+                });
 
                 console.log(`${data.playerName} joined room: ${data.roomId}`);
             } else {
-                socket.emit('error', result.message);
+                socket.emit('roomError', { message: result.message });
             }
         } catch (error) {
             console.error('Error joining room:', error);
-            socket.emit('error', 'เกิดข้อผิดพลาดในการเข้าร่วมห้อง');
+            socket.emit('roomError', { message: 'เกิดข้อผิดพลาดในการเข้าร่วมห้อง' });
         }
     });
 
-    socket.on('player-ready', (data) => {
+    socket.on('playerReady', (data) => {
         try {
-            const roomId = playerRooms.get(socket.id);
-            const room = rooms.get(roomId);
+            const room = rooms.get(data.roomId);
             if (!room) return;
 
             if (room.setPlayerReady(socket.id)) {
-                // ส่งข้อมูลสถานะ ready ของทุกคน
-                const readyData = {
-                    player1: room.players[0] || null,
-                    player2: room.players[1] || null
-                };
-                
-                io.to(roomId).emit('player-ready', readyData);
+                io.to(data.roomId).emit('roomUpdate', {
+                    players: room.players,
+                    gameStarted: room.gameStarted
+                });
 
                 if (room.canStartGame()) {
                     room.startGame();
                     
                     room.players.forEach(player => {
-                        io.to(player.socketId).emit('game-start', {
+                        io.to(player.socketId).emit('gameStart', {
                             playerId: player.id,
-                            roomId: roomId,
-                            players: room.players
+                            roomId: data.roomId
                         });
                     });
 
-                    console.log(`Game started in room: ${roomId}`);
+                    console.log(`Game started in room: ${data.roomId}`);
                 }
             }
         } catch (error) {
@@ -307,103 +305,69 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('game-input', (data) => {
+    socket.on('gameUpdate', (data) => {
         try {
-            const roomId = playerRooms.get(socket.id);
-            const room = rooms.get(roomId);
+            const room = rooms.get(data.roomId);
             if (!room || !room.gameStarted) return;
 
-            // ส่งข้อมูลการเคลื่อนไหวไปยังผู้เล่นอื่น
-            socket.to(roomId).emit('opponent-move', {
-                action: data.action,
-                playerId: socket.id
-            });
-        } catch (error) {
-            console.error('Error handling game input:', error);
-        }
-    });
-
-    socket.on('game-update', (data) => {
-        try {
-            const roomId = playerRooms.get(socket.id);
-            const room = rooms.get(roomId);
-            if (!room || !room.gameStarted) return;
-
-            const player = room.players.find(p => p.socketId === socket.id);
-            if (!player) return;
-
-            room.updatePlayerBoard(player.id, {
+            room.updatePlayerBoard(data.playerId, {
                 board: data.board,
                 score: data.score,
                 lines: data.lines,
                 level: data.level
             });
 
-            // ส่งข้อมูลไปยังผู้เล่นทั้งหมดในห้อง
-            io.to(roomId).emit('game-state', {
-                boards: {
-                    [player.id]: data
-                },
-                players: {
-                    [player.id]: {
-                        id: player.id,
-                        name: player.name,
-                        score: data.score,
-                        lines: data.lines,
-                        level: data.level
-                    }
-                }
-            });
+            const opponent = room.players.find(p => p.id !== data.playerId);
+            if (opponent) {
+                io.to(opponent.socketId).emit('gameUpdate', {
+                    playerId: data.playerId,
+                    board: data.board,
+                    score: data.score,
+                    lines: data.lines,
+                    level: data.level
+                });
+            }
         } catch (error) {
             console.error('Error updating game:', error);
         }
     });
 
-    socket.on('game-over', (data) => {
+    socket.on('gameOver', (data) => {
         try {
-            const roomId = playerRooms.get(socket.id);
-            const room = rooms.get(roomId);
+            const room = rooms.get(data.roomId);
             if (!room) return;
 
-            const player = room.players.find(p => p.socketId === socket.id);
-            if (!player) return;
-
-            room.setPlayerGameOver(player.id, data.score);
+            room.setPlayerGameOver(data.playerId, data.score);
             
             const gameResult = room.getWinner();
             if (gameResult) {
-                io.to(roomId).emit('game-over', {
-                    winner: gameResult.winner,
-                    finalScores: gameResult.scores,
-                    players: room.players.reduce((acc, p) => {
-                        acc[p.id] = { id: p.id, name: p.name, score: p.score };
-                        return acc;
-                    }, {})
-                });
-                console.log(`Game ended in room: ${roomId}, Winner: Player ${gameResult.winner}`);
+                io.to(data.roomId).emit('gameOver', gameResult);
+                console.log(`Game ended in room: ${data.roomId}, Winner: Player ${gameResult.winner}`);
             }
         } catch (error) {
             console.error('Error handling game over:', error);
         }
     });
 
-    socket.on('play-again', () => {
+    socket.on('playAgain', (data) => {
         try {
-            const roomId = playerRooms.get(socket.id);
-            const room = rooms.get(roomId);
+            const room = rooms.get(data.roomId);
             if (!room) return;
 
             room.resetForNewGame();
             
-            io.to(roomId).emit('players-updated', room.players);
+            io.to(data.roomId).emit('roomUpdate', {
+                players: room.players,
+                gameStarted: room.gameStarted
+            });
 
-            console.log(`Room reset for new game: ${roomId}`);
+            console.log(`Room reset for new game: ${data.roomId}`);
         } catch (error) {
             console.error('Error resetting game:', error);
         }
     });
 
-    socket.on('leave-room', () => {
+    socket.on('leaveRoom', (data) => {
         try {
             handlePlayerDisconnect(socket.id);
         } catch (error) {
@@ -427,7 +391,12 @@ io.on('connection', (socket) => {
                     rooms.delete(roomId);
                     console.log(`Deleted empty room: ${roomId}`);
                 } else {
-                    io.to(roomId).emit('players-updated', room.players);
+                    io.to(roomId).emit('playerLeft');
+                    
+                    io.to(roomId).emit('roomUpdate', {
+                        players: room.players,
+                        gameStarted: room.gameStarted
+                    });
                 }
             }
             playerRooms.delete(socketId);
@@ -470,9 +439,9 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`TwoBob Tactics server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Game server ready for multiplayer Tetris!`);
+    console.log(`🚀 TwoBob Tactics server running on port ${PORT}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🎮 Game server ready for multiplayer Tetris!`);
 });
 
 // Graceful shutdown
