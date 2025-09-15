@@ -1579,5 +1579,24 @@ center;
             color: #ffd700;
             margin-bottom: 20px;
         }
+/* เพิ่มโค้ด CSS นี้ลงในไฟล์ styles.css ของคุณ */
+
+.mobile-controls {
+    display: none !important;
+}
+
+/* หรือถ้าต้องการซ่อนเฉพาะบนหน้าจอขนาดใหญ่ */
+@media (min-width: 768px) {
+    .mobile-controls 
+        display: none !important;
+    }
+}
+
+/* หรือถ้าต้องการซ่อนทั้งหมด */
+.control-grid,
+.control-instructions {
+    display: none !important;
+}
     </style>
+
 /* End of CSS */
