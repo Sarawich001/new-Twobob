@@ -674,7 +674,7 @@ clearLines() {
     if (linesCleared > 0) {
         this.gameState.lines += linesCleared;
         this.gameState.score += linesCleared * 100 * this.gameState.level;
-        this.gameState.level = Math.floor(this.gameState.lines / 1) + 1;
+        this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
         this.moveInterval = Math.max(50, 500 - (this.gameState.level - 1) * 50);
         this.updateStats();
         
