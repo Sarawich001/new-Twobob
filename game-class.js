@@ -31,7 +31,7 @@ class TetrisMultiplayer {
         this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
         this.BOARD_HEIGHT = 20; // ความสูงกระดาน 20 ช่อง 
         this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
-        this.SMALL_BLOCK_SIZE = 140; // ขนาดบล็อกของฝ่ายตรงข้าม 
+        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
         
         // Piece templates
         this.pieces = {
@@ -46,13 +46,13 @@ class TetrisMultiplayer {
         
         this.pieceTypes = Object.keys(this.pieces);
         
-        // Enhanced Touch/swipe handling
-        this.touchStartX = 0;
-        this.touchStartY = 0;
-        this.touchStartTime = 0;
-        this.lastMoveTime = 0;
-        this.moveInterval = 500; // 500ms drop interval
-        this.lastTouchAction = 0; // Prevent rapid actions
+        // จับ Touch
+        this.touchStartX = 0;  // ตำแหน่ง X 
+        this.touchStartY = 0;  // ตำแหน่ง Y
+        this.touchStartTime = 0;   // เวลาที่เริ่มแตะ
+        this.lastMoveTime = 0;   // เวลาที่เลื่อนครั้งล่าสุด
+        this.moveInterval = 500; // (0.5 วินาที)
+        this.lastTouchAction = 0; // กดล่าสุด
         this.touchActionDelay = 100; // 100ms between touch actions
         
         // Touch sensitivity settings
@@ -64,7 +64,7 @@ class TetrisMultiplayer {
             swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
         };
         
-        // Viewport properties
+        // ข้อมูลหน้าจอ
         this.viewport = {
             width: window.innerWidth,
             height: window.innerHeight,
