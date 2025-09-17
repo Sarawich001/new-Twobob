@@ -3,14 +3,15 @@ class TetrisMultiplayer {
     constructor() {
         this.socket = null;
         this.gameState = {
-            board: [],
-            currentPiece: null,
-            nextPiece: null,
+            board: [],        
+            currentPiece: null, // ชิ้นส่วนที่กำลังตก
+            nextPiece: null,  // ชิ้นส่วนถัดไป
             score: 0,
             lines: 0,
             level: 1,
-            gameOver: false
+            gameOver: false  // จบเกมหรือยัง
         };
+        //คู่ต่อสู้
         this.opponentState = {
             board: [],
             score: 0,
@@ -26,10 +27,10 @@ class TetrisMultiplayer {
         this.gameStarted = false;
         
         // Tetris constants
-        this.BOARD_WIDTH = 10;
-        this.BOARD_HEIGHT = 20;
-        this.BLOCK_SIZE = 28;
-        this.SMALL_BLOCK_SIZE = 14; // For opponent board
+        this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
+        this.BOARD_HEIGHT = 50; // ความสูงกระดาน 20 ช่อง 
+        this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
+        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
         
         // Piece templates
         this.pieces = {
