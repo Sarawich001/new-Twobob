@@ -19,6 +19,7 @@ class TetrisMultiplayer {
             level: 1,
             gameOver: false
         };
+        //ข้อมูลเพลเยอร์
         this.playerId = null;
         this.roomId = null;
         this.playerName = '';
@@ -26,11 +27,11 @@ class TetrisMultiplayer {
         this.isReady = false;
         this.gameStarted = false;
         
-        // Tetris constants
+        // Tetris ขนาด
         this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
-        this.BOARD_HEIGHT = 50; // ความสูงกระดาน 20 ช่อง 
+        this.BOARD_HEIGHT = 20; // ความสูงกระดาน 20 ช่อง 
         this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
-        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
+        this.SMALL_BLOCK_SIZE = 140; // ขนาดบล็อกของฝ่ายตรงข้าม 
         
         // Piece templates
         this.pieces = {
