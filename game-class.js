@@ -51,9 +51,9 @@ class TetrisMultiplayer {
         this.touchStartY = 0;  // ตำแหน่ง Y
         this.touchStartTime = 0;   // เวลาที่เริ่มแตะ
         this.lastMoveTime = 0;   // เวลาที่เลื่อนครั้งล่าสุด
-        this.moveInterval = 500; // (0.5 วินาที)
+        this.moveInterval = 500; // (0.5 วินาที) บล็อคตก
         this.lastTouchAction = 0; // กดล่าสุด
-        this.touchActionDelay = 100; // 100ms between touch actions
+        this.touchActionDelay = 100; // 100ms delay
         
         // Touch sensitivity settings
         this.touchSettings = {
@@ -64,7 +64,7 @@ class TetrisMultiplayer {
             swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
         };
         
-        // ข้อมูลหน้าจอ
+        // ข้อมูลหน้าจอปรับขนาด
         this.viewport = {
             width: window.innerWidth,
             height: window.innerHeight,
