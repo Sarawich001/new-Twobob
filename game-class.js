@@ -3,15 +3,14 @@ class TetrisMultiplayer {
     constructor() {
         this.socket = null;
         this.gameState = {
-            board: [],        
-            currentPiece: null, // ชิ้นส่วนที่กำลังตก
-            nextPiece: null,  // ชิ้นส่วนถัดไป
+            board: [],
+            currentPiece: null,
+            nextPiece: null,
             score: 0,
             lines: 0,
             level: 1,
-            gameOver: false  // จบเกมหรือยัง
+            gameOver: false
         };
-        //คู่ต่อสู้
         this.opponentState = {
             board: [],
             score: 0,
@@ -19,7 +18,6 @@ class TetrisMultiplayer {
             level: 1,
             gameOver: false
         };
-        //ข้อมูลเพลเยอร์
         this.playerId = null;
         this.roomId = null;
         this.playerName = '';
@@ -27,11 +25,11 @@ class TetrisMultiplayer {
         this.isReady = false;
         this.gameStarted = false;
         
-        // Tetris ขนาด
-        this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
-        this.BOARD_HEIGHT = 20; // ความสูงกระดาน 20 ช่อง 
-        this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
-        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
+        // Tetris constants
+        this.BOARD_WIDTH = 10;
+        this.BOARD_HEIGHT = 20;
+        this.BLOCK_SIZE = 28;
+        this.SMALL_BLOCK_SIZE = 14; // For opponent board
         
         // Piece templates
         this.pieces = {
@@ -46,14 +44,14 @@ class TetrisMultiplayer {
         
         this.pieceTypes = Object.keys(this.pieces);
         
-        // จับ Touch
-        this.touchStartX = 0;  // ตำแหน่ง X 
-        this.touchStartY = 0;  // ตำแหน่ง Y
-        this.touchStartTime = 0;   // เวลาที่เริ่มแตะ
-        this.lastMoveTime = 0;   // เวลาที่เลื่อนครั้งล่าสุด
-        this.moveInterval = 500; // (0.5 วินาที) บล็อคตก
-        this.lastTouchAction = 0; // กดล่าสุด
-        this.touchActionDelay = 100; // 100ms delay
+        // Enhanced Touch/swipe handling
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.touchStartTime = 0;
+        this.lastMoveTime = 0;
+        this.moveInterval = 500; // 500ms drop interval
+        this.lastTouchAction = 0; // Prevent rapid actions
+        this.touchActionDelay = 100; // 100ms between touch actions
         
         // Touch sensitivity settings
         this.touchSettings = {
@@ -64,7 +62,7 @@ class TetrisMultiplayer {
             swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
         };
         
-        // ข้อมูลหน้าจอปรับขนาด
+        // Viewport properties
         this.viewport = {
             width: window.innerWidth,
             height: window.innerHeight,
@@ -502,6 +500,23 @@ class TetrisMultiplayer {
         };
     }
 
+    startGame(data) {
+        this.gameStarted = true;
+        this.initializeBoard();
+        this.gameState.currentPiece = this.generatePiece();
+        this.gameState.nextPiece = this.generatePiece();
+        this.gameState.score = 0;
+        this.gameState.lines = 0;
+        this.gameState.level = 1;
+        this.gameState.gameOver = false;
+        
+        this.showScreen('game-screen');
+        this.setupGameLayout();
+        this.updateBoard();
+        this.updateStats();
+        this.updateNextPiece();
+        this.gameLoop();
+    }
 
     setupGameLayout() {
         // Update player names in the UI
