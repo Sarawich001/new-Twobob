@@ -434,31 +434,6 @@ function togglePause() {
 // =========================================
 // UI Controls (with error handling)
 // =========================================
-// ฟังก์ชันสำหรับตั้งค่าเมนูยืดหด (Accordion)
-function initControlsAccordion() {
-    try {
-        const toggleBtn = document.getElementById('controls-toggle');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                const content = document.getElementById('controls-content');
-                const icon = document.getElementById('toggle-icon');
-                
-                if (content && icon) {
-                    if (content.classList.contains('expanded')) {
-                        content.classList.remove('expanded');
-                        icon.classList.remove('rotated');
-                    } else {
-                        content.classList.add('expanded');
-                        icon.classList.add('rotated');
-                    }
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error initializing controls accordion:', error);
-    }
-}
-
 // =========================================
 // Event Listeners Setup (with error handling)
 // =========================================
@@ -670,6 +645,7 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
 
 
 
