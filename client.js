@@ -208,33 +208,7 @@ function updatePlayersList(players) {
 // =========================================
 // Game Functions (with error handling)
 // =========================================
-// ฟังก์ชันสำหรับตั้งค่าเริ่มต้นเมื่อเกมเริ่ม
-function initGame(gameData) {
-    try {
-        // สร้างกระดานเกมสำหรับผู้เล่นทั้งสองคน
-        initGameBoard('my-board', 20, 10);
-        initGameBoard('opponent-board', 20, 10);
-        
-        // Set player names
-        const myNameEl = document.getElementById('my-player-name');
-        const oppNameEl = document.getElementById('opponent-player-name');
-        
-        if (myNameEl && gameState.currentPlayer) {
-            myNameEl.textContent = gameState.currentPlayer.name || 'YOU';
-        }
-        if (oppNameEl) {
-            oppNameEl.textContent = 'กำลังรอ...';
-        }
-        
-        // Reset scores
-        resetGameStats();
-        
-        // ตั้งค่าการควบคุมเกม
-        initGameControls();
-    } catch (error) {
-        console.error('Error initializing game:', error);
-    }
-}
+
 // ฟังก์ชันสำหรับวาดกระดานเกมเปล่า
 function initGameBoard(boardId, rows, cols) {
     try {
@@ -909,6 +883,7 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
 
 
 
