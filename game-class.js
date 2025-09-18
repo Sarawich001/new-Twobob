@@ -1,5 +1,117 @@
 // TwoBob Tactics - Tetris Multiplayer Game Class (Enhanced Mobile Controls)
-class TetrisMultiplayer {
+class TetrisMultiplayer {  
+    constructor() {
+        this.socket = null;
+        this.gameState = {
+            board: [],        
+            currentPiece: null, // ชิ้นส่วนที่กำลังตก
+            nextPiece: null,  // ชิ้นส่วนถัดไป
+            score: 0,
+            lines: 0,
+            level: 1,
+            gameOver: false  // จบเกมหรือยัง
+        };
+        //คู่ต่อสู้
+        this.opponentState = {
+            board: [],
+            score: 0,
+            lines: 0,
+            level: 1,
+            gameOver: false
+        };
+        //ข้อมูลเพลเยอร์
+        this.playerId = null;
+        this.roomId = null;
+        this.playerName = '';
+        this.opponentName = '';
+        this.isReady = false;
+        this.gameStarted = false;
+        
+        // Tetris ขนาด
+        this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
+        this.BOARD_HEIGHT = 20; // ความสูงกระดาน 20 ช่อง 
+        this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
+        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
+        
+        // Piece templates
+        this.pieces = {
+            I: { shape: [[1,1,1,1]], color: '#00f0f0' },
+            O: { shape: [[1,1],[1,1]], color: '#f0f000' },
+            T: { shape: [[0,1,0],[1,1,1]], color: '#a000f0' },
+            S: { shape: [[0,1,1],[1,1,0]], color: '#00f000' },
+            Z: { shape: [[1,1,0],[0,1,1]], color: '#f00000' },
+            J: { shape: [[1,0,0],[1,1,1]], color: '#0000f0' },
+            L: { shape: [[0,0,1],[1,1,1]], color: '#f0a000' }
+        };
+        
+        this.pieceTypes = Object.keys(this.pieces);
+        
+        // จับ Touch
+        this.touchStartX = 0;  // ตำแหน่ง X 
+        this.touchStartY = 0;  // ตำแหน่ง Y
+        this.touchStartTime = 0;   // เวลาที่เริ่มแตะ
+        this.lastMoveTime = 0;   // เวลาที่เลื่อนครั้งล่าสุด
+        this.moveInterval = 500; // (0.5 วินาที) บล็อคตก
+        this.lastTouchAction = 0; // กดล่าสุด
+        this.touchActionDelay = 100; // 100ms delay
+        
+        // Touch sensitivity settings
+        this.touchSettings = {
+            minSwipeDistance: 40,      // Minimum distance for swipe
+            maxTapDuration: 200,       // Maximum duration for tap (ms)
+            maxTapDistance: 20,        // Maximum distance for tap
+            rapidDropThreshold: 100,   // Threshold for rapid drop detection
+            swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
+        };
+        
+        // ข้อมูลหน้าจอปรับขนาด
+        this.viewport = {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            isMobile: window.innerWidth <= 768,
+            isTablet: window.innerWidth <= 1024 && window.innerWidth > 768
+        };
+        
+        this.init();
+    }
+
+    init() {
+        this.calculateBlockSizes();
+        this.initializeBoard();
+        this.setupEventListeners();
+        this.setupResizeHandler();
+        this.connectToServer();
+        this.setupMobileControls();
+    }
+
+    calculateBlockSizes() {
+        const { width, height, isMobile, isTablet } = this.viewport;
+        
+        if (isMobile) {
+            // Mobile: ใช้ 80% ของความกว้างหน้าจอ
+            const availableWidth = width * 0.8;
+            this.BLOCK_SIZE = Math.floor(availableWidth / this.BOARD_WIDTH);
+            this.BLOCK_SIZE = Math.max(20, Math.min(35, this.BLOCK_SIZE));
+            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.4);
+            
+        } else if (isTablet) {
+            // Tablet: ใช้ 60% ของความกว้าง
+            const availableWidth = width * 0.6;
+            this.BLOCK_SIZE = Math.floor(availableWidth / (this.BOARD_WIDTH * 2));
+            this.BLOCK_SIZE = Math.max(25, Math.min(40, this.BLOCK_SIZE));
+            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.7);
+            
+        } else {
+            // Desktop: ใช้ขนาดคงที่หรือคำนวณจากความสูง
+            const availableHeight = height * 0.8;
+            this.BLOCK_SIZE = Math.floor(availableHeight / this.BOARD_HEIGHT);
+            this.BLOCK_SIZE = Math.max(25, Math.min(35, this.BLOCK_SIZE));
+            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.5);
+        }
+        
+        console.log(`Block sizes: Main=${this.BLOCK_SIZE}, Small=${this.SMALL_BLOCK_SIZE}`);
+    }
+
     updateReadyStatus(players) {
         players.forEach((player, index) => {
             const indicator = document.getElementById(`ready-indicator-${index + 1}`);
@@ -183,118 +295,6 @@ clearLines() {
         this.updateNextPiece();
         this.gameLoop();
     }    
-    
-    constructor() {
-        this.socket = null;
-        this.gameState = {
-            board: [],        
-            currentPiece: null, // ชิ้นส่วนที่กำลังตก
-            nextPiece: null,  // ชิ้นส่วนถัดไป
-            score: 0,
-            lines: 0,
-            level: 1,
-            gameOver: false  // จบเกมหรือยัง
-        };
-        //คู่ต่อสู้
-        this.opponentState = {
-            board: [],
-            score: 0,
-            lines: 0,
-            level: 1,
-            gameOver: false
-        };
-        //ข้อมูลเพลเยอร์
-        this.playerId = null;
-        this.roomId = null;
-        this.playerName = '';
-        this.opponentName = '';
-        this.isReady = false;
-        this.gameStarted = false;
-        
-        // Tetris ขนาด
-        this.BOARD_WIDTH = 10;  //ความกว้างกระดาน 10 ช่อง
-        this.BOARD_HEIGHT = 20; // ความสูงกระดาน 20 ช่อง 
-        this.BLOCK_SIZE = 28;  // ขนาดบล็อกหลัก 28 
-        this.SMALL_BLOCK_SIZE = 14; // ขนาดบล็อกของฝ่ายตรงข้าม 
-        
-        // Piece templates
-        this.pieces = {
-            I: { shape: [[1,1,1,1]], color: '#00f0f0' },
-            O: { shape: [[1,1],[1,1]], color: '#f0f000' },
-            T: { shape: [[0,1,0],[1,1,1]], color: '#a000f0' },
-            S: { shape: [[0,1,1],[1,1,0]], color: '#00f000' },
-            Z: { shape: [[1,1,0],[0,1,1]], color: '#f00000' },
-            J: { shape: [[1,0,0],[1,1,1]], color: '#0000f0' },
-            L: { shape: [[0,0,1],[1,1,1]], color: '#f0a000' }
-        };
-        
-        this.pieceTypes = Object.keys(this.pieces);
-        
-        // จับ Touch
-        this.touchStartX = 0;  // ตำแหน่ง X 
-        this.touchStartY = 0;  // ตำแหน่ง Y
-        this.touchStartTime = 0;   // เวลาที่เริ่มแตะ
-        this.lastMoveTime = 0;   // เวลาที่เลื่อนครั้งล่าสุด
-        this.moveInterval = 500; // (0.5 วินาที) บล็อคตก
-        this.lastTouchAction = 0; // กดล่าสุด
-        this.touchActionDelay = 100; // 100ms delay
-        
-        // Touch sensitivity settings
-        this.touchSettings = {
-            minSwipeDistance: 40,      // Minimum distance for swipe
-            maxTapDuration: 200,       // Maximum duration for tap (ms)
-            maxTapDistance: 20,        // Maximum distance for tap
-            rapidDropThreshold: 100,   // Threshold for rapid drop detection
-            swipeVelocityThreshold: 0.5 // Minimum velocity for swipe
-        };
-        
-        // ข้อมูลหน้าจอปรับขนาด
-        this.viewport = {
-            width: window.innerWidth,
-            height: window.innerHeight,
-            isMobile: window.innerWidth <= 768,
-            isTablet: window.innerWidth <= 1024 && window.innerWidth > 768
-        };
-        
-        this.init();
-    }
-
-    init() {
-        this.calculateBlockSizes();
-        this.initializeBoard();
-        this.setupEventListeners();
-        this.setupResizeHandler();
-        this.connectToServer();
-        this.setupMobileControls();
-    }
-
-    calculateBlockSizes() {
-        const { width, height, isMobile, isTablet } = this.viewport;
-        
-        if (isMobile) {
-            // Mobile: ใช้ 80% ของความกว้างหน้าจอ
-            const availableWidth = width * 0.8;
-            this.BLOCK_SIZE = Math.floor(availableWidth / this.BOARD_WIDTH);
-            this.BLOCK_SIZE = Math.max(20, Math.min(35, this.BLOCK_SIZE));
-            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.4);
-            
-        } else if (isTablet) {
-            // Tablet: ใช้ 60% ของความกว้าง
-            const availableWidth = width * 0.6;
-            this.BLOCK_SIZE = Math.floor(availableWidth / (this.BOARD_WIDTH * 2));
-            this.BLOCK_SIZE = Math.max(25, Math.min(40, this.BLOCK_SIZE));
-            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.7);
-            
-        } else {
-            // Desktop: ใช้ขนาดคงที่หรือคำนวณจากความสูง
-            const availableHeight = height * 0.8;
-            this.BLOCK_SIZE = Math.floor(availableHeight / this.BOARD_HEIGHT);
-            this.BLOCK_SIZE = Math.max(25, Math.min(35, this.BLOCK_SIZE));
-            this.SMALL_BLOCK_SIZE = Math.floor(this.BLOCK_SIZE * 0.5);
-        }
-        
-        console.log(`Block sizes: Main=${this.BLOCK_SIZE}, Small=${this.SMALL_BLOCK_SIZE}`);
-    }
 
     setupResizeHandler() {
         let resizeTimeout;
