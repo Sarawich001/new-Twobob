@@ -1,5 +1,5 @@
 // TwoBob Tactics - Tetris Multiplayer Game Class (Enhanced Mobile Controls)
-class TetrisMultiplayer {  
+class TetrisMultiplayer {
     constructor() {
         this.socket = null;
         this.gameState = {
@@ -491,6 +491,18 @@ class TetrisMultiplayer {
         this.opponentState.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
     }
 
+    generatePiece() {
+        const type = this.pieceTypes[Math.floor(Math.random() * this.pieceTypes.length)];
+        return {
+            type: type,
+            shape: this.pieces[type].shape,
+            color: this.pieces[type].color,
+            x: Math.floor(this.BOARD_WIDTH / 2) - 1,
+            y: 0
+        };
+    }
+
+
     setupGameLayout() {
         // Update player names in the UI
         const myPlayerName = document.getElementById('my-player-name');
@@ -501,6 +513,51 @@ class TetrisMultiplayer {
         }
         if (opponentPlayerName) {
             opponentPlayerName.textContent = this.opponentName || 'ฝ่ายตรงข้าม';
+        }
+    }
+
+    gameLoop() {
+        if (!this.gameStarted || this.gameState.gameOver) return;
+        
+        const now = Date.now();
+        if (now - this.lastMoveTime > this.moveInterval) {
+            if (!this.movePiece(0, 1)) {
+                this.placePiece();
+                this.clearLines();
+                this.spawnNewPiece();
+                this.sendGameUpdate();
+            }
+            this.lastMoveTime = now;
+        }
+        
+        requestAnimationFrame(() => this.gameLoop());
+    }
+
+    movePiece(dx, dy) {
+        if (!this.gameState.currentPiece) return false;
+        
+        const newX = this.gameState.currentPiece.x + dx;
+        const newY = this.gameState.currentPiece.y + dy;
+        
+        if (this.isValidPosition(this.gameState.currentPiece.shape, newX, newY)) {
+            this.gameState.currentPiece.x = newX;
+            this.gameState.currentPiece.y = newY;
+            this.updateBoard();
+            return true;
+        }
+        return false;
+    }
+
+    rotatePiece() {
+        if (!this.gameState.currentPiece) return;
+        
+        const rotated = this.rotateMatrix(this.gameState.currentPiece.shape);
+        if (this.isValidPosition(rotated, this.gameState.currentPiece.x, this.gameState.currentPiece.y)) {
+            this.gameState.currentPiece.shape = rotated;
+            this.updateBoard();
+            
+            // Visual feedback for rotation
+            this.showRotationFeedback();
         }
     }
 
@@ -515,6 +572,24 @@ class TetrisMultiplayer {
         }
     }
 
+    hardDrop() {
+        if (!this.gameState.currentPiece) return;
+        
+        let dropDistance = 0;
+        while (this.movePiece(0, 1)) {
+            dropDistance++;
+        }
+        
+        // Bonus points for hard drop
+        if (dropDistance > 0) {
+            this.gameState.score += dropDistance * 2;
+            this.updateStats();
+        }
+        
+        // Visual feedback for hard drop
+        this.showHardDropFeedback();
+    }
+
     showHardDropFeedback() {
         // Brief visual feedback when hard dropping
         const boardEl = document.getElementById('my-board');
@@ -524,6 +599,19 @@ class TetrisMultiplayer {
                 boardEl.style.background = 'rgba(0,0,0,0.8)';
             }, 150);
         }
+    }
+
+    rotateMatrix(matrix) {
+        const rows = matrix.length;
+        const cols = matrix[0].length;
+        const rotated = Array(cols).fill().map(() => Array(rows).fill(0));
+        
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                rotated[j][rows - 1 - i] = matrix[i][j];
+            }
+        }
+        return rotated;
     }
 
     isValidPosition(shape, x, y) {
@@ -544,6 +632,45 @@ class TetrisMultiplayer {
         return true;
     }
 
+    placePiece() {
+        if (!this.gameState.currentPiece) return;
+        
+        const { shape, x, y, color } = this.gameState.currentPiece;
+        for (let i = 0; i < shape.length; i++) {
+            for (let j = 0; j < shape[i].length; j++) {
+                if (shape[i][j] && y + i >= 0) {
+                    this.gameState.board[y + i][x + j] = color;
+                }
+            }
+        }
+    }
+
+clearLines() {
+    let linesCleared = 0;
+    for (let i = this.BOARD_HEIGHT - 1; i >= 0; i--) {
+        if (this.gameState.board[i].every(cell => cell !== 0)) {
+            this.gameState.board.splice(i, 1);
+            this.gameState.board.unshift(Array(this.BOARD_WIDTH).fill(0));
+            linesCleared++;
+            i++; // Check same line again
+        }
+    }
+    
+    if (linesCleared > 0) {
+        this.gameState.lines += linesCleared;
+        this.gameState.score += linesCleared * 100 * this.gameState.level;
+        this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
+        this.moveInterval = Math.max(50, 500 - (this.gameState.level - 1) * 50);
+        this.updateStats();
+        
+        // Visual feedback for line clear
+        this.showLineClearFeedback(linesCleared);
+        
+        // อัพเดท next piece หลังจาก clear lines
+        this.updateNextPiece();
+    }
+}
+
     showLineClearFeedback(linesCleared) {
         // Visual feedback when lines are cleared
         const boardEl = document.getElementById('my-board');
@@ -557,6 +684,23 @@ class TetrisMultiplayer {
         }
     }
 
+    spawnNewPiece() {
+        this.gameState.currentPiece = this.gameState.nextPiece;
+        this.gameState.nextPiece = this.generatePiece();
+        
+        this.updateNextPiece();
+        
+        if (!this.isValidPosition(this.gameState.currentPiece.shape, 
+                                  this.gameState.currentPiece.x, 
+                                  this.gameState.currentPiece.y)) {
+            this.gameState.gameOver = true;
+            this.socket.emit('gameOver', { 
+                roomId: this.roomId, 
+                playerId: this.playerId,
+                score: this.gameState.score 
+            });
+        }
+    }
     // เพิ่มการ debug - ฟังก์ชันช่วยตรวจสอบ DOM
 checkNextPieceElement() {
     const element = document.getElementById('next-piece-display');
@@ -861,6 +1005,32 @@ updateOpponentStats() {
             playersList.appendChild(li);
         });
     }
+
+    updateReadyStatus(players) {
+        players.forEach((player, index) => {
+            const indicator = document.getElementById(`ready-indicator-${index + 1}`);
+            if (indicator) {
+                indicator.textContent = `${player.name}: ${player.ready ? '✅ พร้อม' : '⏳ รอ...'}`;
+            }
+        });
+    }
+    endGame(data) {
+        this.gameStarted = false;
+        this.gameState.gameOver = true;
+        
+        const winnerMsg = document.getElementById('winner-message');
+        if (winnerMsg) {
+            winnerMsg.textContent = data.winner === this.playerId ? '🎉 คุณชนะ!' : '😢 คุณแพ้';
+        }
+        
+        const finalScoreP1 = document.getElementById('final-score-p1');
+        const finalScoreP2 = document.getElementById('final-score-p2');
+        if (finalScoreP1) finalScoreP1.textContent = data.scores.player1 || 0;
+        if (finalScoreP2) finalScoreP2.textContent = data.scores.player2 || 0;
+        
+        this.showScreen('game-over-screen');
+    }
+}
 
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
