@@ -274,108 +274,7 @@ function drawCurrentPiece(boardId, pieceData, cellSize) {
         console.error('Error drawing current piece:', error);
     }
 }
-// ฟังก์ชันสำหรับอัปเดตการแสดงผลของชิ้นส่วนต่อไป
-function updateNextPiece(nextPieceData) {
-    try {
-        const nextPieceContainer = document.getElementById('next-piece-preview');
-        if (!nextPieceContainer) return;
-        
-        nextPieceContainer.innerHTML = '';
-        
-        if (nextPieceData && nextPieceData.shape && Array.isArray(nextPieceData.shape)) {
-            const blockSize = 20;
-            
-            nextPieceData.shape.forEach((row, r) => {
-                if (Array.isArray(row)) {
-                    row.forEach((cell, c) => {
-                        if (cell) {
-                            const block = document.createElement('div');
-                            block.className = `tetris-block block-${nextPieceData.type}`;
-                            block.style.width = blockSize + 'px';
-                            block.style.height = blockSize + 'px';
-                            block.style.left = (c * blockSize) + 'px';
-                            block.style.top = (r * blockSize) + 'px';
-                            block.style.position = 'absolute';
-                            nextPieceContainer.appendChild(block);
-                        }
-                    });
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error updating next piece:', error);
-    }
-}
-// ฟังก์ชันสำหรับแสดงหน้าจอเกมโอเวอร์
-// ฟังก์ชันสำหรับแสดงหน้าจอเกมโอเวอร์ (แก้ไขแล้ว)
-function showGameOver(data) {
-    try {
-        const winnerMessage = document.getElementById('winner-message');
-        const finalScoreP1 = document.getElementById('final-score-p1');
-        const finalScoreP2 = document.getElementById('final-score-p2');
-        const finalNameP1 = document.getElementById('final-name-p1');
-        const finalNameP2 = document.getElementById('final-name-p2');
-        
-        // ตรวจสอบว่ามี data และ gameState.currentPlayer
-        if (!data || !gameState.currentPlayer) {
-            console.error('Missing game over data or current player');
-            return;
-        }
-        
-        if (winnerMessage) {
-            if (data.winner === gameState.currentPlayer.id) {
-                winnerMessage.textContent = '🎉 คุณชนะ!';
-                winnerMessage.style.color = '#4CAF50';
-            } else {
-                winnerMessage.textContent = '😢 คุณแพ้!';
-                winnerMessage.style.color = '#f44336';
-            }
-        }
-        
-        // ดึงชื่อจากหน้าจอเกมที่กำลังแสดงอยู่
-        const myPlayerNameEl = document.getElementById('my-player-name');
-        const opponentPlayerNameEl = document.getElementById('opponent-player-name');
-        
-        const myDisplayName = myPlayerNameEl ? myPlayerNameEl.textContent : 'คุณ';
-        const opponentDisplayName = opponentPlayerNameEl ? opponentPlayerNameEl.textContent : 'ฝ่ายตรงข้าม';
-        
-        // แสดงชื่อที่ดึงมาจากหน้าจอเกม
-        if (finalNameP1) {
-            finalNameP1.textContent = myDisplayName;
-        }
-        if (finalNameP2) {
-            finalNameP2.textContent = opponentDisplayName;
-        }
-        
-        // แสดงคะแนนจาก data ที่ได้รับ
-        if (data.finalScores && data.players) {
-            const currentPlayerId = gameState.currentPlayer.id.toString();
-            const opponentId = Object.keys(data.players).find(id => id !== currentPlayerId);
-            
-            if (finalScoreP1) {
-                finalScoreP1.textContent = data.finalScores[currentPlayerId] || 0;
-            }
-            if (finalScoreP2) {
-                finalScoreP2.textContent = data.finalScores[opponentId] || 0;
-            }
-        } else {
-            // ใช้คะแนนจากหน้าจอเกมถ้าไม่มีข้อมูลจาก server
-            const myScoreEl = document.getElementById('my-score');
-            const opponentScoreEl = document.getElementById('opponent-score');
-            
-            if (finalScoreP1) {
-                finalScoreP1.textContent = myScoreEl ? myScoreEl.textContent : '0';
-            }
-            if (finalScoreP2) {
-                finalScoreP2.textContent = opponentScoreEl ? opponentScoreEl.textContent : '0';
-            }
-        }
-        
-        showScreen('game-over-screen');
-    } catch (error) {
-        console.error('Error showing game over:', error);
-    }
-}
+
 
 // =========================================
 // Game Controls (with error handling)
@@ -771,6 +670,7 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
 
 
 
